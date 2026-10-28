@@ -141,6 +141,7 @@ function Start-All {
   Say "  graph engine: $($env:GRAPH_ENGINE)"
   # Where Dodo sends the browser back after checkout. Override FRONTEND_URL in the environment to change it.
   if (-not $env:FRONTEND_URL) { $env:FRONTEND_URL = "http://localhost:$WebPort" }
+  if (-not $env:CORS_ORIGINS) { $env:CORS_ORIGINS = $env:FRONTEND_URL }
   Start-Bg 'crypto-service' $cs 'uv' @('run', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', "$CryptoPort")
 
   # ---- 2. FinPilot API ----
@@ -168,7 +169,19 @@ function Start-All {
   }
   # The browser calls /api/crypto/* on its own origin; Next.js forwards /api/* to this URL (next.config.ts).
   if (-not $env:NEXT_PUBLIC_API_URL) { $env:NEXT_PUBLIC_API_URL = "http://127.0.0.1:$ApiPort" }
-  Start-Bg 'frontend' $fe 'cmd' @('/c', "npm run dev -- -p $WebPort")
+  if ($env:CRYPTPILOT_WEB_MODE -eq 'prod') {
+    # Production build: needed when the site is opened through a tunnel (the dev server blocks unknown hostnames).
+    # BACKEND_URL is read at build time by next.config.ts (the /api/* forwarding).
+    Say '  building the frontend for production (log: .demo-logs\npm-build.out.log), about a minute ...'
+    $env:BACKEND_URL = $env:NEXT_PUBLIC_API_URL
+    $env:NEXT_TELEMETRY_DISABLED = '1'
+    $b = Start-Process -FilePath 'cmd' -ArgumentList '/c', 'npm run build' -WorkingDirectory $fe -WindowStyle Hidden -Wait -PassThru `
+      -RedirectStandardOutput (Join-Path $Logs 'npm-build.out.log') -RedirectStandardError (Join-Path $Logs 'npm-build.err.log')
+    if ($b.ExitCode -ne 0) { Die 'npm run build failed, see .demo-logs\npm-build.*.log' }
+    Start-Bg 'frontend' $fe 'cmd' @('/c', "npm run start -- -p $WebPort")
+  } else {
+    Start-Bg 'frontend' $fe 'cmd' @('/c', "npm run dev -- -p $WebPort")
+  }
 
   Say ''
   Say 'Waiting for crypto-service health (the NetworkX engine needs about 30 s to load) ...'
