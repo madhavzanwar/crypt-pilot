@@ -141,6 +141,7 @@ do_start() {
   say "  graph engine: $GRAPH_ENGINE"
   # Where Dodo sends the browser back after checkout. Override FRONTEND_URL in the environment to change it.
   export FRONTEND_URL="${FRONTEND_URL:-http://localhost:$WEB_PORT}"
+  export CORS_ORIGINS="${CORS_ORIGINS:-$FRONTEND_URL}"
   start_bg crypto-service "$ROOT/crypto-service" uv run uvicorn app.main:app --host 127.0.0.1 --port "$CRYPTO_PORT"
 
   # ---- 2. FinPilot API -----------------------------------------------------------------------------------------
@@ -165,7 +166,16 @@ do_start() {
   fi
   # The browser calls /api/crypto/* on its own origin; Next.js forwards /api/* to this URL (next.config.ts).
   export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-http://127.0.0.1:$API_PORT}"
-  start_bg frontend "$ROOT/frontend" npm run dev -- -p "$WEB_PORT"
+  if [ "${CRYPTPILOT_WEB_MODE:-dev}" = "prod" ]; then
+    # Production build: needed when the site is opened through a tunnel (the dev server blocks unknown hostnames).
+    # BACKEND_URL is read at build time by next.config.ts (the /api/* forwarding).
+    say "  building the frontend for production (log: .demo-logs/npm-build.log), about a minute ..."
+    ( cd "$ROOT/frontend" && BACKEND_URL="$NEXT_PUBLIC_API_URL" NEXT_TELEMETRY_DISABLED=1 npm run build ) >"$LOGS/npm-build.log" 2>&1 \
+      || die "npm run build failed, see .demo-logs/npm-build.log"
+    start_bg frontend "$ROOT/frontend" env BACKEND_URL="$NEXT_PUBLIC_API_URL" npm run start -- -p "$WEB_PORT"
+  else
+    start_bg frontend "$ROOT/frontend" npm run dev -- -p "$WEB_PORT"
+  fi
 
   # ---- wait for the crypto service, then print URLs ------------------------------------------------------------
   say ""
