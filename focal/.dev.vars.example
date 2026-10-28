@@ -1,0 +1,64 @@
+# Example Development Environment Variables
+# Copy this file to `.dev.vars` and fill in your actual values
+
+# REQUIRED: JWT Secret for token signing
+# Generate with: openssl rand -base64 32
+JWT_SECRET="your-jwt-secret-here"
+
+# REQUIRED: Encryption key for storing API keys
+# Generate with: openssl rand -base64 32
+ENCRYPTION_KEY="your-encryption-key-here"
+
+# OPTIONAL: Brevo API key for email verification
+# Get from: https://app.brevo.com/settings/keys/api
+# Comment it out to disable email verification
+BREVO_API_KEY="your-brevo-api-key-here"
+
+# OPTIONAL: Application URL for email verification links
+# Default: http://localhost:3000 (for development)
+# Production: https://your-domain.com
+APP_URL="http://localhost:3000"
+
+# Environment indicator
+NODE_ENV="development"
+
+# AI Provider Configuration
+# Options: 'gemini' | 'openai' | 'nvidia' | 'groq'
+AI_PROVIDER="gemini"
+
+# AI Provider API Keys (configure the one matching your AI_PROVIDER)
+# GEMINI_API_KEY - For Google Gemini (default)
+# Get from: https://aistudio.google.com/app/apikey
+GEMINI_API_KEY="your-gemini-api-key-here"
+
+# GEMINI_API_KEY_2 - Fallback Gemini API key for rate limit/error scenarios (optional)
+# GEMINI_API_KEY_2="your-secondary-gemini-api-key-here"
+
+# GITHUB_TOKEN - For OpenAI GPT-4o via GitHub Models
+# Get from: https://github.com/settings/tokens
+# GITHUB_TOKEN="your-github-token-here"
+
+# GITHUB_TOKEN_2 - Fallback GitHub token for rate limit/error scenarios (optional)
+# GITHUB_TOKEN_2="your-secondary-github-token-here"
+
+# NVIDIA_API_KEY - For Nvidia NIM
+# Get from: https://build.nvidia.com/
+# NVIDIA_API_KEY="your-nvidia-api-key-here"
+
+# NVIDIA_API_KEY_2 - Fallback Nvidia API key for rate limit/error scenarios (optional)
+# NVIDIA_API_KEY_2="your-secondary-nvidia-api-key-here"
+
+# GROQ_API_KEY - For Groq (OCR + LLM approach)
+# Get from: https://console.groq.com/keys
+# GROQ_API_KEY="your-groq-api-key-here"
+
+# GROQ_API_KEY_2 - Fallback Groq API key for rate limit/error scenarios (optional)
+# GROQ_API_KEY_2="your-secondary-groq-api-key-here"
+
+# Azure Computer Vision (Required for Groq provider only)
+# Get from: https://portal.azure.com
+# AZURE_VISION_ENDPOINT="https://your-resource.cognitiveservices.azure.com/"
+# AZURE_VISION_KEY="your-azure-vision-key-here"
+
+# Optional: Override default model for any provider
+# AI_MODEL="gemini-2.5-pro"  # or "gpt-4o", "llama-3.3-70b-versatile", etc.

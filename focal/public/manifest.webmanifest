@@ -1,0 +1,49 @@
+{
+    "name": "Focal: AI-Powered Expense Tracker",
+    "short_name": "Focal",
+    "description": "Modern expense tracking PWA with AI-powered receipt scanning. Track expenses, scan receipts with Google Gemini AI, and manage your finances securely.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#111827",
+    "theme_color": "#111827",
+    "orientation": "portrait-primary",
+    "categories": [
+        "finance",
+        "productivity",
+        "utilities"
+    ],
+    "icons": [
+        {
+            "src": "/focal-icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/apple-touch-icon-180x180.png",
+            "sizes": "180x180",
+            "type": "image/png",
+            "purpose": "any"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "/images/dashboard.png",
+            "sizes": "1920x1080",
+            "type": "image/png",
+            "label": "Dashboard with expense tracking and visualizations"
+        },
+        {
+            "src": "/images/home_page.png",
+            "sizes": "1920x1080",
+            "type": "image/png",
+            "label": "Home page with recent expenses overview"
+        },
+        {
+            "src": "/images/add_expense.png",
+            "sizes": "1920x1080",
+            "type": "image/png",
+            "label": "Add expense with AI receipt scanning"
+        }
+    ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "FinPilot Pay (demo)",
+  "short_name": "FinPilot Pay",
+  "description": "Demo scan-and-pay app that books payments into your FinPilot dashboard",
+  "id": "/pay",
+  "start_url": "/pay",
+  "scope": "/pay",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#1a73e8",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/maskable-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
