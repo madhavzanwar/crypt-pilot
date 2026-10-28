@@ -169,7 +169,10 @@ def tally(votes: list[dict]) -> dict:
 
 async def _chain_vote(wallets: list[str], lang: str) -> tuple[dict, int]:
     """Chain Analyst's vote: no model, no tokens. It never joins the debate (it reports graph evidence, not an opinion)."""
-    return chain_analyst.council_vote(await chain_analyst.screen_wallets(wallets, lang)), 0
+    try:
+        return chain_analyst.council_vote(await chain_analyst.screen_wallets(wallets, lang)), 0
+    except Exception:  # noqa: BLE001 - a bad reply from the crypto service must never take the existing council down
+        return chain_analyst.council_vote([chain_analyst._offline(w, 0) for w in wallets]), 0
 
 
 async def convene(user_id: str, wallets: list[str] | None = None, lang: str = "en") -> AsyncIterator[dict]:
@@ -225,6 +228,12 @@ async def convene(user_id: str, wallets: list[str] | None = None, lang: str = "e
             votes = [revised.get(v["agent"], v) for v in votes]
 
     result = {**tally(votes + ([chain_vote] if chain_vote else [])), "anchor": facts.get("anchor", 0), "tokens": tokens, "approx_input_tokens": len(facts_s) // 3, "debated": bool(outliers and use_model)}
+    if chain_vote and not chain_vote.get("abstain") and chain_vote.get("level") == "high":
+        # One flagged wallet is a hard stop however calm the seven money agents are: the median must not bury it.
+        result["score"] = max(result["score"], chain_vote["score"])
+        result["level"] = level(result["score"])
+        if chain_vote.get("do"):
+            result["actions"] = [chain_vote["do"]] + [a for a in result["actions"] if a.lower() != chain_vote["do"].lower()][:2]
     offline = bool(chain_vote) and any(r["status"] == "offline" for r in chain_vote["chain"]["wallets"])
     if wallets:
         result["chain"] = {"wallets": len(wallets), "voted": bool(chain_vote) and not chain_vote.get("abstain"), "offline": offline}

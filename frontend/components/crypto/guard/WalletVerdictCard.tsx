@@ -54,7 +54,7 @@ export default function WalletVerdictCard({
     }
   }, [state]);
 
-  const href = `/wallet-guard?address=${encodeURIComponent(address)}`;
+  const href = `/wallet-guard?address=${encodeURIComponent(address)}&run=1`;
   const link = (
     <Link
       href={href}

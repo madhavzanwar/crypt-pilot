@@ -11,7 +11,8 @@ export function looksLikeSecret(input: string): boolean {
   if (text === "") return false;
 
   // 12/15/18/21/24 space-separated lowercase words (BIP-39 style)
-  const words = text.split(/\s+/);
+  // (case-insensitive; commas, semicolons and "1." / "1)" numbering between the words do not hide it)
+  const words = text.toLowerCase().replace(/(^|[\s,;])\d{1,2}[.):]?(?=[\s,;])/g, " ").split(/[\s,;]+/).filter(Boolean);
   if (SEED_LENGTHS.has(words.length) && words.every((w) => /^[a-z]{3,8}$/.test(w))) return true;
 
   // 64 hex characters (raw private key), with or without 0x

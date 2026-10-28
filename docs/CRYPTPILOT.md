@@ -1,0 +1,79 @@
+# CryptPilot: FinPilot x Cryptiq
+
+CryptPilot is two projects in one repository. **FinPilot** is a personal-finance AI copilot (Next.js frontend, FastAPI backend, 90-day Monte Carlo cash-flow forecasts, an Evidence Council and a Risk Council of specialist agents). **Cryptiq** is a Bitcoin wallet risk checker: paste an address, get ALLOW / WARN / BLOCK / UNKNOWN, with graph evidence and a plain-language explanation in English and Hindi.
+
+This file says what the merge added, what it removed, what has actually been verified, and what is still open. It only describes code that exists on the `cryptiq-merge` branch. For how the pieces connect, see [CRYPTPILOT_ARCHITECTURE.md](CRYPTPILOT_ARCHITECTURE.md). FinPilot's own docs (root `README.md`, `ENVIRONMENT.md`, `docs/FinPilot_Feature_Guide.*`) are unchanged and still describe the baseline product.
+
+## Why merge them
+
+A person who manages money in one place also sends money to wallets they do not know. FinPilot knows the user's finances; Cryptiq knows whether a wallet is connected to addresses labelled illicit in a research graph. Putting them together means the wallet check can happen where the payment decision is made (the Copilot chat, the Evidence Room, the Risk Council, the fraud simulator), and the credits that pay for checks can be bought with a card (Dodo test mode) or a Bitcoin testnet / Monero demo invoice (Cake Wallet).
+
+Everything payment-related is **test mode or testnet only**. No real money moves. Mainnet is not configured anywhere in the frontend (Base Sepolia only) or the credit rails (Dodo `test_mode` only; the service refuses any other value).
+
+## What was added
+
+| Feature | What it is | Where |
+|---|---|---|
+| **Wallet Guard** | `/wallet-guard`: check a Bitcoin address, get a verdict card, progress steps, an inspectable evidence graph, and an explanation in English or Hindi. Demo-wallet chips, `?address=` deep link, seed-phrase guard. A Wallet Guard tile on the dashboard jumps to it. | `frontend/components/crypto/guard/`, `frontend/components/crypto/graph/`, `frontend/lib/crypto/` |
+| **Credits** | `/credits` and a credits drawer. 1 credit per new check; a repeat of the same wallet within 10 minutes is served from cache and costs nothing; UNKNOWN is free; a service error is free. Packs are bought through Dodo Payments test-mode checkout or a Cake Wallet invoice. | `frontend/components/crypto/credits/`, `crypto-service/app/services/billing/` |
+| **Cake Wallet invoices** | In Connectors, **Dodo Payments** and **Cake Wallet** appear as always-available "payment rails" (they carry no user data). A Bitcoin testnet invoice is a `bitcoin:` URI plus QR; Monero is a `monero:` URI plus QR in demo mode. BTC payment is detected by polling an Esplora-style explorer; **XMR has no automatic confirmation** (demo only). | `backend/app/api/connectors_router.py`, `frontend/components/crypto/credits/CryptoInvoice.tsx`, `crypto-service/app/services/billing/crypto.py` |
+| **Voice in the Copilot** | A mic button in the Copilot input. Audio goes to `POST /api/crypto/transcribe`; the text lands in the input box for the person to check and edit (it is never sent automatically). A chip shows which provider actually produced it: "Wispr Flow", "Sarvam" or "Browser speech". If the service has no voice provider, the browser's Web Speech API is used. Seed phrases and private keys are detected and cleared, never sent. A wallet address in a chat message shows a wallet verdict card under it. | `frontend/components/crypto/voice/`, `frontend/lib/crypto/voice/`, `frontend/app/(app)/copilot/page.tsx`, `crypto-service/app/services/voice/` |
+| **Chain Analyst** | A council specialist that screens up to five public wallet addresses the user lists. In the **Evidence Room** it is a tenth stage just before the Risk Scorer; in the **Risk Council** it is an eighth specialist that reports graph evidence (no model, no tokens) and **abstains** when a wallet is UNKNOWN or the service is offline. Informational findings (ALLOW, not in dataset) never raise the risk score. The fraud simulator in the Twin page also accepts an optional wallet. With no wallets listed, the original nine agents and seven-agent council behave exactly as before. | `backend/app/security/chain_analyst.py`, `backend/app/security/council.py`, `backend/app/security/agents.py`, `frontend/components/crypto/council/` |
+| **Statement anchoring** | On `/statement` (screen only, hidden when printing) an "Anchor this statement on-chain" panel offers an EAS attestation on **Base Sepolia** (testnet), plus a "Verify a statement hash" field that needs no wallet. Only hashes, the document type, the period and the health score are published. A **simulated** preview of the steps exists for when no schema UID is configured. | `frontend/components/statement/StatementAnchorPanel.tsx`, `frontend/lib/crypto/eas/`, `frontend/components/crypto/web3/` |
+| **AI x crypto landing** | New page title and metadata ("CryptPilot"), a hero with a "Check a wallet" action, a Wallet Guard section with an illustrative (not real) example verdict, a "Crypto" navigation group (Wallet Guard, Credits) and a mobile "Guard" tab. | `frontend/app/page.tsx`, `frontend/app/layout.tsx`, `frontend/components/AppSidebar.tsx`, `frontend/components/MobileBottomNav.tsx` |
+| **Crypto bridge** | The browser only talks to the FinPilot API at `/api/crypto/*`. An explicit allowlist of routes is forwarded to the crypto service; only the crypto session cookie (`cryptiq_sid`) crosses over, never FinPilot credentials. `GET /api/crypto/status` is answered by FinPilot itself and reports which voice provider the service has. | `backend/app/crypto_bridge/` |
+| **crypto-service** | The Cryptiq backend, vendored as its own FastAPI service: scoring model, TigerGraph and NetworkX graph engines, OFAC list, LLM explanations with a groundedness validator and template fallback, Sarvam / Wispr voice, Dodo and BTC/XMR billing, and a raw-dump vs graph-evidence benchmark. | `crypto-service/` (its API contract is `docs/crypto-service-api-contract.md`) |
+
+## What was removed or trimmed, and why
+
+The merge narrows FinPilot to the surfaces that support the "AI x crypto" story and makes room for the Crypto navigation group. Removed items are frontend pages and components on this branch; the corresponding FinPilot backend routes were **not** deleted by this diff.
+
+| Removed or trimmed | Detail |
+|---|---|
+| **Photo prices** navigation entry | The nav link is gone. The `/photos` page itself is **kept**: the voice assistant routes to it for spoken quick-add of an expense ("item + amount"), and it is described to the model as "not in the menu". |
+| **Invoices** | `/invoices` page removed (nav entry and the voice page route too). |
+| **Scheme Analyst**, **Web Intel**, the **Schemes** nav group | Pages removed; the group is gone from the sidebar. |
+| **Agent Ops** | `/agent-ops` page removed. |
+| **Google Pay / FinPilot Pay phone card** | The Google Pay connector, its link dialog and mark, and the dashboard "Phone payments" card are removed. In Connectors, Google Pay is replaced by the Dodo and Cake Wallet payment rails. The backend still accepts the `google_pay` id (`LEGACY_IDS`) because the Account Aggregator flow and plan seeding record that link. The `PhonePairPanel` component still sits in `components/dashboard/PhonePairCard.tsx` but nothing renders it any more. |
+| Mobile "Goals" tab | Replaced by "Guard" in the bottom nav (Goals is still in the sidebar). |
+
+The reasons given here are the product reasons for the merge (a focused demo and a Connectors page whose payment options are the ones CryptPilot actually supports). They are not recorded in the code, so treat them as the maintainers' intent.
+
+## Honest status
+
+"Verified" below means checked by running something, with the evidence named. Anything not in the first column is not claimed to work.
+
+| Area | Status | Evidence / what is missing |
+|---|---|---|
+| crypto-service code (API, scoring, billing logic, voice, explanations) | **Built and verified (unit level)** | `uv run pytest` in `crypto-service/`: 208 passed, 3 skipped (run when this document was written). |
+| TigerGraph Savanna engine | **Built and verified** (Cryptiq run, 2026-10-28) | Counts match the processed Parquet exactly: 822,942 vertices, 2,775,637 edges, labels illicit 14,266 / licit 251,088 / unknown 557,588 on both sides. GSQL compile/install: 3 succeeded, 0 failed. TigerGraph vs NetworkX on the same full data: 0 differences over 46 compared wallets (11 skipped, hub cap). Latency over 60 real calls: p50 669.86 ms, p95 774.72 ms (client-observed from the sandbox to Savanna, two round trips). |
+| Elliptic++ data, model, explanations, voice STT/TTS, explorer client, artifact fetch | **Built and verified** (Cryptiq run) | Real data download verified; real model trained; LLM calls through Groq and Gemini; Sarvam STT and TTS round trip; Esplora client matched real recent transactions on signet and testnet4; `scripts/fetch_artifacts.py` pulled 27 files, 232,036,359 bytes in 7.5 s from a private Hugging Face dataset repo. See `/home/user/cryptiq/docs/INTEGRATION_NOTES.md` sections 12 and 13 (outside this repo) for every number. |
+| Benchmark (raw dump vs graph evidence) | **Measured, with caveats** | N=25, Gemini `gemini-3.1-flash-lite`: `graph_evidence` mean input 187.2 tokens vs 10,931.0 for `raw_dump`; accuracy 72.0 % vs 96.0 %; median latency 2,211 ms vs 2,215 ms. The compact method found every illicit wallet but flagged 7 of 13 licit ones. One model, one seed, 25 wallets, significance not tested. |
+| Frontend type-check | **Verified** | `tsc --noEmit` in `frontend/`: one error, `LayoutProps` in `app/layout.tsx`, which is generated by `next build` (clean otherwise). |
+| FinPilot bridge, Chain Analyst, connector rails (Python) | **Built and verified (unit level)** | `cd backend && python -m pytest --noconftest tests/test_crypto_bridge.py tests/test_chain_analyst.py tests/test_connector_rails.py`: 97 passed (no network, no Firestore emulator; the services are mocked). The rest of FinPilot's own backend suite, run the same way: 454 passed, 3 failed; the same 3 (`test_household::test_managed_member_lifecycle`, `test_rag::test_retrieve_dining_first`, `test_seed_realism[demo-arjun]`) also fail on the untouched FinPilot `main`, so they are not caused by this merge. |
+| All new frontend screens (Wallet Guard, Credits, Copilot voice and wallet cards, Chain Analyst in councils, statement anchor panel, landing) | **Verified in a browser (desktop 1360 px, one mobile pass at 390 px)** | `next build` passes (35 routes). A scripted Chromium pass against the full chain (Next.js -> FinPilot API -> bridge -> crypto-service on TigerGraph Savanna, real Elliptic++ data, Gemini explanations) ran a BLOCK check (score 78, evidence graph, "answered by TigerGraph in 671 ms"), an UNKNOWN check, the credits drawer, Connectors, a Copilot message with a wallet address (inline verdict card), the Risk Council and Evidence Council with a wallet (Chain Analyst voting BLOCK 74, floor applied) and the statement anchor panel, with 0 page errors and 0 horizontal overflow at 390 px. **Not verified:** a real microphone, real wallet signing, real Dodo checkout, print output of the statement, accessibility with a screen reader, other browsers. |
+| Wispr Flow voice | **Needs a key** | No Wispr Flow key was available, so Wispr has never been called. The provider chip only says "Wispr Flow" if the service reports that provider for a clip. |
+| EAS attestation on Base Sepolia | **Needs setup, untested** | The 5-field schema must be registered once on Base Sepolia and its UID set in `NEXT_PUBLIC_EAS_SCHEMA_UID`; until then the sign button stays disabled and only the simulated preview works. Wallet signing is **untested** without a wallet and testnet ETH. |
+| WalletConnect | **Optional** | Without `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` only browser and extension wallets (injected, Coinbase) are offered. |
+| Dodo Payments test checkout | **Needs keys, not tested live** | Needs `DODO_API_KEY`, a webhook pointed at `/api/crypto/webhooks/dodo` on the FinPilot API with `DODO_WEBHOOK_SECRET`, and real product ids in `PACKS_JSON`. Signature check and idempotency are unit-tested only. |
+| Bitcoin testnet invoice end to end | **Not tested** | The explorer client is proven; no receive address or test coins were available. XMR has no automatic confirmation by design. |
+| Deployment | **Nothing deployed** | See the deployment section of the architecture doc. |
+
+## Known limitations
+
+- **The data is old research data.** Elliptic++ covers wallets active roughly 2016 to 2018 (inferred from block heights in the dataset's own notebooks, not confirmed from the paper). Almost any wallet checked today will come back **UNKNOWN**. The live value is mostly the OFAC list plus dataset hits.
+- **A verdict is a risk signal, not an accusation.** Demo addresses are real public Bitcoin addresses carrying a research-dataset label; present them as "labelled illicit in the Elliptic++ research dataset".
+- **UNKNOWN is not safe.** It means "not in the dataset". The Chain Analyst treats it as an abstention, and the UI must never show it as a green all-clear.
+- **Model behaviour under drift.** On the test split the graph-feature model improves PR-AUC (0.4342 vs 0.3394) and the BLOCK-level F1 (0.4637 vs 0.1670), but at the WARN threshold its F1 is lower (0.2223 vs 0.3151) and it flags 22,049 of 87,562 licit test wallets (25.2 %). Nothing was tuned on the test split. Treat WARN as a weak signal.
+- **TigerGraph engine is not in the free path by default.** A deployment without TigerGraph uses the NetworkX engine, which needs about 2.6 GB of RAM (measured); the scorer alone needs about 1 GB.
+- **The statement "audit hash" is not a hash of the statement.** FinPilot's statement already printed `Hash: SHA256:<code>...`. That code is **not** a SHA-256 of the data: it is the first 16 characters of the base64 of `FP-<userId>-<period>` (see `frontend/components/statement/auditHash.ts`). Anchoring it on Base Sepolia therefore timestamps an account reference plus the health score; it **does not prove the statement's figures**. The anchor panel says this on screen. Follow-up recommended: compute a real digest (for example SHA-256 or keccak256 of a canonical JSON of the statement's figures), print that on the statement, and anchor it instead.
+- **Data licence.** Elliptic++ has no stated licence. The dataset, the derived tables and the trained model (a pickle) must **stay out of this repository** and out of any public image. They are loaded at runtime from a private store (a private Hugging Face dataset repo via `crypto-service/scripts/fetch_artifacts.py`). Only fetch `model.joblib` from a repo you control.
+- **Known wording problem.** One explanation says a wallet "is part of a cluster of 822,935 wallets"; that is the size of the connected component, which is nearly the whole graph, so "cluster" is misleading. Not fixed.
+- **Free LLM tiers rate-limit.** A burst of checks can hit HTTP 429 and fall back to template explanations (never an error). The first uncached calls after a cache miss can take as long as the 8 s explanation deadline.
+- **No Marathi in the crypto service.** It speaks English and Hindi; the Copilot sends Marathi as Hindi.
+
+## Where to go next
+
+- Architecture, deployment and the environment variable table: [CRYPTPILOT_ARCHITECTURE.md](CRYPTPILOT_ARCHITECTURE.md)
+- Run everything locally: `scripts/run_cryptpilot_demo.sh` (macOS / Linux) or `scripts/run_cryptpilot_demo.ps1` (Windows, untested)
+- Crypto service API: `docs/crypto-service-api-contract.md`, `docs/crypto-service-openapi.json`, `crypto-service/README.md`, `crypto-service/DECISIONS.md`

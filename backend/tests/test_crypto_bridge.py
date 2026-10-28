@@ -70,6 +70,7 @@ def make(monkeypatch, handler=None) -> tuple[TestClient, Upstream]:
     ("GET", "/api/crypto/audio/notahash.mp3"),
     ("GET", "/api/crypto/crypto-invoice/a/b"),
     ("GET", "/api/crypto/"),
+    ("POST", "/api/crypto/benchmark/run"),      # admin-only on the service: the bridge never forwards the admin token
 ])
 def test_not_allowlisted_is_404_and_never_reaches_service(monkeypatch, method, path):
     c, up = make(monkeypatch)
@@ -91,7 +92,6 @@ def test_not_allowlisted_is_404_and_never_reaches_service(monkeypatch, method, p
     ("POST", "transcribe", "/api/transcribe"),
     ("GET", "audio/" + "a" * 32 + ".mp3", "/api/audio/" + "a" * 32 + ".mp3"),
     ("GET", "benchmark", "/api/benchmark"),
-    ("POST", "benchmark/run", "/api/benchmark/run"),
     ("GET", "benchmark/job/j-1", "/api/benchmark/job/j-1"),
     ("POST", "webhooks/dodo", "/api/webhooks/dodo"),
 ])
@@ -462,3 +462,50 @@ def test_router_is_included_in_finpilot_app():
 
     paths = {getattr(r, "path", "") for r in app.routes}
     assert "/api/crypto/status" in paths and "/api/crypto/{path:path}" in paths
+
+
+# ---- review fixes ----------------------------------------------------------------------------------------------------
+
+def test_chunked_upload_without_content_length_is_bounded(monkeypatch):
+    """A body sent with Transfer-Encoding: chunked has no Content-Length: it must be cut off, not buffered whole."""
+    c, up = make(monkeypatch)
+    big = (b"x" * 65536 for _ in range(int(bridge_router.MAX_BODY_BYTES / 65536) + 8))
+    r = c.post("/api/crypto/transcribe", content=big)  # generator body => chunked, no Content-Length
+    assert r.status_code == 413 and r.json() == {"error": "request_too_large"}
+    assert up.requests == []
+
+
+def test_secure_is_added_on_https_when_the_service_forgot_it(monkeypatch):
+    c, _ = make(monkeypatch, _cookie_handler("cryptiq_sid=abc.def; Path=/; SameSite=Lax; HttpOnly"))
+    assert "secure" in c.get("https://testserver/api/crypto/credits").headers["set-cookie"].lower()
+    assert "secure" not in c.get("http://testserver/api/crypto/credits").headers["set-cookie"].lower()
+
+
+def test_abusable_post_routes_are_rate_limited(monkeypatch):
+    c, _ = make(monkeypatch)
+    for path in ("transcribe", "checkout", "crypto-invoice"):
+        route = bridge_router._match("POST", path)
+        assert route is not None and route.limited, path
+
+
+def test_interrupted_stream_is_reported_not_silently_closed(monkeypatch):
+    def handler(req):
+        class Broken(httpx.AsyncByteStream):
+            async def __aiter__(self):
+                yield b"event: step\ndata: {}\n\n"
+                raise httpx.ReadError("boom")
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, stream=Broken())
+
+    c, _ = make(monkeypatch, handler)
+    r = c.post("/api/crypto/check/stream", json={"address": "x", "lang": "en"})
+    assert b"crypto_service_interrupted" in r.content
+
+
+def test_trust_proxy_defaults_on_only_on_vercel(monkeypatch):
+    monkeypatch.delenv("CRYPTO_TRUST_PROXY", raising=False)
+    monkeypatch.delenv("VERCEL", raising=False)
+    assert bridge_router._trust_proxy() is False
+    monkeypatch.setenv("VERCEL", "1")
+    assert bridge_router._trust_proxy() is True
+    monkeypatch.setenv("CRYPTO_TRUST_PROXY", "false")
+    assert bridge_router._trust_proxy() is False

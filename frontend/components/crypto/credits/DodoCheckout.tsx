@@ -9,6 +9,16 @@ import { Button } from "@/components/shadcn/button";
 import { formatUsd } from "./PackCard";
 
 /** "Card (Dodo, test mode)": POST checkout, then leave for the Dodo test checkout page. The webhook adds the credits. */
+/** The checkout link must be https on Dodo's own domain (test or live): a compromised backend must not be able to redirect elsewhere. */
+function isDodoCheckoutUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" && (u.hostname === "dodopayments.com" || u.hostname.endsWith(".dodopayments.com"));
+  } catch {
+    return false;
+  }
+}
+
 export function DodoCheckout({ pack }: { pack: CreditPack }) {
   const { t, lang } = useT();
   const [state, setState] = useState<"idle" | "busy" | "redirecting">("idle");
@@ -19,7 +29,7 @@ export function DodoCheckout({ pack }: { pack: CreditPack }) {
     setError(null);
     try {
       const { url } = await api.checkout(pack.id);
-      if (!/^https:\/\//i.test(url)) throw new Error("bad_checkout_url");
+      if (!isDodoCheckoutUrl(url)) throw new Error("bad_checkout_url");
       setState("redirecting");
       window.location.href = url;
     } catch (e) {

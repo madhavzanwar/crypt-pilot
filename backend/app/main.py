@@ -139,6 +139,8 @@ async def audit_log_middleware(request: Request, call_next):
     path = request.url.path
     method = request.method
     status = response.status_code
+    if path.startswith("/api/crypto/"):
+        return response  # anonymous wallet-check traffic is rate-limited by the bridge; not an audit-trail event (a flood would amplify writes)
 
     def _guess_user_id() -> str | None:
         parts = [p for p in path.split("/") if p]

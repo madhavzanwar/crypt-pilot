@@ -54,13 +54,12 @@ ALLOWLIST: tuple[Route, ...] = (
     _r("POST", r"check", timeout=CHECK_TIMEOUT, limited=True),
     _r("POST", r"check/stream", timeout=CHECK_TIMEOUT, limited=True),
     _r("GET", r"credits"),
-    _r("POST", r"checkout"),
-    _r("POST", r"crypto-invoice"),
+    _r("POST", r"checkout", limited=True),
+    _r("POST", r"crypto-invoice", limited=True),
     _r("GET", rf"crypto-invoice/{_ID}"),
-    _r("POST", r"transcribe"),
+    _r("POST", r"transcribe", limited=True),
     _r("GET", r"audio/[0-9a-f]{32}\.mp3"),
     _r("GET", r"benchmark"),
-    _r("POST", r"benchmark/run"),
     _r("GET", rf"benchmark/job/{_ID}"),
     _r("POST", r"webhooks/dodo", cookies=False, webhook=True),
 )
@@ -81,7 +80,9 @@ def _err(status: int, code: str) -> JSONResponse:
 
 
 def _trust_proxy() -> bool:
-    return os.environ.get("CRYPTO_TRUST_PROXY", "").lower() in ("1", "true", "yes")
+    # On Vercel the platform proxy always fronts the app, so its forwarded headers are the only source of the visitor's IP/scheme.
+    default = "true" if os.environ.get("VERCEL") else ""
+    return os.environ.get("CRYPTO_TRUST_PROXY", default).lower() in ("1", "true", "yes")
 
 
 def _peer(request: Request) -> str:
@@ -131,6 +132,8 @@ def rewrite_set_cookie(value: str, plain_http: bool) -> str:
             out.append("SameSite=Lax")  # SameSite=None without Secure is rejected by browsers
             continue
         out.append(attr)
+    if not plain_http and not any(a.split("=", 1)[0].strip().lower() == "secure" for a in out[1:]):
+        out.append("Secure")  # the first-party cookie on an https site must be Secure even if the service forgot it
     return "; ".join(out)
 
 
@@ -162,6 +165,7 @@ async def _relay(resp: httpx.Response) -> AsyncIterator[bytes]:
             yield chunk
     except httpx.HTTPError as exc:
         log.warning("crypto stream interrupted: %s", upstream.error_summary(exc))
+        yield b'event: error\ndata: {"error":"crypto_service_interrupted"}\n\n'
     finally:
         await resp.aclose()
 
@@ -184,9 +188,12 @@ async def _proxy(request: Request, path: str) -> Response:
         declared = request.headers.get("content-length", "")
         if declared.isdigit() and int(declared) > MAX_BODY_BYTES:
             return _err(413, "request_too_large")
-        body = await request.body()
-        if len(body) > MAX_BODY_BYTES:
-            return _err(413, "request_too_large")
+        buf = bytearray()
+        async for chunk in request.stream():  # bounded read: a chunked upload without Content-Length must not buffer unbounded
+            buf += chunk
+            if len(buf) > MAX_BODY_BYTES:
+                return _err(413, "request_too_large")
+        body = bytes(buf)
 
     headers = {"accept-encoding": "identity", "x-forwarded-for": _forwarded_for(request)}
     for name in _FORWARD_REQUEST_HEADERS:

@@ -53,7 +53,7 @@ function RailCard({ c }: { c: Connector }) {
           <div className="flex h-12 min-w-12 items-center justify-center rounded-2xl bg-fog px-3">
             {meta && <meta.icon className={`size-6 ${meta.tone.split(" ")[1]}`} />}
           </div>
-          <Badge className="bg-leaf/15 text-leaf hover:bg-leaf/15">Connected</Badge>
+          <Badge className="bg-leaf/15 text-leaf hover:bg-leaf/15">Available</Badge>
         </div>
         <div>
           <p className="text-xs font-medium tracking-wide text-pewter uppercase">Payment rail</p>

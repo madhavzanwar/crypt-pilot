@@ -7,7 +7,8 @@
 export type Verdict = "ALLOW" | "WARN" | "BLOCK" | "UNKNOWN";
 export type NodeLabel = "illicit" | "licit" | "unknown";
 export type Lang = "en" | "hi";
-export type Engine = "tigergraph" | "networkx" | "replay";
+// Any other string is shown with a neutral label; the TigerGraph badge needs the exact value "tigergraph".
+export type Engine = "tigergraph" | "networkx" | "replay" | (string & {});
 export type VoiceProvider = "wispr" | "sarvam" | "browser";
 export type CryptoCoin = "btc" | "xmr";
 

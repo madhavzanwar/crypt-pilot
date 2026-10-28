@@ -181,8 +181,7 @@ export function useWalletCheck(): {
   useEffect(() => {
     mounted.current = true;
     return () => {
-      mounted.current = false;
-      token.current += 1; // detach: a late answer must not set state on an unmounted component
+      mounted.current = false; // a late answer must not set state on an unmounted component (live() checks this flag)
     };
   }, []);
 

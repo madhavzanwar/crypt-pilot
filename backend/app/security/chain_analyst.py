@@ -185,6 +185,14 @@ def wallet_finding(r: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def evidence_step(wallets: list[str], lang: str = "en") -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Failure-isolated: anything unexpected from the crypto service becomes an 'offline' step, never a crashed investigation."""
+    try:
+        return _evidence_step(wallets, lang)
+    except Exception:  # noqa: BLE001
+        return [], {"error": OFFLINE_NOTE, "findings": 0}
+
+
+def _evidence_step(wallets: list[str], lang: str = "en") -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """(findings, summary fields) for the Evidence Council's Chain Analyst stage."""
     results = run_sync(screen_wallets(wallets, lang))
     findings = [f for f in (wallet_finding(r) for r in results) if f]

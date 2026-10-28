@@ -320,3 +320,26 @@ def test_routes_accept_wallets_and_stay_backwards_compatible(risk_council, servi
     assert allow["wallet"]["verdict"] == "ALLOW" and not any(f["agent"] == "chain_analyst" for f in allow["findings"])
     bad = client.post("/api/security/demo-meera/simulate-fraud", json={"merchant": "Local cafe", "amount": 100, "wallet": "not a wallet"})
     assert bad.status_code == 422
+
+
+# --- review fixes ---------------------------------------------------------------------------------------------------
+
+
+def test_a_blocked_wallet_cannot_be_buried_by_a_calm_median(risk_council, service):
+    """Seven money agents can all sound relaxed; one flagged wallet is still a hard stop."""
+    base = convene()[-1]
+    council._cache.clear()
+    verdict = convene([BLOCK_ADDR])[-1]
+    assert verdict["score"] >= max(base["score"], 50) and verdict["level"] == "high"
+    assert verdict["actions"][0].startswith("Do not send funds")
+
+
+def test_a_malformed_service_reply_does_not_break_the_council_or_the_investigation(risk_council, monkeypatch):
+    async def junk(address, lang="en"):
+        return {"status": "ok", "verdict": "BLOCK", "riskScore": float("nan"), "labelHits": [], "tigergraph": None}
+
+    monkeypatch.setattr(chain_analyst, "check_wallet", junk)
+    verdict = convene([BLOCK_ADDR])[-1]  # must still produce a verdict
+    assert verdict["type"] == "verdict" and verdict["chain"]["wallets"] == 1
+    monkeypatch.setattr(chain_analyst, "_evidence_step", lambda w, lang="en": (_ for _ in ()).throw(RuntimeError("boom")))
+    assert chain_analyst.evidence_step([BLOCK_ADDR]) == ([], {"error": chain_analyst.OFFLINE_NOTE, "findings": 0})

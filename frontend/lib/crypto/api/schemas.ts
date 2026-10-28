@@ -71,7 +71,7 @@ export const checkResponseSchema: Schema<CheckResponse> = z.object({
   creditsRemaining: opt(z.number()),
   error: opt(z.string()),
   cached: opt(z.boolean()),
-  engine: opt(z.enum(["tigergraph", "networkx", "replay"])),
+  engine: opt(z.string()), // the UI names TigerGraph only for the exact value "tigergraph"; any other engine gets a neutral label
   replay: opt(z.boolean()),
   truncated: opt(z.boolean()),
 });
@@ -93,7 +93,7 @@ export const checkoutResponseSchema: Schema<CheckoutResponse> = z.object({ url: 
 
 export const cryptoInvoiceSchema: Schema<CryptoInvoice> = z.object({
   invoiceId: z.string(),
-  uri: z.string(),
+  uri: z.string().regex(/^(bitcoin|monero):/i), // never render a javascript: or other scheme as a payment link
   address: z.string(),
   amount: z.string(),
   coin: z.enum(["btc", "xmr"]),

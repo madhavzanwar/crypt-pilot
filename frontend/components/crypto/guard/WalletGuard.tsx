@@ -106,10 +106,12 @@ export default function WalletGuard() {
 
   // Deep link from the Copilot card: /wallet-guard?address=... prefills the field and runs once.
   useEffect(() => {
-    if (autoRan.current || !initial || initialIsSecret) return;
+    // Auto-run only for the in-app link from a wallet card (run=1: that address was just checked, so it is cached and free).
+    // A plain ?address= only pre-fills: opening a link must never spend a credit.
+    if (autoRan.current || !initial || initialIsSecret || params.get("run") !== "1") return;
     autoRan.current = true;
     void submit(initial);
-  }, [initial, initialIsSecret, submit]);
+  }, [initial, initialIsSecret, params, submit]);
 
   // On small screens bring the result into view when it arrives.
   const done = state.phase === "done";

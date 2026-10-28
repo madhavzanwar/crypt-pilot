@@ -179,7 +179,7 @@ def my_data(request: Request, user_id: str = Depends(resolve_user_id)) -> dict:
     if rows:
         n, prev = _preview("ledger", rows)
         src = next((c for c in ("google_pay", "google_sheets") if c in linked), None)
-        sources.append({"id": src or "ledger", "name": CATALOG[src][0] if src else "Transactions & accounts",
+        sources.append({"id": src or "ledger", "name": (CATALOG[src][0] if src in CATALOG else str(src).replace("_", " ").title()) if src else "Transactions & accounts",
                         "detail": f"{len(store.query(AccountRow, user_id=user_id))} accounts", "records": n, "preview": prev, "disconnectable": src is not None})
     for cid in DATASET_FILES:
         if cid in linked:

@@ -8,16 +8,30 @@ import { useT } from "@/lib/i18n";
 import { Button } from "@/components/shadcn/button";
 import { Card, CardContent } from "@/components/shadcn/card";
 import { Input } from "@/components/shadcn/input";
+import { looksLikeSecret } from "@/lib/crypto/address/seedGuard";
+import { validateAddress } from "@/lib/crypto/address/validate";
 
 /** Dashboard tile: paste a Bitcoin address and jump to Wallet Guard with it pre-filled. */
 export function WalletGuardTile() {
   const { t } = useT();
   const router = useRouter();
   const [address, setAddress] = useState("");
+  const [warn, setWarn] = useState(false);
 
   function go(e: React.FormEvent) {
     e.preventDefault();
     const a = address.trim();
+    // A seed phrase or key must never reach a URL (history, access logs): wipe it and stay here.
+    if (looksLikeSecret(a)) {
+      setAddress("");
+      setWarn(true);
+      return;
+    }
+    // Only a well-formed address is passed along, and it is only pre-filled: the user presses Check (1 credit) on the next page.
+    if (a && !validateAddress(a, { allowDemo: true }).ok) {
+      setWarn(false);
+      return;
+    }
     router.push(a ? `/wallet-guard?address=${encodeURIComponent(a)}` : "/wallet-guard");
   }
 
@@ -35,7 +49,7 @@ export function WalletGuardTile() {
           </Link>
         </div>
         <p className="text-sm text-graphite">
-          {t("d.wg_copy", "Check a Bitcoin wallet before you pay. Graph-verified by TigerGraph.")}
+          {t("d.wg_copy", "Check a Bitcoin wallet before you pay. Graph-verified, with the evidence shown.")}
         </p>
         <form onSubmit={go} className="flex flex-col gap-2 sm:flex-row">
           <Input
@@ -51,6 +65,11 @@ export function WalletGuardTile() {
             {t("d.wg_check", "Check wallet")}
           </Button>
         </form>
+        {warn && (
+          <p role="alert" className="text-xs font-medium text-ember">
+            {t("d.wg_secret", "That looks like a seed phrase or private key. Never type it anywhere: we cleared it and sent nothing.")}
+          </p>
+        )}
         <p className="text-[11px] text-pewter">
           {t("d.wg_note", "A risk signal from a research dataset, not an accusation.")}
         </p>

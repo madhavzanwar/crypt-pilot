@@ -376,3 +376,25 @@ FinPilot includes 3 realistic personas, each pre-loaded with 12 months of synthe
 ## 📜 License
 
 This project is open-source software licensed under the [MIT License](LICENSE).
+
+## CryptPilot: FinPilot x Cryptiq
+
+CryptPilot merges FinPilot (above) with **Cryptiq**, a Bitcoin wallet risk checker, on the `cryptiq-merge` branch. Everything crypto is test mode or testnet only; no real money moves.
+
+- **Wallet Guard** (`/wallet-guard`): paste or speak a Bitcoin address, get ALLOW / WARN / BLOCK / UNKNOWN, an inspectable evidence graph and an English or Hindi explanation. It is a risk signal from 2016-2018 research data (Elliptic++), not an accusation, and UNKNOWN is not safe.
+- **Credits** (`/credits`, Connectors): Dodo Payments test-mode cards and Cake Wallet Bitcoin testnet / Monero demo invoices (URI + QR) replace the Google Pay connector.
+- **Voice in the Copilot**: Wispr Flow or Sarvam speech-to-text through the service, browser speech as fallback; a chip shows which provider really produced the text.
+- **Chain Analyst** joins the Evidence Room and the Risk Council to screen wallets against a TigerGraph graph; the **statement** page can anchor a hash on Base Sepolia via EAS (the printed "audit hash" is a reference code, not a digest of the figures: see the docs).
+- Removed from the sidebar and pages: Photo prices nav entry (page kept), Invoices, Scheme Analyst, Web Intel, Agent Ops, and the Google Pay / phone-pay card.
+- Details and honest status: [docs/CRYPTPILOT.md](docs/CRYPTPILOT.md). Diagrams, deployment and env vars: [docs/CRYPTPILOT_ARCHITECTURE.md](docs/CRYPTPILOT_ARCHITECTURE.md).
+
+### Run the merged demo
+
+```bash
+# keys come from your environment or an untracked .env in the repo root; see docs/CRYPTPILOT_ARCHITECTURE.md for names
+export ARTIFACTS_REPO=<owner>/<private-hf-dataset> HF_TOKEN=<read token>   # data is not in git (no stated licence)
+scripts/run_cryptpilot_demo.sh          # crypto-service :8132, FinPilot API :8000, frontend :3100; logs in ./.demo-logs/
+scripts/run_cryptpilot_demo.sh stop     # stops by saved PID files
+```
+
+On Windows use `scripts\run_cryptpilot_demo.ps1` (untested). The FinPilot API still needs its Firestore setup (see `ENVIRONMENT.md`). Open http://localhost:3100.
