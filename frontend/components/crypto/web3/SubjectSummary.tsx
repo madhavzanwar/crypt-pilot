@@ -34,11 +34,6 @@ export function SubjectSummary({ subject }: { subject: AttestSubject }) {
     };
   }, [subject]);
 
-  return () => {
-      live = false;
-    };
-  }, [subject]);
-
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-mist bg-fog/60 p-3.5">
       <p className="text-xs font-semibold uppercase tracking-wider text-pewter">

@@ -4,15 +4,21 @@ import { useState } from "react";
 import { Users } from "lucide-react";
 import { api } from "@/lib/api";
 import { useUserId } from "@/lib/hooks";
-import type { CouncilVerdict, CouncilVote } from "@/lib/types";
+import type { CouncilEvent, CouncilVerdict, CouncilVote } from "@/lib/types";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import WalletsInput from "@/components/crypto/council/WalletsInput";
+import { AddWalletInvite, GraphEvidence, WalletList, firstScreened } from "@/components/crypto/council/ChainParts";
+import { postNdjson } from "@/components/crypto/council/stream";
+import { useWalletList } from "@/components/crypto/council/useWallets";
+import { isChainVote, type ChainVote } from "@/components/crypto/council/types";
 
 const tone: Record<string, string> = {
   low: "bg-emerald-100 text-emerald-800",
   medium: "bg-amber-100 text-amber-800",
   high: "bg-orange-100 text-orange-800",
   critical: "bg-rose-100 text-rose-800",
+  abstain: "bg-fog text-graphite",
 };
 
 function Badge({ level, children }: { level: string; children: React.ReactNode }) {
@@ -21,7 +27,8 @@ function Badge({ level, children }: { level: string; children: React.ReactNode }
 
 export default function CouncilPage() {
   const userId = useUserId();
-  const [votes, setVotes] = useState<CouncilVote[]>([]);
+  const [wallets, setWallets] = useWalletList(userId);
+  const [votes, setVotes] = useState<(CouncilVote | ChainVote)[]>([]);
   const [debate, setDebate] = useState<string[] | null>(null);
   const [verdict, setVerdict] = useState<CouncilVerdict | null>(null);
   const [running, setRunning] = useState(false);
@@ -34,14 +41,17 @@ export default function CouncilPage() {
     setError(null);
     setRunning(true);
     try {
-      await api.convene(userId, (e) => {
+      const onEvent = (e: CouncilEvent) => {
         if (e.type === "vote") setVotes((v) => [...v.filter((x) => x.agent !== e.vote.agent), e.vote]);
         else if (e.type === "debate") setDebate(e.agents);
         else if (e.type === "verdict") {
           setVerdict(e);
           setVotes(e.votes);
         }
-      });
+      };
+      // With no wallets this is the original request; with wallets the Chain Analyst joins as an extra specialist.
+      if (wallets.length === 0) await api.convene(userId, onEvent);
+      else await postNdjson<CouncilEvent>(`/api/security/${userId}/council`, { wallets, lang: "en" }, onEvent, "Council failed");
     } catch (err) {
       setError(err instanceof Error ? err.message : "The council could not convene");
     } finally {
@@ -55,8 +65,13 @@ export default function CouncilPage() {
         <h1 className="font-display text-3xl font-medium text-ink">Risk Council</h1>
         <p className="mt-1 text-sm text-graphite">
           Seven AI specialists read a short summary of your finances (never your raw transactions), vote on your risk, and argue when they disagree.
+          List crypto wallets below and an eighth, the Chain Analyst, adds graph evidence.
         </p>
       </div>
+
+      <Card>
+        <WalletsInput wallets={wallets} onChange={setWallets} disabled={running} />
+      </Card>
 
       <Button variant="lime" onClick={convene} disabled={running}>
         <Users className="size-4" /> {running ? "The council is deliberating…" : verdict ? "Convene again" : "Convene the council"}
@@ -94,7 +109,20 @@ export default function CouncilPage() {
       {debate && !verdict && <p className="text-sm text-graphite">Some agents disagree sharply, so they get a second turn…</p>}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {votes.map((v) => (
+        {votes.map((v) => isChainVote(v) ? (
+          <Card key={v.agent} className="sm:col-span-2">
+            <div className="flex flex-col gap-2 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-ink">{v.name}</span>
+                <Badge level={v.level}>{v.abstain ? "Abstains" : v.score}</Badge>
+              </div>
+              <p className="text-sm text-graphite">{v.why}</p>
+              {v.chain.wallets.length > 0 && <WalletList wallets={v.chain.wallets} />}
+              {v.do && <p className="text-xs text-ink">Do: {v.do}</p>}
+              <p className="text-xs text-pewter">Graph evidence, no model{v.abstain ? " · not counted in the vote" : ""}</p>
+            </div>
+          </Card>
+        ) : (
           <Card key={v.agent}>
             <div className="flex flex-col gap-2 p-4">
               <div className="flex items-center justify-between gap-2">
@@ -111,6 +139,12 @@ export default function CouncilPage() {
           </Card>
         ))}
       </div>
+
+      {wallets.length === 0 && (verdict || votes.length > 0) && <AddWalletInvite />}
+      {(() => {
+        const cv = votes.find(isChainVote);
+        return cv ? <GraphEvidence address={firstScreened(cv.chain.wallets, wallets)} /> : null;
+      })()}
     </div>
   );
 }

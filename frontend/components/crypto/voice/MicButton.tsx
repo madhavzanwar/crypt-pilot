@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useReducedMotion } from "framer-motion";
 import { Loader2, Mic, MicOff, X } from "lucide-react";
 import type { Lang, VoiceProvider } from "@/lib/crypto/api";
@@ -52,10 +52,8 @@ export default function MicButton({ lang, onTranscript, disabled = false, speech
   });
   const downAt = useRef(0);
   const stickyRef = useRef(false);
-  const [recordingMode, setRecordingMode] = useState<"hold" | "tap">("hold");
   const setSticky = (v: boolean) => {
     stickyRef.current = v;
-    setRecordingMode(v ? "tap" : "hold");
   };
 
   const { status } = voice;
@@ -183,7 +181,7 @@ export default function MicButton({ lang, onTranscript, disabled = false, speech
 
       {/* spoken status for screen readers, and the reason when something went wrong */}
       <span className="sr-only" role="status" aria-live="polite">
-        {recording ? `${tr("cp.mic.recording")} ${recordingMode === "tap" ? "" : ""}` : busy ? label : ""}
+        {recording ? tr("cp.mic.recording") : busy ? label : ""}
       </span>
       {errorText && (
         <div

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { AlertCircle, ArrowUpRight, Coins, Loader2, ShieldAlert } from "lucide-react";
+import { openCreditsDrawer } from "@/components/crypto/credits/openCredits";
 import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import type { CheckResponse, Lang } from "@/lib/crypto/api";
@@ -96,7 +97,7 @@ export default function WalletVerdictCard({
           {credits ? (
             <button
               type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent("cryptpilot:open-credits"))}
+              onClick={openCreditsDrawer}
               className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-chip border border-lime-dark/40 bg-lime px-3 text-xs font-semibold text-ink hover:bg-lime-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember"
             >
               <Coins className="size-4" aria-hidden />

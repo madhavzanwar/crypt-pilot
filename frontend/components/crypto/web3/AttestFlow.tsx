@@ -8,7 +8,7 @@ import { checkSubjectHash, type LocalHashCheck } from "@/lib/crypto/eas/verify";
 import { CHAIN, HAS_WALLETCONNECT } from "@/lib/crypto/web3Config";
 import { useT } from "@/lib/i18n";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAccount, useDisconnect, useSwitchChain, useWalletClient } from "wagmi";
 import { AttestStepper } from "./AttestStepper";
 import { AttestSuccess } from "./AttestSuccess";

@@ -100,7 +100,7 @@ export default function ExplanationPanel({ result, requestLang, className }: { r
   };
 
   return (
-    <Card className="flex flex-col gap-4 p-5 sm:p-6" aria-labelledby="wg-explain-title">
+    <Card className={cn("flex flex-col gap-4 p-5 sm:p-6", className)} aria-labelledby="wg-explain-title">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="wg-explain-title" className="font-display text-lg font-medium text-ink">{g("wg.explain.title")}</h2>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-black/[0.06] bg-fog px-2.5 py-1 text-[11px] font-semibold text-graphite">

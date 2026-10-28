@@ -10,6 +10,7 @@ import { looksLikeSecret } from "@/lib/crypto/address/seedGuard";
 import { validateAddress } from "@/lib/crypto/address/validate";
 import { useWalletCheck, type WalletCheckState } from "@/lib/crypto/useWalletCheck";
 import { cn } from "@/lib/utils";
+import { openCreditsDrawer } from "@/components/crypto/credits/openCredits";
 import AttestButton from "@/components/crypto/web3/AttestButton";
 import { EvidenceGraph } from "@/components/crypto/graph/EvidenceGraph";
 import { useGuardT, verdictWord } from "./copy";
@@ -22,9 +23,6 @@ import VerdictCard from "./VerdictCard";
 const INPUT =
   "min-h-12 w-full min-w-0 rounded-chip border bg-white px-3 pr-24 font-mono text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ember sm:text-[15px]";
 
-/** Contract for the credits drawer (owned by the payments agent). */
-export const OPEN_CREDITS_EVENT = "cryptpilot:open-credits";
-const openCredits = () => window.dispatchEvent(new CustomEvent(OPEN_CREDITS_EVENT));
 
 function ErrorPanel({ state, onRetry }: { state: Extract<WalletCheckState, { phase: "error" }>; onRetry: () => void }) {
   const { g } = useGuardT();
@@ -49,7 +47,7 @@ function ErrorPanel({ state, onRetry }: { state: Extract<WalletCheckState, { pha
       </div>
       <div className="flex flex-wrap gap-2">
         {credits && (
-          <Button variant="lime" onClick={openCredits}>
+          <Button variant="lime" onClick={openCreditsDrawer}>
             <Coins className="size-4" aria-hidden />
             {g("wg.error.credits.cta")}
           </Button>
@@ -69,8 +67,10 @@ export default function WalletGuard() {
   const { g, uiLang, reqLang } = useGuardT();
   const params = useSearchParams();
   const { state, run, reset } = useWalletCheck();
-  const [value, setValue] = useState("");
-  const [secretNotice, setSecretNotice] = useState(false);
+  const initial = params.get("address");
+  const initialIsSecret = Boolean(initial) && looksLikeSecret(initial ?? "");
+  const [value, setValue] = useState(() => (initial && !initialIsSecret ? initial.trim() : ""));
+  const [secretNotice, setSecretNotice] = useState(initialIsSecret);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const autoRan = useRef(false);
@@ -105,17 +105,11 @@ export default function WalletGuard() {
   );
 
   // Deep link from the Copilot card: /wallet-guard?address=... prefills the field and runs once.
-  const initial = params.get("address");
   useEffect(() => {
-    if (autoRan.current || !initial) return;
+    if (autoRan.current || !initial || initialIsSecret) return;
     autoRan.current = true;
-    if (looksLikeSecret(initial)) {
-      setSecretNotice(true);
-      return;
-    }
-    setValue(initial.trim());
     void submit(initial);
-  }, [initial, submit]);
+  }, [initial, initialIsSecret, submit]);
 
   // On small screens bring the result into view when it arrives.
   const done = state.phase === "done";
