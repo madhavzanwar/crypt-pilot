@@ -1,0 +1,19 @@
+# secrets: keep only the example
+.env
+.env.*
+!.env.example
+# data and generated artifacts never go in git (Elliptic++ has no stated licence)
+data/
+artifacts/
+*.sqlite
+*.db
+*.sqlite3
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.log

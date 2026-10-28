@@ -1,0 +1,7 @@
+CREATE OR REPLACE QUERY graph_stats() FOR GRAPH Cryptiq SYNTAX v2 {
+  // vertex counts per label, used by scripts/verify_graph.py
+  MapAccum<STRING, SumAccum<INT>> @@by_label;
+  All = {Wallet.*};
+  All = SELECT s FROM All:s POST-ACCUM @@by_label += (s.label -> 1);
+  PRINT @@by_label AS by_label;
+}

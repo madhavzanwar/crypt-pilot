@@ -1,0 +1,5 @@
+CREATE OR REPLACE QUERY wallet_summary(VERTEX<Wallet> seed) FOR GRAPH Cryptiq SYNTAX v2 {
+  Start = {seed};
+  PRINT Start[Start.address AS address, Start.label AS label, Start.pagerank AS pagerank,
+              Start.comp_size AS comp_size, Start.in_deg AS in_deg, Start.out_deg AS out_deg] AS wallet;
+}

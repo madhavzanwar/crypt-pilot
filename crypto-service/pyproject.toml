@@ -1,0 +1,71 @@
+[project]
+name = "cryptiq-backend"
+version = "0.1.0"
+description = "Cryptiq backend: wallet risk signal from the Elliptic++ graph"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "pydantic>=2.7",
+  "pydantic-settings>=2.3",
+  "sqlalchemy>=2.0",
+  "httpx>=0.27",
+  "pandas>=2.2",
+  "pyarrow>=16",
+  "numpy>=1.26",
+  "scipy>=1.11",
+  "scikit-learn>=1.5",
+  # CPU-only wheel on Linux (the default wheel drags in ~470 MB of NVIDIA libraries); same `xgboost` module
+  "xgboost>=2.0; sys_platform != 'linux'",
+  "xgboost-cpu>=2.1; sys_platform == 'linux'",
+  "networkx>=3.3",
+  "pyTigerGraph>=1.6",
+  "slowapi>=0.1.9",
+  "sse-starlette>=2.1",
+  "python-multipart>=0.0.9",
+  "pycryptodome>=3.20",
+  "tenacity>=8.3",
+  "structlog>=24.1",
+  "joblib>=1.4",
+  "tqdm>=4.66",
+]
+
+[dependency-groups]
+data = [
+  "huggingface_hub>=0.24",
+  "gdown>=5.2",
+]
+dev = [
+  "pytest>=8.2",
+  "pytest-asyncio>=0.23",
+  "ruff>=0.5",
+  "mypy>=1.10",
+  "pandas-stubs",
+  "types-tqdm",
+  "pip-audit>=2.7",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM", "RUF"]
+ignore = ["S101", "S311", "RUF001", "RUF002", "RUF003", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S105", "S106", "S108", "E501", "S603", "S607"]
+"scripts/*" = ["T201", "S603", "S607"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
+exclude = ["tests/", "scripts/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = ["tigergraph: needs a live TigerGraph cluster (skipped without credentials)"]
+filterwarnings = ["ignore::DeprecationWarning"]

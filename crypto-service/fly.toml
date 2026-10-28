@@ -1,0 +1,41 @@
+# Fly.io config for the Cryptiq backend. Set `app` to your own name: fly launch --no-deploy --copy-config
+app = "cryptiq-backend-CHANGE-ME"
+primary_region = "bom"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  APP_ENV = "prod"
+  DATA_DIR = "/data/data"
+  ARTIFACTS_DIR = "/data/artifacts"
+  DATABASE_URL = "sqlite:////data/cryptiq.sqlite"
+  OFAC_LIST_PATH = "/data/data/labels/ofac_btc.txt"
+  # same-site setup: the browser talks to the FRONTEND origin, whose /api/* is proxied (Next.js rewrites)
+  # to this app, so the session cookie is first-party. Do NOT use SameSite=None across sites: Safari and
+  # Chrome (third-party cookies blocked) drop it, creating a new session per request and losing payments.
+  COOKIE_SAMESITE = "lax"
+  COOKIE_SECURE = "true"
+  TRUST_FLY_CLIENT_IP = "true"
+
+[mounts]
+  source = "cryptiq_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "off"   # a stopped machine means a cold start during the live demo
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "60s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[[vm]]
+  memory = "2gb"   # measured: loading the feature table for 823k wallets peaks near 1.0 GB RSS
+  cpu_kind = "shared"
+  cpus = 1
