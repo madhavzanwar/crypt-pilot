@@ -3,9 +3,9 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://finpilot.ai"),
-  title: "FinPilot — AI Financial Health Copilot",
+  title: "CryptPilot",
   description:
-    "A consolidated view of your financial health: spending patterns, debt pressure, cash-flow forecasts, and recommendations with their expected impact.",
+    "AI x crypto: a personal-finance copilot with 90-day Monte Carlo cash-flow forecasts, plus graph-verified Bitcoin wallet risk checks with plain-language, multilingual explanations.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -14,17 +14,17 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
   openGraph: {
-    title: "FinPilot — AI Financial Health Copilot",
+    title: "CryptPilot",
     description:
-      "Autonomous AI Financial Health Copilot & Private Wealth Intelligence Engine.",
-    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "FinPilot" }],
+      "AI x crypto: personal-finance copilot and graph-verified Bitcoin wallet risk checks.",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "CryptPilot" }],
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "FinPilot — AI Financial Health Copilot",
+    title: "CryptPilot",
     description:
-      "Autonomous AI Financial Health Copilot & Private Wealth Intelligence Engine.",
+      "AI x crypto: personal-finance copilot and graph-verified Bitcoin wallet risk checks.",
     images: ["/og-image.png"],
   },
 };

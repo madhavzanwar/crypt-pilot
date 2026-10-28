@@ -1,0 +1,6 @@
+// Cryptiq graph schema. Topology + labels + precomputed graph features only;
+// the 55 per-wallet feature columns stay in Parquet (loaded by the model service).
+CREATE VERTEX Wallet (PRIMARY_ID address STRING, label STRING, pagerank DOUBLE, comp_id INT,
+                      comp_size INT, in_deg INT, out_deg INT) WITH primary_id_as_attribute="true"
+CREATE DIRECTED EDGE SENT_TO (FROM Wallet, TO Wallet)
+CREATE GRAPH Cryptiq (Wallet, SENT_TO)

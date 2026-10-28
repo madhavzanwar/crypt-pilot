@@ -3,11 +3,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { BotIcon } from "@animateicons/react/lucide";
-import { CalendarClock, ChevronDown, Check, ExternalLink, History, Paperclip, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { CalendarClock, ChevronDown, Check, ExternalLink, History, Paperclip, Plus, ShieldAlert, Sparkles, Trash2, X } from "lucide-react";
 import { LoopIcon } from "@/components/ui/LoopIcon";
 import { PromptInputBox } from "@/components/copilot/PromptInputBox";
 import { AnswerView } from "@/components/copilot/AnswerView";
 import { DocumentsPanel } from "@/components/copilot/DocumentsPanel";
+import { WalletTurn } from "@/components/copilot/WalletTurn";
+import MicButton from "@/components/crypto/voice/MicButton";
+import { VoiceProviderChip } from "@/components/crypto/voice/VoiceProviderChip";
+import type { CheckResponse, Lang as CryptoLang, VoiceProvider } from "@/lib/crypto/api";
+import { messageHasSecret, scanAddress } from "@/lib/crypto/extractAddress";
+import { useVoiceT, type VoiceStringKey } from "@/lib/crypto/voice/strings";
+import { useCryptoStatus } from "@/lib/crypto/voice/useCryptoStatus";
+import { SPEECH_LANG } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import { newChatId, titleFrom, useChats, type Turn } from "@/lib/chats";
 import { useAsync, useUserId } from "@/lib/hooks";
@@ -30,6 +38,8 @@ const STARTERS = [
   "Can I afford to increase my mutual fund SIP by ₹3,000/month?",
 ];
 
+const PROVIDER_KEYS: Record<VoiceProvider, VoiceStringKey> = { wispr: "cp.voice.wispr", sarvam: "cp.voice.sarvam", browser: "cp.voice.browser" };
+
 const FinPilotAvatar = ({ className }: { className?: string }) => (
   <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-full bg-lime text-ink", className)}>
     <Sparkles className="size-4" />
@@ -44,6 +54,17 @@ export default function CopilotPage() {
   const [chatId, setChatId] = useState<string | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
+  const { lang, tr } = useVoiceT();
+  // the crypto service speaks en/hi only: Marathi is sent as Hindi
+  const cryptoLang: CryptoLang = lang === "en" ? "en" : "hi";
+  const cryptoStatus = useCryptoStatus();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [secretWarn, setSecretWarn] = useState(false);
+  const [voiceProvider, setVoiceProvider] = useState<VoiceProvider | null>(null);
+  // wallet cards, keyed `${chatId}:${index of the user turn}`; only messages sent in this visit run on their own
+  const [armed, setArmed] = useState<Record<string, true>>({});
+  const [walletResults, setWalletResults] = useState<Record<string, CheckResponse>>({});
+  const [evidenceOpen, setEvidenceOpen] = useState<Record<string, true>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signedInName, setSignedInName] = useState<string | null>(null);
@@ -81,6 +102,9 @@ export default function CopilotPage() {
     setTurns([]);
     setError(null);
     setInput("");
+    setArmed({});
+    setSecretWarn(false);
+    setVoiceProvider(null);
   }
 
   useEffect(() => {
@@ -101,12 +125,57 @@ export default function CopilotPage() {
     setChatId(c ? c.id : null);
     setTurns(c ? c.turns : []);
     setError(null);
+    setArmed({});
     setRailOpen(false);
+  }
+
+  /** Seed phrases and private keys never leave the input: cleared, not stored, not sent, and a warning shows. */
+  function rejectSecret() {
+    setInput("");
+    setVoiceProvider(null);
+    setSecretWarn(true);
+  }
+
+  function changeInput(v: string) {
+    if (messageHasSecret(v)) return rejectSecret();
+    setInput(v);
+    if (v.trim() === "") setVoiceProvider(null);
+  }
+
+  function prefill(text: string) {
+    setInput(text);
+    setVoiceProvider(null);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(text.length, text.length);
+    });
+  }
+
+  function onTranscript(text: string, provider: VoiceProvider) {
+    // the words go into the input for the person to check and edit; they are never sent automatically
+    setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text));
+    setVoiceProvider(provider);
+    setSecretWarn(false);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }
+
+  /** "Explain the TigerGraph evidence": explains the latest wallet check of this chat, or prefills the question. */
+  function explainEvidence() {
+    const keys = Object.keys(walletResults).filter((k) => chatId && k.startsWith(`${chatId}:`));
+    const last = keys.sort((a, b) => Number(a.split(":")[1]) - Number(b.split(":")[1])).pop();
+    if (last) setEvidenceOpen((o) => ({ ...o, [last]: true }));
+    else prefill(tr("cp.chip.evidencePrefill"));
   }
 
   async function send(message: string) {
     if (!message.trim() || loading) return;
+    if (messageHasSecret(message)) return rejectSecret();
     const id = chatId ?? newChatId();
+    if (scanAddress(message)?.checksumValid) setArmed((a) => ({ ...a, [`${id}:${turns.length}`]: true }));
+    setSecretWarn(false);
+    setVoiceProvider(null);
     const history = turns.slice(-8).map((t) => ({ role: t.role, content: t.role === "user" ? t.message : t.answer?.narrative ?? "" }));
     const withUser: Turn[] = [...turns, { role: "user", message }];
     setChatId(id);
@@ -142,6 +211,44 @@ export default function CopilotPage() {
     [chats, today],
   );
   const current = ENGINES.find((e) => e.id === engine)!;
+  const scans = useMemo(() => turns.map((t) => (t.role === "user" ? scanAddress(t.message) : null)), [turns]);
+
+  /** The wallet verdict (or checksum note) for the user message at index `ui`; talks to the crypto service, not the chat backend. */
+  const walletFor = (ui: number) => {
+    const sc = scans[ui];
+    if (!sc) return null;
+    const key = `${chatId}:${ui}`;
+    return (
+      <motion.div key={`w${ui}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="ml-11 min-w-0">
+        <WalletTurn
+          address={sc.address}
+          checksumValid={sc.checksumValid}
+          lang={cryptoLang}
+          armed={!!armed[key]}
+          onArm={() => setArmed((a) => ({ ...a, [key]: true }))}
+          result={walletResults[key]}
+          onResult={(r) => setWalletResults((m) => ({ ...m, [key]: r }))}
+          evidenceOpen={!!evidenceOpen[key]}
+        />
+      </motion.div>
+    );
+  };
+
+  const chipCls = "cursor-pointer rounded-full border border-ember/30 bg-orange-50/60 px-3.5 py-2 text-xs text-ember-dark transition-colors hover:bg-orange-50";
+  const cryptoChips = (
+    <>
+      <li>
+        <button type="button" onClick={() => prefill(tr("cp.chip.checkPrefill"))} className={chipCls}>
+          {tr("cp.chip.check")}
+        </button>
+      </li>
+      <li>
+        <button type="button" onClick={explainEvidence} className={chipCls}>
+          {tr("cp.chip.evidence")}
+        </button>
+      </li>
+    </>
+  );
 
   const rail = (
     <div className="flex h-full w-72 shrink-0 flex-col gap-3 bg-sage/50 p-3">
@@ -305,25 +412,35 @@ export default function CopilotPage() {
                       </button>
                     </li>
                   ))}
+                  {cryptoChips}
                 </ul>
               </>
             ) : (
               <>
-                {turns.map((t, i) =>
-                  t.role === "user" ? (
-                    <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="ml-auto max-w-[85%] rounded-3xl bg-sage px-5 py-3 text-sm text-ink sm:max-w-[75%]">
-                      {t.message}
-                    </motion.div>
-                  ) : (
-                    <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex w-full gap-3">
-                      <FinPilotAvatar className="mt-0.5" />
-                      <div className="min-w-0 flex-1">
-                        <p className="mb-1.5 text-xs font-semibold text-ink">FinPilot</p>
-                        {t.answer && <AnswerView answer={t.answer} />}
-                      </div>
-                    </motion.div>
-                  ),
-                )}
+                {turns.flatMap((t, i) => {
+                  const out: React.ReactNode[] = [];
+                  if (t.role === "user") {
+                    out.push(
+                      <motion.div key={`u${i}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="ml-auto max-w-[85%] rounded-3xl bg-sage px-5 py-3 text-sm text-ink sm:max-w-[75%]">
+                        {t.message}
+                      </motion.div>,
+                    );
+                    // no reply yet (still thinking, or the chat backend failed): the wallet check still shows
+                    if (turns[i + 1]?.role !== "assistant") out.push(walletFor(i));
+                  } else {
+                    out.push(
+                      <motion.div key={`a${i}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex w-full gap-3">
+                        <FinPilotAvatar className="mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <p className="mb-1.5 text-xs font-semibold text-ink">FinPilot</p>
+                          {t.answer && <AnswerView answer={t.answer} />}
+                        </div>
+                      </motion.div>,
+                    );
+                    if (turns[i - 1]?.role === "user") out.push(walletFor(i - 1));
+                  }
+                  return out;
+                })}
                 {loading && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-3">
                     <span className="flex size-8 items-center justify-center rounded-full bg-lime text-ink">
@@ -362,14 +479,53 @@ export default function CopilotPage() {
               <DocumentsPanel userId={userId} />
             </div>
           )}
+          {secretWarn && (
+            <div role="alert" className="mb-2 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50/70 p-3 text-xs text-rose-700">
+              <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <p className="min-w-0 flex-1">
+                <span className="font-semibold">{tr("cp.secret.title")}</span> {tr("cp.secret.body")}
+              </p>
+              <button type="button" onClick={() => setSecretWarn(false)} aria-label={tr("cp.secret.dismiss")} className="cursor-pointer rounded-full p-0.5 hover:bg-rose-100">
+                <X className="size-3.5" />
+              </button>
+            </div>
+          )}
+          {!empty && <ul className="mb-2 flex flex-wrap gap-2">{cryptoChips}</ul>}
           <PromptInputBox
             value={input}
-            onChange={setInput}
+            onChange={changeInput}
             onSend={() => send(input)}
             isLoading={loading}
-            placeholder="Ask about spending, debts, deadlines, schemes or anything else..."
+            textareaRef={textareaRef}
+            placeholder={tr("cp.input.placeholder")}
             footer="Numbers come from your own records. Dates follow the usual calendar, so confirm on the official site."
+            actions={
+              <MicButton
+                lang={cryptoLang}
+                speechTag={SPEECH_LANG[lang]}
+                onTranscript={onTranscript}
+                onSecret={rejectSecret}
+                disabled={loading}
+              />
+            }
           />
+          {(voiceProvider || cryptoStatus) && (
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-2 text-[11px] text-pewter">
+              {voiceProvider && (
+                <>
+                  <VoiceProviderChip provider={voiceProvider} />
+                  <span>{tr("cp.voice.review")}</span>
+                </>
+              )}
+              {cryptoStatus && (
+                <span data-testid="crypto-status">
+                  {tr("cp.status.online")}
+                  {cryptoStatus.mocks ? ` (${tr("cp.status.mocks")})` : ""}
+                  {cryptoStatus.voiceProvider ? ` · ${tr("cp.status.voice")}: ${tr(PROVIDER_KEYS[cryptoStatus.voiceProvider])}` : ""}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </section>
     </div>

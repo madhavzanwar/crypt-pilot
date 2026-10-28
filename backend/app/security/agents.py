@@ -23,7 +23,7 @@ from app.analytics.recurring import detect_recurring, find_redundant_subscriptio
 from app import telemetry
 from app.core import store
 from app.core.config import get_settings
-from app.security import ai_agents
+from app.security import ai_agents, chain_analyst
 from app.models import AccountRow, InvestigationRow, TransactionRow
 
 DEMO_TAG = "demo-threat"
@@ -245,24 +245,38 @@ def verdict_for(findings: list[dict], score: int, run: str | None = None) -> tup
     return {"headline": "No security problems found.", "what_is_wrong": "All checks came back clean on your current data.", "what_to_do": ["Re-run after your next sync."]}, "rules", None
 
 
-def save_report(user_id: str, run: str, rows: list, findings: list[dict], score: int, summaries: list[dict], verdict, source, error) -> dict:
+def scored(findings: list[dict]) -> list[dict]:
+    """Findings that count as problems. Informational ones (Chain Analyst: a wallet that is ALLOW or not in the dataset)
+    are shown in the report but never raise the score or reach the Verdict Writer."""
+    return [f for f in findings if not f.get("info")]
+
+
+def save_report(user_id: str, run: str, rows: list, findings: list[dict], score: int, summaries: list[dict], verdict, source, error, extra: dict | None = None) -> dict:
     report = {
         "created_at": datetime.now(timezone.utc).isoformat(), "risk_score": score, "risk_level": risk_level(score),
         "transactions_checked": len(rows), "agents": summaries, "findings": findings,
         "run": run, "verdict": verdict, "verdict_source": source, "verdict_error": error,
         "demo_threats_present": any(DEMO_TAG in (r.tags or "") for r in rows),
+        **(extra or {}),
     }
     store.put(InvestigationRow(user_id=user_id, risk_score=score, report=json.dumps(report, default=str)))
     return report
 
 
-def investigate(user_id: str, pace: float = 0.35):
-    """Generator of progress events; the last one is the saved report."""
+def investigate(user_id: str, pace: float = 0.35, wallets: list[str] | None = None, lang: str = "en"):
+    """Generator of progress events; the last one is the saved report.
+
+    With `wallets` (cleaned by chain_analyst.clean_wallets) the Chain Analyst joins as a tenth stage, just before the Risk
+    Scorer. Without wallets it does not run and the nine agents behave exactly as before."""
     rows, accounts = store.query(TransactionRow, user_id=user_id), store.query(AccountRow, user_id=user_id)
     all_findings, summaries = [], {}
     run, score = uuid.uuid4().hex[:8], 0
-    telemetry.record(kind="run", run=run, user=user_id, transactions=len(rows), parts=len(AGENTS), via="stream")
-    for key, name, _ in AGENTS:
+    wallets = list(wallets or [])
+    stages = list(AGENTS)
+    if wallets:
+        stages.insert(next(i for i, a in enumerate(stages) if a[0] == "risk_scorer"), (chain_analyst.AGENT_ID, chain_analyst.AGENT_NAME, chain_analyst.AGENT_JOB))
+    telemetry.record(kind="run", run=run, user=user_id, transactions=len(rows), parts=len(stages), via="stream")
+    for key, name, _ in stages:
         yield {"type": "agent", "agent": key, "status": "running"}
         t0 = time.time()
         if key == "web_checker":
@@ -271,10 +285,13 @@ def investigate(user_id: str, pace: float = 0.35):
             res = []
         elif key == "risk_scorer":
             cross_check(all_findings)
-            score, extra = ai_agents.calibrate(risk_score(all_findings), all_findings, run)
+            score, extra = ai_agents.calibrate(risk_score(scored(all_findings)), scored(all_findings), run)
             res, extra = [], {**extra, "score": score}
+        elif key == chain_analyst.AGENT_ID:
+            res, extra = chain_analyst.evidence_step(wallets, lang)
+            all_findings += res
         elif key == "verdict_writer":
-            verdict, source, error = verdict_for(all_findings, score, run)
+            verdict, source, error = verdict_for(scored(all_findings), score, run)
             res, extra = [], {"source": source, "error": error}
         else:
             res, extra = CHECKS[key](rows, accounts), {}
@@ -282,10 +299,11 @@ def investigate(user_id: str, pace: float = 0.35):
                 res, extra = ai_agents.review(key, res, rows, all_findings, run)
             all_findings += res
         time.sleep(pace)
-        summaries[key] = {"agent": key, "name": name, "findings": len(res), "ms": int((time.time() - t0) * 1000), **extra}
+        summaries[key] = {"agent": key, "name": name, "findings": len(res), "ms": int((time.time() - t0) * 1000), **extra}  # extra may override `findings`
         telemetry.record(kind="stage", run=run, agent=key, step="agent", ms=summaries[key]["ms"], findings=len(res))
         yield {"type": "agent", "agent": key, "status": "done", **summaries[key]}
-    report = save_report(user_id, run, rows, all_findings, score, list(summaries.values()), verdict, source, error)
+    report = save_report(user_id, run, rows, all_findings, score, list(summaries.values()), verdict, source, error,
+                         {"wallets_screened": wallets} if wallets else None)
     yield {"type": "report", "report": report}
 
 

@@ -22,7 +22,7 @@ from app.core import store
 from app.core.config import get_settings
 from app.ingest.snapshot import build_dashboard_snapshot
 from app.models import AccountRow, TransactionRow
-from app.security import agents
+from app.security import agents, chain_analyst
 
 URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 _SPREAD = 25  # an agent this many points from the median gets a second turn
@@ -150,28 +150,42 @@ async def _revise(client, facts_s: str, persona, mine: dict, median: float, oppo
 
 
 def tally(votes: list[dict]) -> dict:
-    scores = [v["score"] for v in votes]
+    """Median of the votes cast. An abstention (`abstain: True`, e.g. Chain Analyst with nothing to say) is listed but never counted."""
+    cast = [v for v in votes if not v.get("abstain")]
+    scores = [v["score"] for v in cast]
     med = statistics.median(scores)
     counts: dict[str, int] = {}
-    for v in votes:
+    for v in cast:
         counts[v["level"]] = counts.get(v["level"], 0) + 1
     verdict = level(med)
     actions = []
-    for v in sorted(votes, key=lambda v: abs(v["score"] - med)):
+    for v in sorted(cast, key=lambda v: abs(v["score"] - med)):
         if v["do"] and v["do"].lower() not in (a.lower() for a in actions):
             actions.append(v["do"])
     return {"score": round(med), "level": verdict, "counts": counts, "votes": votes,
-            "dissent": [{"agent": v["agent"], "name": v["name"], "level": v["level"], "why": v["why"]} for v in votes if v["level"] != verdict],
+            "dissent": [{"agent": v["agent"], "name": v["name"], "level": v["level"], "why": v["why"]} for v in cast if v["level"] != verdict],
             "actions": actions[:3]}
 
 
-async def convene(user_id: str) -> AsyncIterator[dict]:
-    """Progress events: facts, vote (as each agent finishes), debate, then the final verdict."""
+async def _chain_vote(wallets: list[str], lang: str) -> tuple[dict, int]:
+    """Chain Analyst's vote: no model, no tokens. It never joins the debate (it reports graph evidence, not an opinion)."""
+    try:
+        return chain_analyst.council_vote(await chain_analyst.screen_wallets(wallets, lang)), 0
+    except Exception:  # noqa: BLE001 - a bad reply from the crypto service must never take the existing council down
+        return chain_analyst.council_vote([chain_analyst._offline(w, 0) for w in wallets]), 0
+
+
+async def convene(user_id: str, wallets: list[str] | None = None, lang: str = "en") -> AsyncIterator[dict]:
+    """Progress events: facts, vote (as each agent finishes), debate, then the final verdict.
+
+    With `wallets` (already cleaned by chain_analyst.clean_wallets) an eighth specialist, Chain Analyst, screens them on the
+    crypto service and votes. Without wallets it does not run and everything below is exactly the seven-agent council."""
+    wallets = list(wallets or [])
     facts = await asyncio.to_thread(compact_facts, user_id)
     facts_s = facts_json(facts)
     s = get_settings()
     use_model = bool(s.nvidia_chat_api_key)
-    key = hashlib.sha1(f"{facts_s}|{s.nvidia_council_model}|{use_model}".encode()).hexdigest()
+    key = hashlib.sha1(f"{facts_s}|{s.nvidia_council_model}|{use_model}{'|w:' + ','.join(wallets) if wallets else ''}".encode()).hexdigest()
     hit = _cache.get(key)
     if hit and time.monotonic() - hit[0] < _TTL:
         yield {"type": "verdict", "cached": True, **hit[1]}
@@ -181,11 +195,17 @@ async def convene(user_id: str) -> AsyncIterator[dict]:
     tokens = 0
     async with httpx.AsyncClient() as client:
         tasks = [asyncio.create_task(_first_vote(client, facts_s, facts, p, use_model)) for p in PERSONAS]
+        if wallets:
+            tasks.append(asyncio.create_task(_chain_vote(wallets, lang)))
         votes: list[dict] = []
+        chain_vote: dict | None = None
         for done in asyncio.as_completed(tasks):
             vote, used = await done
             tokens += used
-            votes.append(vote)
+            if vote["agent"] == chain_analyst.AGENT_ID:
+                chain_vote = vote
+            else:
+                votes.append(vote)
             yield {"type": "vote", "vote": vote}
 
         med = statistics.median(v["score"] for v in votes)
@@ -207,6 +227,16 @@ async def convene(user_id: str) -> AsyncIterator[dict]:
                     yield {"type": "vote", "vote": vote}
             votes = [revised.get(v["agent"], v) for v in votes]
 
-    result = {**tally(votes), "anchor": facts.get("anchor", 0), "tokens": tokens, "approx_input_tokens": len(facts_s) // 3, "debated": bool(outliers and use_model)}
-    _cache[key] = (time.monotonic(), result)
+    result = {**tally(votes + ([chain_vote] if chain_vote else [])), "anchor": facts.get("anchor", 0), "tokens": tokens, "approx_input_tokens": len(facts_s) // 3, "debated": bool(outliers and use_model)}
+    if chain_vote and not chain_vote.get("abstain") and chain_vote.get("level") == "high":
+        # One flagged wallet is a hard stop however calm the seven money agents are: the median must not bury it.
+        result["score"] = max(result["score"], chain_vote["score"])
+        result["level"] = level(result["score"])
+        if chain_vote.get("do"):
+            result["actions"] = [chain_vote["do"]] + [a for a in result["actions"] if a.lower() != chain_vote["do"].lower()][:2]
+    offline = bool(chain_vote) and any(r["status"] == "offline" for r in chain_vote["chain"]["wallets"])
+    if wallets:
+        result["chain"] = {"wallets": len(wallets), "voted": bool(chain_vote) and not chain_vote.get("abstain"), "offline": offline}
+    if not offline:  # an unreachable crypto service must not be remembered for ten minutes
+        _cache[key] = (time.monotonic(), result)
     yield {"type": "verdict", "cached": False, **result}

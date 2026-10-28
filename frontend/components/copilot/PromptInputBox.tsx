@@ -14,6 +14,8 @@ export function PromptInputBox({
   isLoading = false,
   placeholder,
   footer,
+  actions,
+  textareaRef,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -21,8 +23,13 @@ export function PromptInputBox({
   isLoading?: boolean;
   placeholder?: string;
   footer?: React.ReactNode;
+  /** Extra controls (the mic) shown just before the send button. */
+  actions?: React.ReactNode;
+  /** Lets the page focus the box, e.g. after a prompt chip prefills it. */
+  textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
+  const ownRef = useRef<HTMLTextAreaElement>(null);
+  const ref = textareaRef ?? ownRef;
   const hasContent = value.trim() !== "";
 
   useEffect(() => {
@@ -32,7 +39,7 @@ export function PromptInputBox({
     // empty: the placeholder can measure tall before layout settles, so keep the one-row min height
     if (!value) return;
     el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT)}px`;
-  }, [value]);
+  }, [value, ref]);
 
   return (
     <div
@@ -58,6 +65,8 @@ export function PromptInputBox({
       />
       <div className="flex items-center justify-between gap-2 pt-1">
         <div className="min-w-0 px-2 text-[11px] text-pewter">{footer}</div>
+        <div className="flex shrink-0 items-center gap-2">
+        {actions}
         <button
           type="button"
           onClick={onSend}
@@ -71,6 +80,7 @@ export function PromptInputBox({
         >
           {isLoading ? <Square className="size-4 animate-pulse fill-current" /> : <ArrowUp className="size-4" />}
         </button>
+        </div>
       </div>
     </div>
   );

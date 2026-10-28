@@ -6,7 +6,6 @@ import { ShieldCheckIcon } from "@animateicons/react/lucide";
 import { onAuthChange } from "@/lib/firebase/auth";
 import { isDemoMode } from "@/lib/user";
 import { LoadingMark } from "@/components/ui/LoopIcon";
-import { ProfileQuestionnaire } from "@/components/ProfileQuestionnaire";
 
 /** Renders nothing of the app (no shell, no data fetches) until a Firebase user is signed in; otherwise sends the visitor to /login. */
 export function AuthGate({ children }: { children: ReactNode }) {
@@ -25,10 +24,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  return (
-    <>
-      {children}
-      <ProfileQuestionnaire />
-    </>
-  );
+  // CryptPilot: the first-run "Scheme Finder" questionnaire was removed together with the Schemes feature.
+  return <>{children}</>;
 }

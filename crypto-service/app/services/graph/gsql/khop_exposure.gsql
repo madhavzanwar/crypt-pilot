@@ -1,0 +1,47 @@
+CREATE OR REPLACE QUERY khop_exposure(VERTEX<Wallet> seed, INT max_hop = 3, INT max_nodes = 120,
+                                      INT max_frontier = 5000) FOR GRAPH Cryptiq SYNTAX v2 {
+  // Exposure is measured on the undirected view (money in either direction); returned edges keep
+  // their SENT_TO direction. Each hop's frontier is capped (hub guard) and reported as truncated.
+  SumAccum<INT> @hop;
+  SumAccum<INT> @prio;
+  OrAccum @visited;
+  OrAccum @in_sub;
+  MapAccum<STRING, SumAccum<INT>> @@counts;
+  MinAccum<INT> @@nearest_illicit = 9999;
+  OrAccum @@truncated;
+  SetAccum<EDGE> @@edges;
+
+  Start = {seed};
+  Start = SELECT s FROM Start:s POST-ACCUM s.@visited = TRUE, s.@hop = 0, s.@prio = -1;
+  Visited = Start;
+  Frontier = Start;
+  FOREACH i IN RANGE[1, max_hop] DO
+    // undirected view = outgoing UNION incoming (two plain directed hops: simplest valid GSQL)
+    Out1 = SELECT t FROM Frontier:s -(SENT_TO>)- Wallet:t WHERE t.@visited == FALSE;
+    In1  = SELECT t FROM Frontier:s -(<SENT_TO)- Wallet:t WHERE t.@visited == FALSE;
+    Cand = Out1 UNION In1;
+    // hub guard: cap the NEW frontier first, and only then mark what survived the cap as visited
+    Frontier = SELECT s FROM Cand:s LIMIT max_frontier;
+    IF Cand.size() > max_frontier THEN
+      @@truncated += TRUE;
+    END;
+    Frontier = SELECT s FROM Frontier:s POST-ACCUM s.@visited = TRUE, s.@hop = i;
+    Visited = Visited UNION Frontier;
+  END;
+
+  Stats = SELECT s FROM Visited:s WHERE s.@hop > 0
+          POST-ACCUM
+            @@counts += ("h" + to_string(s.@hop) + ":" + s.label -> 1),
+            IF s.label == "illicit" THEN @@nearest_illicit += s.@hop END,
+            IF s.label == "illicit" THEN s.@prio = s.@hop * 3
+            ELSE IF s.label == "unknown" THEN s.@prio = s.@hop * 3 + 1
+            ELSE s.@prio = s.@hop * 3 + 2 END;
+
+  Capped = SELECT s FROM Visited:s ORDER BY s.@prio ASC, s.address ASC LIMIT max_nodes;
+  Capped = SELECT s FROM Capped:s POST-ACCUM s.@in_sub = TRUE;
+  Links = SELECT t FROM Capped:s -(SENT_TO>:e)- Wallet:t WHERE t.@in_sub == TRUE ACCUM @@edges += e;
+
+  PRINT @@counts AS counts, @@nearest_illicit AS nearest_illicit, @@truncated AS truncated;
+  PRINT Capped[Capped.address AS address, Capped.label AS label, Capped.@hop AS hop] AS nodes;
+  PRINT @@edges AS edges;
+}

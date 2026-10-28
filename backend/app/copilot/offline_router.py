@@ -336,7 +336,7 @@ def _intent_fallback(user_id: str, message: str) -> AnswerContract:
     if "error" not in summary and not summary.get("monthly_income") and not summary.get("monthly_expenses"):
         return AnswerContract(
             query=message,
-            data_gaps=[DataGap(text="No financial data is connected yet.", what_would_help="Connect Google Pay or a bank account on the Connect page.")],
+            data_gaps=[DataGap(text="No financial data is connected yet.", what_would_help="Connect a bank account on the Connect page.")],
             narrative="I don't see any transactions yet, so there is nothing to analyse. Connect a source and ask me again.",
         )
     facts = _facts_from_summary(summary) if "error" not in summary else []

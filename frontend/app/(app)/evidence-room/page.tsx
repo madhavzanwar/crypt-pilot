@@ -5,16 +5,21 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  AlertTriangle, Check, Globe, Copy, FileSearch, FlaskConical, Gauge, Loader2, PenLine, Play, Radar, RotateCcw, ScanSearch, ShieldAlert, Store, Trash2, Repeat2, Database, Waves,
+  AlertTriangle, Check, Globe, Copy, FileSearch, FlaskConical, Gauge, Loader2, PenLine, Play, Radar, RotateCcw, ScanSearch, ShieldAlert, Store, Trash2, Repeat2, Database, Waves, Network,
   type LucideIcon,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useUserId } from "@/lib/hooks";
-import type { AgentSummary, SecurityFinding, SecurityReport } from "@/lib/types";
+import type { AgentSummary, SecurityEvent, SecurityFinding, SecurityReport } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/shadcn/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
+import WalletsInput from "@/components/crypto/council/WalletsInput";
+import { AddWalletInvite, ChainChips, GraphEvidence } from "@/components/crypto/council/ChainParts";
+import { postNdjson } from "@/components/crypto/council/stream";
+import { useWalletList } from "@/components/crypto/council/useWallets";
+import { CHAIN_AGENT, toWallet, type ChainFinding } from "@/components/crypto/council/types";
 
 const AGENTS: { id: string; name: string; job: string; icon: LucideIcon }[] = [
   { id: "data_guardian", name: "Data Guardian", job: "Checks your records for broken or missing data", icon: Database },
@@ -28,6 +33,11 @@ const AGENTS: { id: string; name: string; job: string; icon: LucideIcon }[] = [
   { id: "verdict_writer", name: "Verdict Writer", job: "Explains the problems and what to do (AI)", icon: PenLine },
 ];
 
+// The Chain Analyst sits just before the Risk Scorer. It runs only when wallets were listed; otherwise its node stays idle.
+const ALL = [...AGENTS.slice(0, 7), { id: CHAIN_AGENT.id, name: CHAIN_AGENT.name, job: CHAIN_AGENT.job, icon: Network }, ...AGENTS.slice(7)];
+type ChainInfo = Partial<AgentSummary> & { wallets?: number; screened?: number; engine?: string | null; tigergraph?: boolean; graph_ms?: number | null };
+type Finding = SecurityFinding & ChainFinding;
+
 type Status = "idle" | "running" | "done";
 type AgentState = Record<string, { status: Status; info?: Partial<AgentSummary> }>;
 
@@ -39,7 +49,7 @@ const SEV = {
 
 const R = 39; // ring radius, % of the stage
 const pos = (i: number) => {
-  const a = ((-90 + i * (360 / AGENTS.length)) * Math.PI) / 180;
+  const a = ((-90 + i * (360 / ALL.length)) * Math.PI) / 180;
   return { x: 50 + R * Math.cos(a), y: 50 + R * Math.sin(a) };
 };
 
@@ -63,13 +73,23 @@ function ScoreRing({ score, level, size = 120 }: { score: number; level: string;
 }
 
 /** The stage: your ledger as a document in the middle, the agents around it, evidence beams between them. */
-function Stage({ state, report, running, checked }: { state: AgentState; report: SecurityReport | null; running: boolean; checked: number | null }) {
-  const doneAll = AGENTS.every((a) => state[a.id]?.status === "done");
+/** How the Chain Analyst's node reads when it finished: offline and not-in-dataset are never shown as a green all clear. */
+function chainNote(report: SecurityReport | null, info?: ChainInfo): { label: string; tone: "red" | "green" | "grey" } {
+  if (!info || info.error || !info.screened) return { label: "Chain Analyst offline", tone: "grey" };
+  if ((info.findings ?? 0) > 0) return { label: `${info.findings} found`, tone: "red" };
+  const mine = ((report?.findings ?? []) as Finding[]).filter((f) => f.agent === CHAIN_AGENT.id);
+  if (mine.length > 0 && mine.every((f) => f.chain?.verdict === "UNKNOWN")) return { label: "Not in dataset", tone: "grey" };
+  return { label: "All clear", tone: "green" };
+}
+
+function Stage({ state, report, running, checked, walletsListed }: { state: AgentState; report: SecurityReport | null; running: boolean; checked: number | null; walletsListed: number }) {
+  const chainRan = !!state[CHAIN_AGENT.id];
+  const doneAll = ALL.every((a) => (a.id === CHAIN_AGENT.id && !chainRan) || state[a.id]?.status === "done");
   return (
     <div className="relative mx-auto aspect-square w-full max-w-[640px] overflow-hidden rounded-[2rem] bg-gradient-to-br from-tint-lime via-white to-sage p-2 shadow-sm">
       <div className="pointer-events-none absolute inset-0 opacity-60 [background-image:radial-gradient(#c6f13555_1px,transparent_1px)] [background-size:22px_22px]" />
       <svg viewBox="0 0 100 100" className="absolute inset-0 size-full" aria-hidden>
-        {AGENTS.map((a, i) => {
+        {ALL.map((a, i) => {
           const { x, y } = pos(i);
           const st = state[a.id]?.status ?? "idle";
           const found = (state[a.id]?.info?.findings ?? 0) > 0;
@@ -80,7 +100,7 @@ function Stage({ state, report, running, checked }: { state: AgentState; report:
                 initial={{ pathLength: 0, opacity: 0 }}
                 animate={{ pathLength: 1, opacity: 1 }}
                 transition={{ delay: 0.5 + i * 0.07, duration: 0.5 }}
-                stroke={st === "done" ? (found ? "#e5484d" : "#3f7d5c") : st === "running" ? "#a6d11a" : "#cfd4bf"}
+                stroke={st === "done" ? (found ? "#e5484d" : a.id === CHAIN_AGENT.id && chainNote(report, state[a.id]?.info as ChainInfo).tone === "grey" ? "#94a3b8" : "#3f7d5c") : st === "running" ? "#a6d11a" : "#cfd4bf"}
                 strokeWidth={st === "idle" ? 0.35 : 0.7}
                 strokeDasharray={st === "running" ? "1.5 1.5" : st === "idle" ? "1 1.5" : undefined}
                 style={{ transition: "stroke 0.4s" }}
@@ -126,12 +146,15 @@ function Stage({ state, report, running, checked }: { state: AgentState; report:
       </motion.div>
 
       {/* the agents */}
-      {AGENTS.map((a, i) => {
+      {ALL.map((a, i) => {
         const { x, y } = pos(i);
         const st = state[a.id]?.status ?? "idle";
         const info = state[a.id]?.info;
         const found = info?.findings ?? 0;
         const Icon = a.icon;
+        const chain = a.id === CHAIN_AGENT.id;
+        const note = chain && st === "done" ? chainNote(report, info as ChainInfo) : null;
+        const ci = info as ChainInfo | undefined;
         return (
           <motion.div
             key={a.id}
@@ -148,7 +171,7 @@ function Stage({ state, report, running, checked }: { state: AgentState; report:
                     "relative flex size-12 items-center justify-center rounded-full shadow-md ring-2 transition-colors duration-500 sm:size-14",
                     st === "idle" && "bg-white text-pewter ring-white",
                     st === "running" && "bg-lime text-ink ring-lime-dark",
-                    st === "done" && (found ? "bg-rose-500 text-white ring-rose-200" : "bg-leaf text-white ring-lime/60"),
+                    st === "done" && (found ? "bg-rose-500 text-white ring-rose-200" : note?.tone === "grey" ? "bg-slate-400 text-white ring-slate-200" : "bg-leaf text-white ring-lime/60"),
                   )}
                 >
                   {st === "running" ? <Loader2 className="size-5 animate-spin" /> : <Icon className="size-5" />}
@@ -162,7 +185,8 @@ function Stage({ state, report, running, checked }: { state: AgentState; report:
                 </AnimatePresence>
               </div>
               <span className="text-[10px] font-semibold leading-tight text-ink sm:text-xs">{a.name}</span>
-              <span className="hidden text-[10px] leading-tight text-graphite sm:block">{st === "running" ? "Checking..." : st === "done" ? (found ? `${found} found` : info?.error ? "no AI text" : "All clear") : "Waiting"}</span>
+              <span className="hidden text-[10px] leading-tight text-graphite sm:block">{note ? note.label : st === "running" ? "Checking..." : st === "done" ? (found ? `${found} found` : info?.error ? "no AI text" : "All clear") : chain ? (walletsListed === 0 ? "Add a wallet to screen" : "Waiting") : "Waiting"}</span>
+              {note && ci?.screened ? <span className="hidden max-w-full truncate text-[9px] leading-tight text-pewter sm:block">{ci.tigergraph ? "TigerGraph" : ci.engine ?? "graph"}{ci.graph_ms != null ? ` · ${ci.graph_ms} ms` : ""}</span> : null}
               {st === "done" && info?.model && <span className="hidden max-w-full truncate text-[9px] leading-tight text-pewter sm:block" title={`${info.model} (${info.ai})`}>{info.model.split("/").pop()}{info.backup ? " · backup" : ""}{info.ai === "error" ? " · offline" : ""}</span>}
             </div>
           </motion.div>
@@ -172,17 +196,25 @@ function Stage({ state, report, running, checked }: { state: AgentState; report:
   );
 }
 
-function Finding({ f, label, i }: { f: SecurityFinding; label: string; i: number }) {
+const CHAIN_INFO = {
+  ALLOW: { label: "Low risk", cls: "bg-emerald-50 text-emerald-800", bar: "bg-emerald-400" },
+  UNKNOWN: { label: "Not in dataset", cls: "bg-slate-100 text-slate-700", bar: "bg-slate-300" },
+} as const;
+
+function Finding({ f, label, i }: { f: Finding; label: string; i: number }) {
+  const w = f.chain ? toWallet(f.chain) : null;
+  const sev = f.info && f.chain && (f.chain.verdict === "ALLOW" || f.chain.verdict === "UNKNOWN") ? CHAIN_INFO[f.chain.verdict] : SEV[f.severity];
   return (
     <motion.li initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.05, 0.6) }} className="relative overflow-hidden rounded-2xl bg-white p-4 pl-5 shadow-sm">
-      <i className={cn("absolute inset-y-0 left-0 w-1.5", SEV[f.severity].bar)} />
+      <i className={cn("absolute inset-y-0 left-0 w-1.5", sev.bar)} />
       <div className="flex flex-wrap items-center gap-2">
-        <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-semibold", SEV[f.severity].cls)}>{SEV[f.severity].label}</span>
+        <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-semibold", sev.cls)}>{sev.label}</span>
         <span className="text-[11px] text-pewter">Found by {label}</span>
         {f.amount > 0 && <span className="ml-auto text-sm font-semibold tnum text-ink">{formatCurrency(f.amount)}</span>}
       </div>
       <p className="mt-2 text-sm font-semibold text-ink">{f.title}</p>
       <p className="mt-0.5 text-xs text-graphite">{f.detail}</p>
+      {w && <div className="mt-2"><ChainChips w={w} /></div>}
       {f.corroborated_by && <p className="mt-1.5 text-[11px] font-semibold text-rose-700">Also flagged by {f.corroborated_by.map((id) => AGENTS.find((a) => a.id === id)?.name ?? id).join(", ")}</p>}
       {f.web?.answer && (
         <p className="mt-1.5 rounded-lg bg-fog px-2.5 py-1.5 text-[11px] text-graphite">
@@ -206,6 +238,7 @@ export default function EvidenceRoomPage() {
   const [report, setReport] = useState<SecurityReport | null>(null);
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [wallets, setWallets] = useWalletList(userId);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const load = useCallback(async () => {
@@ -230,10 +263,13 @@ export default function EvidenceRoomPage() {
     setReport(null);
     setState({});
     try {
-      await api.investigate(userId, (e) => {
+      const onEvent = (e: SecurityEvent) => {
         if (e.type === "agent") setState((s) => ({ ...s, [e.agent]: { status: e.status, info: e.status === "done" ? e : s[e.agent]?.info } }));
         else setReport(e.report);
-      });
+      };
+      // With no wallets this is the original request; with wallets the Chain Analyst joins as a tenth stage.
+      if (wallets.length === 0) await api.investigate(userId, onEvent);
+      else await postNdjson<SecurityEvent>(`/api/security/${userId}/investigate`, { wallets, lang: "en" }, onEvent, "Investigation failed");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "The investigation could not run");
     } finally {
@@ -268,8 +304,11 @@ export default function EvidenceRoomPage() {
     }
   }
 
-  const label = (id: string) => AGENTS.find((a) => a.id === id)?.name ?? id;
-  const sorted = [...(report?.findings ?? [])].sort((a, b) => ["high", "medium", "low"].indexOf(a.severity) - ["high", "medium", "low"].indexOf(b.severity));
+  const label = (id: string) => ALL.find((a) => a.id === id)?.name ?? id;
+  const rank = (f: Finding) => (f.info ? 3 : ["high", "medium", "low"].indexOf(f.severity));
+  const sorted = [...((report?.findings ?? []) as Finding[])].sort((a, b) => rank(a) - rank(b));
+  const chainFindings = sorted.filter((f) => f.agent === CHAIN_AGENT.id && f.chain);
+  const evidenceAddress = chainFindings[0]?.chain?.address ?? null;
   const finished = !!report && !running;
 
   return (
@@ -314,7 +353,14 @@ export default function EvidenceRoomPage() {
         </CardContent>
       </Card>
 
-      <Stage state={state} report={report} running={running} checked={report?.transactions_checked ?? null} />
+      <Card>
+        <CardContent>
+          <WalletsInput wallets={wallets} onChange={setWallets} disabled={running} id="evidence-wallets" />
+        </CardContent>
+      </Card>
+
+      <Stage state={state} report={report} running={running} checked={report?.transactions_checked ?? null} walletsListed={wallets.length} />
+      {wallets.length === 0 && !state[CHAIN_AGENT.id] && <AddWalletInvite compact />}
 
       <AnimatePresence>
         {finished && report && (
@@ -353,6 +399,7 @@ export default function EvidenceRoomPage() {
                 ))}
               </ul>
             )}
+            <GraphEvidence address={evidenceAddress} />
           </motion.div>
         )}
       </AnimatePresence>

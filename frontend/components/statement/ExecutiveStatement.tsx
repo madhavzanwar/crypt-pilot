@@ -10,6 +10,7 @@ import { CategoryDonut, IncomeVsSpend, TopMerchants } from "@/components/dashboa
 import { ForecastChart } from "@/components/dashboard/ForecastChart";
 import { NetWorthTrend } from "@/components/dashboard/NetWorthTrend";
 import { CATEGORY_META, summarizeSpend } from "@/lib/spend";
+import { auditCode } from "@/components/statement/auditHash";
 
 interface ExecutiveStatementProps {
   dashboard: DashboardSnapshot;
@@ -751,7 +752,7 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
               FinPilot Autonomous Financial Intelligence Engine v2.4
             </div>
             <div className="text-[10px] text-neutral-500 mt-1 font-mono">
-              Hash: SHA256:{Buffer.from(`FP-${userId}-2026-09`).toString("base64").substring(0, 16)}...
+              Hash: SHA256:{auditCode(userId)}...
             </div>
             <div className="text-[10px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
               <ShieldCheck className="h-3 w-3" />

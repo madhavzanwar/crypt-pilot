@@ -37,6 +37,9 @@ export function LandingHeader() {
           <Link href="/copilot" className={link}>
             AI Copilot
           </Link>
+          <Link href="/wallet-guard" className={`${link} hidden sm:inline-flex`}>
+            Wallet Guard
+          </Link>
           <SignInButton />
         </div>
       </div>

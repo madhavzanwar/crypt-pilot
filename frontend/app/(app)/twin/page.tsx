@@ -11,6 +11,11 @@ import { Button } from "@/components/shadcn/button";
 import { Input } from "@/components/shadcn/input";
 import { Skeleton } from "@/components/shadcn/skeleton";
 import { formatCurrency } from "@/lib/format";
+import { validateAddress } from "@/lib/crypto/address/validate";
+import { looksLikeSecret } from "@/lib/crypto/address/seedGuard";
+import { ChainChips } from "@/components/crypto/council/ChainParts";
+import { postJson } from "@/components/crypto/council/stream";
+import type { ChainWallet } from "@/components/crypto/council/types";
 import { cn } from "@/lib/utils";
 
 interface Merchant { id: string; label: string; amount: number; flagged: boolean; findings: string[] }
@@ -41,8 +46,8 @@ export default function TwinSimulatorPage() {
   const [open, setOpen] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<string[]>([]);
-  const [fraud, setFraud] = useState({ merchant: "AMAZ0N PAY", amount: "4999" });
-  const [sim, setSim] = useState<{ caught: boolean; findings: SecurityFinding[]; merchant: string } | null>(null);
+  const [fraud, setFraud] = useState({ merchant: "AMAZ0N PAY", amount: "4999", wallet: "" });
+  const [sim, setSim] = useState<{ caught: boolean; findings: SecurityFinding[]; merchant: string; wallet?: ChainWallet } | null>(null);
   const [simError, setSimError] = useState<string | null>(null);
   const graph = useAsync(useCallback(() => api.securityGraph(userId, months), [userId, months]), [userId, months]);
 
@@ -74,8 +79,25 @@ export default function TwinSimulatorPage() {
 
   async function attempt() {
     setSimError(null);
+    const amount = Math.abs(Number(fraud.amount)) || 0;
+    const wallet = fraud.wallet.trim();
+    if (wallet && looksLikeSecret(wallet)) {
+      setFraud((f) => ({ ...f, wallet: "" }));
+      setSim(null);
+      setSimError("Never share your seed phrase or private key. That text was cleared and not sent.");
+      return;
+    }
+    const checked = wallet ? validateAddress(wallet, { allowDemo: true }) : null;
+    if (checked && !checked.ok) {
+      setSim(null);
+      setSimError("That does not look like a Bitcoin wallet address (it starts with 1, 3 or bc1).");
+      return;
+    }
     try {
-      const r = await api.simulateFraud(userId, fraud.merchant, Math.abs(Number(fraud.amount)) || 0);
+      // Without a wallet this is the original request; with one the Chain Analyst screens it too.
+      const r = checked
+        ? await postJson<{ caught: boolean; findings: SecurityFinding[]; wallet?: ChainWallet }>(`/api/security/${userId}/simulate-fraud`, { merchant: fraud.merchant, amount, wallet: checked.address })
+        : await api.simulateFraud(userId, fraud.merchant, amount);
       setSim({ ...r, merchant: fraud.merchant });
     } catch (err) {
       setSim(null);
@@ -183,12 +205,20 @@ export default function TwinSimulatorPage() {
             <CardContent className="grid gap-2">
               <Input value={fraud.merchant} onChange={(e) => setFraud({ ...fraud, merchant: e.target.value })} aria-label="Merchant name" />
               <Input value={fraud.amount} inputMode="numeric" onChange={(e) => setFraud({ ...fraud, amount: e.target.value })} aria-label="Amount in rupees" />
+              <Input value={fraud.wallet} onChange={(e) => setFraud({ ...fraud, wallet: e.target.value })} placeholder="Paying a crypto wallet? Paste its address (optional)" aria-label="Crypto wallet address (optional)" className="font-mono text-xs" autoComplete="off" spellCheck={false} />
               <Button size="sm" onClick={attempt}>Run the agents</Button>
               {simError && <p className="text-xs text-rose-700">{simError}</p>}
               {sim && (
                 <div className={cn("rounded-xl p-3 text-xs", sim.caught ? "bg-rose-50 text-rose-800" : "bg-tint-lime text-ink")}>
                   <p className="font-semibold">{sim.caught ? `Caught: ${sim.findings.length} flag(s) for ${sim.merchant}` : `Not flagged: ${sim.merchant} looks normal to the agents.`}</p>
                   {sim.findings.map((f, i) => <p key={i} className="mt-1">{f.title}</p>)}
+                  {sim.wallet && (
+                    <div className="mt-2 grid gap-1 border-t border-black/10 pt-2 text-ink">
+                      <p className="font-semibold">Chain Analyst</p>
+                      <ChainChips w={sim.wallet} />
+                      <p>{sim.wallet.reason}</p>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

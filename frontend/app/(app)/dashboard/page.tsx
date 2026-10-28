@@ -27,7 +27,7 @@ import { useAnalystMode, useSimpleMode } from "@/lib/simple";
 import { AnalystPanel } from "@/components/dashboard/AnalystPanel";
 import { useT } from "@/lib/i18n";
 import { RoleSpotlight } from "@/components/dashboard/RoleSpotlight";
-import { PhonePairCard } from "@/components/dashboard/PhonePairCard";
+import { WalletGuardTile } from "@/components/dashboard/WalletGuardTile";
 import { PromoCard } from "@/components/dashboard/PromoCard";
 import { CategoryDonut, IncomeVsSpend, SpendingShifts, TopMerchants } from "@/components/dashboard/SpendCharts";
 import { EvilHoverTraceBarChart } from "@/components/shadcn/hover-trace-bar-chart";
@@ -140,7 +140,7 @@ export default function DashboardPage() {
     return (
       <div className="flex flex-col gap-4">
         <SimpleHome name={profile.data?.answers.name} income={data.monthly_income} spent={data.monthly_expenses} connected={connected} onFullView={() => setSimple(false)} onSaved={reload} />
-        <PhonePairCard />
+        <WalletGuardTile />
       </div>
     );
   }
@@ -191,7 +191,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <PhonePairCard />
+      <WalletGuardTile />
 
       {analyst && connected && <AnalystPanel data={data} spend={spend} />}
 

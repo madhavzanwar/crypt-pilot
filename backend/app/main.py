@@ -35,6 +35,7 @@ from app.api.webhooks_router import router as webhooks_router
 from app.api.tax_router import router as tax_router
 from app.api.transactions_router import router as transactions_router
 from app.core.audit import log_audit_event
+from app.crypto_bridge.router import router as crypto_router
 
 _MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
@@ -122,6 +123,7 @@ app.include_router(rules_router)
 app.include_router(security_router)
 app.include_router(expenses_router, prefix="/api")
 app.include_router(webhooks_router, prefix="/api")
+app.include_router(crypto_router)  # CryptPilot bridge: already carries its own /api/crypto prefix
 
 
 @app.middleware("http")
@@ -137,6 +139,8 @@ async def audit_log_middleware(request: Request, call_next):
     path = request.url.path
     method = request.method
     status = response.status_code
+    if path.startswith("/api/crypto/"):
+        return response  # anonymous wallet-check traffic is rate-limited by the bridge; not an audit-trail event (a flood would amplify writes)
 
     def _guess_user_id() -> str | None:
         parts = [p for p in path.split("/") if p]

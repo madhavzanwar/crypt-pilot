@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
 import { DEMO_PERSONAS, isDemoUserId, setUserId } from "@/lib/user";
 import { ExecutiveStatement } from "@/components/statement/ExecutiveStatement";
+import { StatementAnchorPanel } from "@/components/statement/StatementAnchorPanel";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { HealthScoreSkeleton, ListItemSkeleton } from "@/components/ui/Skeleton";
@@ -156,6 +157,14 @@ export default function StatementPage() {
             userId={userId}
           />
         </motion.div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          SCREEN-ONLY: OPTIONAL ON-CHAIN ANCHOR (testnet). Outside the printable
+          article and hidden in @media print, so the PDF view is unchanged.
+          ───────────────────────────────────────────────────────────── */}
+      {data && (
+        <StatementAnchorPanel userId={userId} healthScore={Math.round(data.dashboard.health_score.overall)} />
       )}
     </div>
   );

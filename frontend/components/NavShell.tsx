@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import CreditsPill from "@/components/crypto/credits/CreditsPill";
 import { NotificationBell } from "@/components/NotificationBell";
 import { CurrencySelector } from "@/components/ui/CurrencySelector";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -143,6 +144,7 @@ export function NavShell({ children }: { children: ReactNode }) {
               <div className="hidden xl:block">
                 <PersonaSwitcher />
               </div>
+              <CreditsPill />
               <NotificationBell userId={userId} large={isDashboard} />
             </div>
           </header>

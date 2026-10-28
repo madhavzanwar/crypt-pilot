@@ -129,9 +129,9 @@ export default function LoginPage() {
         </Link>
         <div className="relative max-w-md">
           <h2 className="font-display text-4xl font-semibold leading-tight">
-            Your money, on <span className="text-[#5f7f0c]">autopilot</span>.
+            Your money, <span className="text-[#5f7f0c]">explained</span>. Every wallet, checked.
           </h2>
-          <p className="mt-3 text-ink/70">FinPilot connects to your accounts and does the rest.</p>
+          <p className="mt-3 text-ink/70">FinPilot forecasts your cash flow and checks Bitcoin wallets with graph evidence before you pay.</p>
         </div>
         <div className="relative min-h-0 flex-1 overflow-hidden rounded-3xl">
           <video
@@ -144,7 +144,7 @@ export default function LoginPage() {
             aria-hidden
           />
         </div>
-        <p className="relative text-xs text-ink/60">Demo build. Sample data only.</p>
+        <p className="relative text-xs text-ink/60">Demo build. Sample data and testnet only.</p>
       </div>
 
       {/* Form panel */}

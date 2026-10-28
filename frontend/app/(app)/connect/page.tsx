@@ -1,11 +1,12 @@
 "use client";
 
-import { Banknote, CreditCard, FileText, FolderOpen, LineChart, Mail, Receipt, Smartphone } from "lucide-react";
+import { Banknote, CreditCard, FileText, FolderOpen, LineChart, Mail, Receipt, Wallet } from "lucide-react";
 import { ConnectorsGrid } from "@/components/connect/ConnectorsGrid";
 import { IntegrationShowcase, type Integration } from "@/components/shadcn/integration-showcase";
 
 const ROADMAP: Integration[] = [
-  { name: "Google Pay", description: "UPI payments and merchants. Available now.", icon: Smartphone, tone: "bg-tint-sky text-sky" },
+  { name: "Dodo Payments", description: "Card checkout for credits. Test mode, no real charge. Available now.", icon: CreditCard, tone: "bg-tint-sun text-ember-dark" },
+  { name: "Cake Wallet", description: "Bitcoin testnet and Monero demo invoices. No real money. Available now.", icon: Wallet, tone: "bg-tint-ember text-ember-dark" },
   { name: "Bank accounts", description: "Balances and salary credits via Account Aggregator.", icon: Banknote, tone: "bg-tint-leaf text-leaf" },
   { name: "Credit cards", description: "Statements, dues and interest charges.", icon: CreditCard, tone: "bg-tint-ember text-ember-dark" },
   { name: "Gmail invoices", description: "Bills and receipts parsed automatically.", icon: Mail, tone: "bg-tint-ember text-ember-dark" },
@@ -27,7 +28,7 @@ export default function ConnectPage() {
       <ConnectorsGrid />
       <IntegrationShowcase
         title="Everything connects ~automatically~"
-        subtitle="Google Pay is live in this demo. The rest of the sources below are on the roadmap, so you never type a number in."
+        subtitle="Dodo Payments and Cake Wallet are live in this demo, in test mode only. The rest of the sources below are on the roadmap, so you never type a number in."
         integrations={ROADMAP}
       />
     </div>

@@ -1,0 +1,14 @@
+# never ship secrets, data or local state into the image
+.env
+.env.*
+!.env.example
+data/
+artifacts/
+.venv/
+**/__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+tests/
+*.sqlite
+*.db
