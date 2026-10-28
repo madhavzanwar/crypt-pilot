@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import type { DashboardSnapshot, Account, Transaction } from "@/lib/types";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,7 @@ import { CategoryDonut, IncomeVsSpend, TopMerchants } from "@/components/dashboa
 import { ForecastChart } from "@/components/dashboard/ForecastChart";
 import { NetWorthTrend } from "@/components/dashboard/NetWorthTrend";
 import { CATEGORY_META, summarizeSpend } from "@/lib/spend";
-import { auditCode } from "@/components/statement/auditHash";
+import { statementDigest } from "@/components/statement/auditHash";
 
 interface ExecutiveStatementProps {
   dashboard: DashboardSnapshot;
@@ -95,6 +95,12 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
   const totalLiquid = liquidAccounts.reduce((sum, a) => sum + a.balance, 0);
   const totalInvestments = investmentAccounts.reduce((sum, a) => sum + a.balance, 0);
   const totalDebts = dashboard.debts.reduce((sum, d) => sum + d.principal, 0);
+
+  // SHA-256 of the figures printed here (see components/statement/auditHash.ts): recomputable by anyone with the same data.
+  const digest = useMemo(
+    () => statementDigest({ userId, dashboard, accounts, transactions }),
+    [userId, dashboard, accounts, transactions],
+  );
 
   const spend = summarizeSpend(transactions);
   const recent = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
@@ -751,12 +757,14 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
             <div className="font-medium text-black text-xs">
               FinPilot Autonomous Financial Intelligence Engine v2.4
             </div>
-            <div className="text-[10px] text-neutral-500 mt-1 font-mono">
-              Hash: SHA256:{auditCode(userId)}...
+            <div className="text-[10px] text-neutral-500 mt-1 font-mono break-all">
+              SHA-256 of the figures in this statement:
+              <br />
+              <span className="text-black">{digest.hex}</span>
             </div>
             <div className="text-[10px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
               <ShieldCheck className="h-3 w-3" />
-              <span>Cryptographically Sealed & Grounded</span>
+              <span>Figures fingerprinted (SHA-256)</span>
             </div>
           </div>
 
