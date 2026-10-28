@@ -15,9 +15,24 @@ from app.core import store
 from app.core.audit import log_audit_event
 from app.core.auth import resolve_user_id
 from app.models import AccountRow, AuditLogRow, ConnectionRow, TransactionRow
-from app.security import agents, council
+from app.security import agents, chain_analyst, council
 
 router = APIRouter(prefix="/api/security", tags=["security"])
+
+
+class Screening(BaseModel):
+    """Optional body for the councils: public crypto wallet addresses for the Chain Analyst to screen (never seed phrases or keys)."""
+    wallets: list[str] = []
+    lang: str = "en"
+
+
+def _wallets(body: Screening | None) -> tuple[list[str], str, str]:
+    """(valid wallets, language, audit note). Anything that is not an address is dropped without being stored or logged."""
+    if body is None or not body.wallets:
+        return [], "en", ""
+    wallets, rejected = chain_analyst.clean_wallets(body.wallets)
+    note = f" and sent {len(wallets)} public wallet address(es) to the crypto graph service for the Chain Analyst" if wallets else ""
+    return wallets, body.lang if body.lang in ("en", "hi") else "en", note + (f" ({rejected} ignored)" if rejected else "")
 
 
 def _log(request: Request, user_id: str, what: str) -> None:
@@ -26,9 +41,10 @@ def _log(request: Request, user_id: str, what: str) -> None:
 
 
 @router.post("/{user_id}/investigate")
-def investigate(request: Request, user_id: str = Depends(resolve_user_id)) -> StreamingResponse:
-    _log(request, user_id, "Evidence Room investigation read your transactions and accounts")
-    return StreamingResponse((json.dumps(e, default=str) + "\n" for e in agents.investigate(user_id)), media_type="application/x-ndjson")
+def investigate(request: Request, body: Screening | None = None, user_id: str = Depends(resolve_user_id)) -> StreamingResponse:
+    wallets, lang, note = _wallets(body)
+    _log(request, user_id, "Evidence Room investigation read your transactions and accounts" + note)
+    return StreamingResponse((json.dumps(e, default=str) + "\n" for e in agents.investigate(user_id, wallets=wallets, lang=lang)), media_type="application/x-ndjson")
 
 
 @router.post("/{user_id}/investigate-job")
@@ -39,11 +55,12 @@ def investigate_job(request: Request, user_id: str = Depends(resolve_user_id)) -
 
 
 @router.post("/{user_id}/council")
-async def convene_council(request: Request, user_id: str = Depends(resolve_user_id)) -> StreamingResponse:
-    _log(request, user_id, "Risk Council read a summary of your finances (no raw transactions)")
+async def convene_council(request: Request, body: Screening | None = None, user_id: str = Depends(resolve_user_id)) -> StreamingResponse:
+    wallets, lang, note = _wallets(body)
+    _log(request, user_id, "Risk Council read a summary of your finances (no raw transactions)" + note)
 
     async def events():
-        async for e in council.convene(user_id):
+        async for e in council.convene(user_id, wallets=wallets, lang=lang):
             yield json.dumps(e, default=str) + "\n"
 
     return StreamingResponse(events(), media_type="application/x-ndjson")
@@ -119,6 +136,7 @@ def graph(request: Request, months: int = 6, user_id: str = Depends(resolve_user
 class FraudSim(BaseModel):
     merchant: str
     amount: float
+    wallet: str | None = None  # optional: a crypto wallet the payment would go to, screened by the Chain Analyst
 
 
 @router.post("/{user_id}/simulate-fraud")
@@ -131,7 +149,17 @@ def simulate_fraud(body: FraudSim, user_id: str = Depends(resolve_user_id)) -> d
                           merchant=body.merchant.strip() or "Unknown", category="shopping")]
     before = {f["title"] for fs in agents.run_checks(rows, accounts).values() for f in fs}
     caught = [f for fs in agents.run_checks(rows + sim, accounts).values() for f in fs if "sim" in f["txn_ids"] or f["title"] not in before]
-    return {"caught": bool(caught), "findings": caught}
+    out: dict = {}
+    if body.wallet is not None and body.wallet.strip():
+        wallets, _ = chain_analyst.clean_wallets([body.wallet])
+        if not wallets:
+            raise HTTPException(422, "That does not look like a Bitcoin wallet address")
+        result = chain_analyst.run_sync(chain_analyst.screen_wallets(wallets))[0]
+        finding = chain_analyst.wallet_finding(result)
+        if finding and not finding["info"]:
+            caught.append(finding)
+        out["wallet"] = {**result, "finding": finding}
+    return {"caught": bool(caught), "findings": caught, **out}
 
 
 def _preview(connector: str, rows: list[TransactionRow]) -> tuple[int, list]:

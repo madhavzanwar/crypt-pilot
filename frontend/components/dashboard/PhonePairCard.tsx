@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import QRCode from "qrcode";
-import { CheckCircle2, Smartphone } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useUserId } from "@/lib/hooks";
 import { Button } from "@/components/shadcn/button";
-import { Card, CardContent } from "@/components/shadcn/card";
 
 /** Body of the phone-pairing flow: mints a code and shows the link and QR that open the phone app on this account. */
 export function PhonePairPanel({ onConnected }: { onConnected?: () => void }) {
@@ -65,23 +63,5 @@ export function PhonePairPanel({ onConnected }: { onConnected?: () => void }) {
         <Button size="sm" onClick={connect}>Connect phone</Button>
       )}
     </div>
-  );
-}
-
-/** Dashboard card for the same flow; the full list of sources is on /connect. */
-export function PhonePairCard() {
-  return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 pt-6">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="flex items-center gap-2 font-display text-lg font-medium text-ink">
-            <span className="flex size-9 items-center justify-center rounded-full bg-sage"><Smartphone className="size-5" /></span>
-            Phone payments
-          </h2>
-          <Link href="/connect" className="text-xs text-graphite underline">All connectors</Link>
-        </div>
-        <PhonePairPanel />
-      </CardContent>
-    </Card>
   );
 }

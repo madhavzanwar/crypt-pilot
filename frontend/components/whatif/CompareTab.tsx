@@ -142,7 +142,7 @@ function Planner({ initial, usingSample }: { initial: Baseline; usingSample: boo
     <div className="flex flex-col gap-5">
       {usingSample && (
         <p className="rounded-card bg-tint-lime px-4 py-3 text-sm text-ink">
-          Showing sample numbers. <Link href="/connect" className="font-semibold underline">Connect Google Pay</Link> to start from your own data.
+          Showing sample numbers. <Link href="/connect" className="font-semibold underline">Connect a bank account</Link> to start from your own data.
         </p>
       )}
 

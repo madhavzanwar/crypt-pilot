@@ -15,12 +15,11 @@ router = APIRouter(prefix="/api/voice", tags=["voice"])
 _limit = RateLimiter(60, 60)
 
 PAGES = {  # path -> what it is, so the model can choose where to go
-    "/dashboard": "overview, balances, spending, health score", "/transactions": "all transactions", "/budgets": "budgets", "/goals": "savings goals",
-    "/tax": "tax", "/plan": "forecast plan", "/household": "family", "/invoices": "invoices", "/upload": "upload a bill", "/statement": "statement",
-    "/security": "security", "/financial-security": "financial security score", "/evidence-room": "Evidence Council fraud agents", "/council": "Risk Council",
-    "/scheme-analyst": "government scheme analyst", "/web-intel": "web search tools", "/twin": "twin simulator", "/my-data": "my data", "/profile": "profile",
+    "/dashboard": "overview, balances, spending, health score", "/wallet-guard": "check a Bitcoin wallet before paying (graph-verified risk verdict)", "/credits": "buy or top up wallet-check credits (test mode)", "/transactions": "all transactions", "/photos": "quick expense entry (item + amount) and price-from-photo; not in the menu", "/budgets": "budgets", "/goals": "savings goals",
+    "/tax": "tax", "/plan": "forecast plan", "/household": "family", "/upload": "upload a bill", "/statement": "statement",
+    "/security": "security", "/financial-security": "financial security score", "/evidence-room": "Evidence Council fraud agents", "/council": "Risk Council", "/twin": "twin simulator", "/my-data": "my data", "/profile": "profile",
     "/copilot": "full copilot chat", "/scenarios": "what-if scenarios", "/timeline": "timeline", "/simulate": "simulator",
-    "/connect": "Connectors: link Google Pay, bank accounts, Google Sheets, Gmail, mutual funds, add a card", "/photos": "Photo prices: price an item from a photo", "/agent-ops": "agent operations dashboard",
+    "/connect": "Connectors: link bank accounts, Google Sheets, Gmail, mutual funds, add a card",
 }
 LANG = {"en": "English", "hi": "Hindi (Devanagari script)", "mr": "Marathi (Devanagari script)"}
 

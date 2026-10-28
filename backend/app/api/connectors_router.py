@@ -1,10 +1,9 @@
 """Data connectors: the app starts empty and fills itself when a source is linked.
 
-Google Pay is a *dummy* connector for now: "connecting" generates a realistic
-12-month dataset for the user from one of the synthetic personas (the same
-generator the demo personas use). Bank / invoice / investment connectors link
-demo datasets from backend/data/connectors/. Swap `_seed_from_persona` for a real adapter later; the routes
-and the frontend don't change.
+Bank / invoice / investment connectors link demo datasets from backend/data/connectors/.
+"Payment rails" (Dodo Payments, Cake Wallet) are not data sources: they are always available, test mode / testnet only,
+and open the credits drawer in the UI. The retired Google Pay connector is no longer listed; its id is still accepted by
+the connect/disconnect/export routes (LEGACY_IDS) because the Account Aggregator flow and the plan seeding record that link.
 """
 from __future__ import annotations
 
@@ -33,15 +32,30 @@ router = APIRouter(prefix="/api/connectors", tags=["connectors"])
 
 # id -> (name, description, live?)
 CATALOG: dict[str, tuple[str, str, bool]] = {
-    "google_pay": ("Google Pay", "Your UPI payments, linked through your bank accounts with Account Aggregator", True),
     "bank": ("Bank accounts", "Balances, salary credits, loans and cards", True),
     "google_sheets": ("Google Sheets", "A live expense sheet: edit it and the app updates", True),
     "invoices": ("Gmail & Drive invoices", "Bills and invoices parsed automatically", True),
     "investments": ("Mutual funds & stocks", "SIPs and holdings from your depository", True),
     "plaid": ("Plaid", "Link a US or European bank (sandbox) to import accounts and transactions", True),
+    "dodo": ("Dodo Payments", "Card checkout for CryptPilot credits. Test mode, no real charge", True),
+    "cake_wallet": ("Cake Wallet", "Bitcoin testnet / Monero demo invoices, opened as a bitcoin: or monero: link in your wallet", True),
 }
 
-# Demo datasets for the non-Google-Pay connectors, all kept in one folder.
+# Payment rails: always "connected" (available), carry no user data, and never touch the ledger.
+RAILS: dict[str, str] = {"dodo": "Test mode", "cake_wallet": "Bitcoin testnet / Monero demo"}
+
+# Retired from the catalogue but still honoured by the routes (existing links, the AA flow and plan seeding use this id).
+LEGACY_IDS: dict[str, str] = {"google_pay": "Google Pay"}
+
+
+def _known(connector: str) -> bool:
+    return connector in CATALOG or connector in LEGACY_IDS
+
+
+def _label(connector: str) -> str:
+    return CATALOG[connector][0] if connector in CATALOG else LEGACY_IDS[connector]
+
+# Demo datasets for the bank / invoices / investments connectors, all kept in one folder.
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "connectors"
 DATASET_FILES = {"bank": "bank.json", "invoices": "invoices.json", "investments": "investments.json"}
 
@@ -142,6 +156,9 @@ def list_connectors(user_id: str = Depends(resolve_user_id)) -> list[Connector]:
     linked = {c.connector: c for c in store.query(ConnectionRow, user_id=user_id)}
     out = []
     for cid, (name, desc, live) in CATALOG.items():
+        if cid in RAILS:
+            out.append(Connector(id=cid, name=name, description=desc, available=live, connected=True, detail=RAILS[cid]))
+            continue
         row = linked.get(cid)
         out.append(Connector(id=cid, name=name, description=desc, available=live,
                              connected=row is not None and row.status == "connected",
@@ -152,10 +169,13 @@ def list_connectors(user_id: str = Depends(resolve_user_id)) -> list[Connector]:
 
 @router.post("/{user_id}/{connector}/connect")
 def connect(connector: str, body: ConnectRequest, user_id: str = Depends(resolve_user_id)) -> dict:
-    if connector not in CATALOG:
+    if not _known(connector):
         raise HTTPException(404, "Unknown connector")
-    if not CATALOG[connector][2]:
-        raise HTTPException(409, f"{CATALOG[connector][0]} isn't available yet")
+    if connector in CATALOG and not CATALOG[connector][2]:
+        raise HTTPException(409, f"{_label(connector)} isn't available yet")
+    if connector in RAILS:
+        # nothing to link: the rail is always available (test mode / testnet only)
+        return {"connected": True, "rail": True}
     if connector == "google_sheets":
         csv_url = _sheet_csv_url(body.url)
         _, digest, n = _sync_sheet(user_id, csv_url)
@@ -195,10 +215,12 @@ def sync_sheet(user_id: str = Depends(resolve_user_id)) -> dict:
 @router.get("/{user_id}/{connector}/export")
 def export(connector: str, user_id: str = Depends(resolve_user_id)) -> Response:
     """Download what a connector brought in, as a CSV file."""
-    if connector not in CATALOG:
+    if not _known(connector):
         raise HTTPException(404, "Unknown connector")
+    if connector in RAILS:
+        raise HTTPException(409, f"{_label(connector)} is a payment rail, it has no data to export")
     if store.get(ConnectionRow, f"{user_id}:{connector}") is None:
-        raise HTTPException(409, f"{CATALOG[connector][0]} isn't connected")
+        raise HTTPException(409, f"{_label(connector)} isn't connected")
     if connector in ("google_pay", "google_sheets", "plaid"):
         data = {"transactions": [t.model_dump(mode="json") for t in store.query(TransactionRow, user_id=user_id)]}
     else:
@@ -211,8 +233,10 @@ def export(connector: str, user_id: str = Depends(resolve_user_id)) -> Response:
 @router.delete("/{user_id}/{connector}", status_code=204, response_model=None)
 def disconnect(connector: str, user_id: str = Depends(resolve_user_id)) -> None:
     """Unlinking removes everything that source brought in (the app returns to empty); demo personas only lose the link (and any sheet rows)."""
-    if connector not in CATALOG:
+    if not _known(connector):
         raise HTTPException(404, "Unknown connector")
+    if connector in RAILS:
+        return  # payment rails hold no user data: nothing to remove, and the ledger must stay untouched
     if user_id not in DEMO_USER_IDS:
         _clear_user(user_id)
     elif connector == "google_sheets":

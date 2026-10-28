@@ -7,7 +7,6 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   ReceiptText,
-  Camera,
   ScanText,
   Wallet,
   Target,
@@ -21,13 +20,11 @@ import {
   ScanSearch,
   Network,
   Database,
-  FilePlus2,
   Link2,
   UserRound,
-  Globe,
-  Landmark,
-  Activity,
   ChartLine,
+  ShieldCheck,
+  Coins,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -60,6 +57,14 @@ export const NAV_GROUPS: { label: string; tone: string; links: NavLink[] }[] = [
     links: [{ href: "/copilot", label: "FinPilot Copilot", icon: Sparkles }],
   },
   {
+    label: "Crypto",
+    tone: "text-[#3b6bff]",
+    links: [
+      { href: "/wallet-guard", label: "Wallet Guard", icon: ShieldCheck },
+      { href: "/credits", label: "Credits", icon: Coins },
+    ],
+  },
+  {
     label: "Track",
     tone: "text-[#0fb67a]",
     links: [
@@ -67,8 +72,6 @@ export const NAV_GROUPS: { label: string; tone: string; links: NavLink[] }[] = [
       { href: "/connect", label: "Connectors", icon: Link2 },
       { href: "/transactions", label: "Transactions", icon: ReceiptText },
       { href: "/upload", label: "Upload document", icon: ScanText },
-      { href: "/photos", label: "Photo prices", icon: Camera },
-      { href: "/invoices", label: "Invoices", icon: FilePlus2 },
       { href: "/budgets", label: "Budgets", icon: Wallet },
       { href: "/goals", label: "Goals", icon: Target },
       { href: "/household", label: "Household", icon: Users },
@@ -83,7 +86,6 @@ export const NAV_GROUPS: { label: string; tone: string; links: NavLink[] }[] = [
       { href: "/plan", label: "Plan", icon: Route },
       { href: "/forecast-risk", label: "Forecast & Risk", icon: ChartLine },
       { href: "/scenarios", label: "Compare, Tax & Timeline", icon: GitCompare },
-      { href: "/agent-ops", label: "Agent Ops", icon: Activity },
     ],
   },
   {
@@ -91,14 +93,6 @@ export const NAV_GROUPS: { label: string; tone: string; links: NavLink[] }[] = [
     tone: "text-[#3b6bff]",
     links: [
       { href: "/statement", label: "Statement", icon: FileText },
-    ],
-  },
-  {
-    label: "Schemes",
-    tone: "text-[#0fb67a]",
-    links: [
-      { href: "/scheme-analyst", label: "Scheme Analyst", icon: Landmark },
-      { href: "/web-intel", label: "Web Intel", icon: Globe },
     ],
   },
   {
@@ -130,6 +124,7 @@ export function AppSidebar({ footer }: { footer?: ReactNode }) {
                   <FinPilotLogo size={20} />
                 </div>
                 <span className="font-display text-lg font-medium tracking-tight">FinPilot</span>
+                <span className="-ml-1 mt-1 text-[10px] font-medium uppercase tracking-wider text-ember">x Crypto</span>
                 <span className="ml-auto size-1.5 rounded-full bg-lime shadow-[0_0_8px_rgba(198,241,53,0.8)] animate-pulse" />
               </Link>
             </SidebarMenuButton>

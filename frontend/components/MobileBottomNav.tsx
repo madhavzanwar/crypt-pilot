@@ -8,7 +8,7 @@ import {
   LayoutDashboard,
   ReceiptText,
   Wallet,
-  Target,
+  ShieldCheck,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
@@ -38,9 +38,9 @@ const MOBILE_TABS: MobileTabItem[] = [
     icon: Wallet,
   },
   {
-    href: "/goals",
-    label: "Goals",
-    icon: Target,
+    href: "/wallet-guard",
+    label: "Guard",
+    icon: ShieldCheck,
   },
   {
     href: "/copilot",

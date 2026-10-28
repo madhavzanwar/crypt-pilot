@@ -17,7 +17,7 @@ import { FeatureShowcase } from "@/components/showcase/FeatureShowcase";
 import { FinPilotLogo } from "@/components/FinPilotLogo";
 import { LandingHeader } from "@/components/landing/LandingHeader";
 import { Reveal } from "@/components/landing/Reveal";
-import { ShieldCheck, TrendingUp, Sparkles, CheckCircle2 } from "lucide-react";
+import { ShieldCheck, TrendingUp, Sparkles, CheckCircle2, Network } from "lucide-react";
 import type { ReactNode } from "react";
 
 const PREVIEW_ANSWER: AnswerContract = {
@@ -110,23 +110,24 @@ export default function Home() {
           <Reveal>
             <div className="inline-flex items-center gap-2 rounded-full border border-black/[0.08] bg-white/80 px-3.5 py-1.5 text-xs font-medium text-graphite shadow-[0_1px_3px_rgba(0,0,0,0.03)] backdrop-blur-md mb-8">
               <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Fintech Intelligence Engine • 90-Day Cash-Flow Modeling</span>
+              <span>AI x Crypto Intelligence Engine</span>
             </div>
           </Reveal>
 
           {/* Editorial Headline */}
           <Reveal delay={0.05}>
             <h1 className="font-display max-w-5xl text-[2.5rem] sm:text-6xl md:text-7xl lg:text-[5.5rem] leading-[1.05] text-ink tracking-tight text-balance">
-              Your financial health, <br className="hidden sm:block" />
-              <span className="italic font-normal text-ember">explained</span> — not just reported.
+              Your money, <span className="italic font-normal text-ember">explained</span>. <br className="hidden sm:block" />
+              Every wallet, checked.
             </h1>
           </Reveal>
 
           {/* Subtitle */}
           <Reveal delay={0.1}>
             <p className="mt-7 max-w-2xl text-base sm:text-xl text-graphite leading-relaxed text-pretty">
-              FinPilot reads your transactions, forecasts 90-day cash flow with P10/P90 confidence bands,
-              and shows the simulated before → after impact of every financial recommendation.
+              A 90-day Monte Carlo forecast of your cash flow, with P10/P90 confidence bands and the simulated
+              before → after impact of every recommendation. Plus graph-verified Bitcoin wallet risk, so you can
+              check who you are about to pay.
             </p>
           </Reveal>
 
@@ -141,9 +142,9 @@ export default function Home() {
                   </svg>
                 </Button>
               </Link>
-              <Link href="/simulate" className="w-full sm:w-auto">
+              <Link href="/wallet-guard" className="w-full sm:w-auto">
                 <Button variant="secondary" size="lg" className="w-full sm:w-auto px-6 py-3.5 text-base">
-                  Run What-If Simulator
+                  Check a wallet
                 </Button>
               </Link>
             </div>
@@ -152,7 +153,7 @@ export default function Home() {
           {/* Trust Badges */}
           <Reveal delay={0.2}>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-3 text-xs text-graphite font-medium">
-              {["Sign in with Google or email", "Offline rule router fallback", "Three-lane verified insights"].map((t) => (
+              {["Sign in with Google or email", "Testnet and test-mode only", "Three-lane verified insights"].map((t) => (
                 <span key={t} className="flex items-center gap-1.5 rounded-full border border-black/[0.06] bg-white/70 px-3 py-1.5 backdrop-blur">
                   <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -176,6 +177,111 @@ export default function Home() {
       <Section>
         <DeviceMockupSection />
       </Section>
+
+      {/* Wallet Guard */}
+      <Section band>
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-14 lg:items-center">
+          <div className="max-w-xl">
+            <span className="text-xs font-semibold text-ember uppercase tracking-wider">Wallet Guard</span>
+            <h2 className="font-display text-3xl sm:text-4xl text-ink mt-2 text-balance">
+              Check a Bitcoin wallet <span className="italic font-normal text-ember">before</span> you pay.
+            </h2>
+            <p className="mt-3 text-sm sm:text-base text-graphite text-pretty">
+              Paste or speak an address and get a clear verdict, backed by graph evidence you can inspect. It is a risk
+              signal from a research dataset, not an accusation.
+            </p>
+            <ul className="mt-6 space-y-3 text-sm text-graphite">
+              {[
+                "Four verdicts: ALLOW, WARN, BLOCK or UNKNOWN, never a vague score.",
+                "Plain-language explanations in English and Hindi.",
+                "Graph evidence: the connected wallets and paths behind the verdict.",
+                "Optional on-chain attestation of the result on a testnet.",
+              ].map((line) => (
+                <li key={line} className="flex items-start gap-2.5">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-8">
+              <Link href="/wallet-guard">
+                <Button variant="lime" size="lg" className="px-7 py-3 text-base">
+                  Open Wallet Guard
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          <Card className="p-6 sm:p-8 min-w-0">
+            <div className="flex items-center justify-between gap-3 pb-4 border-b border-black/[0.06]">
+              <div className="flex items-center gap-2">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50 text-ember border border-ember/20">
+                  <ShieldCheck className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-ink leading-tight">Wallet verdict</p>
+                  <p className="text-[11px] text-graphite">Illustrative example, not a real wallet</p>
+                </div>
+              </div>
+              <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold tracking-wide text-rose-700">
+                BLOCK
+              </span>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[
+                ["ALLOW", "border-emerald-200 bg-emerald-50 text-emerald-700"],
+                ["WARN", "border-amber-200 bg-amber-50 text-amber-700"],
+                ["BLOCK", "border-rose-200 bg-rose-50 text-rose-700"],
+                ["UNKNOWN", "border-black/10 bg-fog text-graphite"],
+              ].map(([label, tone]) => (
+                <span key={label} className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${tone}`}>
+                  {label}
+                </span>
+              ))}
+            </div>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-black/[0.06] bg-fog/70 p-3.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-pewter">English</span>
+                <p className="mt-1 text-sm text-ink">This wallet is linked to flagged addresses two hops away. Pause before sending.</p>
+              </div>
+              <div className="rounded-xl border border-black/[0.06] bg-fog/70 p-3.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-pewter">हिन्दी</span>
+                <p className="mt-1 text-sm text-ink">यह वॉलेट दो कदम दूर चिह्नित पतों से जुड़ा है। भेजने से पहले रुकें।</p>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between rounded-xl border border-black/[0.06] bg-fog/60 p-3 text-xs">
+              <span className="flex items-center gap-2 font-medium text-graphite">
+                <Network className="h-4 w-4 text-ember shrink-0" />
+                Graph evidence: 3 hops, 2 flagged neighbours
+              </span>
+              <span className="font-mono text-[11px] font-bold text-ink">ATTEST</span>
+            </div>
+          </Card>
+        </div>
+      </Section>
+
+      {/* Built with */}
+      <section className="w-full">
+        <div className="mx-auto w-full max-w-[1240px] px-4 py-12 sm:px-8 sm:py-14">
+          <Reveal>
+            <p className="text-center text-xs font-semibold uppercase tracking-wider text-pewter">Built with</p>
+            <ul className="mt-5 flex flex-wrap items-center justify-center gap-2.5 text-xs font-medium text-graphite">
+              {[
+                "TigerGraph · graph evidence",
+                "Dodo Payments · test mode",
+                "Cake Wallet · testnet invoices",
+                "Sarvam · voice",
+                "Wispr Flow · voice",
+                "EAS on Base Sepolia · attestations",
+              ].map((item) => (
+                <li key={item} className="rounded-full border border-black/[0.06] bg-white/70 px-3.5 py-1.5 backdrop-blur">
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </Reveal>
+        </div>
+      </section>
 
       {/* Floating Overlap Card Section */}
       <Section band>
@@ -383,11 +489,11 @@ export default function Home() {
                 </span>
 
                 <h2 className="font-display text-3xl sm:text-5xl text-ink mt-4 text-balance font-bold leading-[1.12]">
-                  Ready to see FinPilot in action?
+                  Ready to see CryptPilot in action?
                 </h2>
 
                 <p className="mt-4 text-sm sm:text-base text-graphite leading-relaxed max-w-xl font-medium">
-                  Explore real-time health scoring, 90-day cash-flow forecasting with confidence bands, and simulated impact recommendations now.
+                  Explore real-time health scoring, 90-day cash-flow forecasting with confidence bands, simulated impact recommendations and graph-verified wallet checks now.
                 </p>
 
                 <div className="mt-8 flex flex-col sm:flex-row gap-3.5 w-full sm:w-auto">
@@ -488,6 +594,7 @@ export default function Home() {
             {[
               ["/dashboard", "Dashboard"],
               ["/copilot", "AI Copilot"],
+              ["/wallet-guard", "Wallet Guard"],
               ["/simulate", "What-If Simulator"],
             ].map(([href, label]) => (
               <Link key={href} href={href} className="inline-flex min-h-11 items-center rounded-chip px-3 hover:text-ink transition-colors">
