@@ -164,7 +164,7 @@ export default function StatementPage() {
           article and hidden in @media print, so the PDF view is unchanged.
           ───────────────────────────────────────────────────────────── */}
       {data && (
-        <StatementAnchorPanel userId={userId} healthScore={Math.round(data.dashboard.health_score.overall)} />
+        <StatementAnchorPanel data={{ userId, dashboard: data.dashboard, accounts: data.accounts, transactions: data.transactions }} />
       )}
     </div>
   );

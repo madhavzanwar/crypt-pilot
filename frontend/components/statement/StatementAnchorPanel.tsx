@@ -9,7 +9,7 @@ import { statementSubject } from "@/lib/crypto/eas/statement";
 import { useT } from "@/lib/i18n";
 import { Anchor } from "lucide-react";
 import { useMemo, useState } from "react";
-import { auditHashLabel, STATEMENT_PERIOD } from "./auditHash";
+import { statementDigest, STATEMENT_PERIOD, type StatementData } from "./auditHash";
 
 /**
  * "Anchor this statement on-chain": SCREEN ONLY (print:hidden, and it lives outside #executive-statement-document,
@@ -17,10 +17,12 @@ import { auditHashLabel, STATEMENT_PERIOD } from "./auditHash";
  * attestation flow (Base Sepolia testnet) plus a standalone "Verify a statement hash" field that needs no wallet.
  * Hashes only: no transactions, balances or personal data are ever published.
  */
-export function StatementAnchorPanel({ userId, healthScore }: { userId: string; healthScore: number }) {
+export function StatementAnchorPanel({ data }: { data: StatementData }) {
   const { t } = useT();
   const [attestOpen, setAttestOpen] = useState(false);
-  const auditHash = auditHashLabel(userId);
+  const digest = useMemo(() => statementDigest(data), [data]);
+  const healthScore = data.dashboard.health_score.overall;
+  const auditHash = digest.bytes32;
   const subject = useMemo(
     () => statementSubject({ auditHash, period: STATEMENT_PERIOD, healthScore }),
     [auditHash, healthScore],
@@ -48,7 +50,7 @@ export function StatementAnchorPanel({ userId, healthScore }: { userId: string; 
           )}
         </p>
         <dl className="grid gap-x-4 gap-y-1.5 text-xs sm:grid-cols-[max-content_1fr]">
-          <dt className="text-graphite">{t("stmt.anchor.audit", "Audit hash on this statement")}</dt>
+          <dt className="text-graphite">{t("stmt.anchor.audit", "SHA-256 of this statement's figures")}</dt>
           <dd className="break-all font-mono text-ink">{auditHash}</dd>
           <dt className="text-graphite">{t("stmt.anchor.period", "Period")}</dt>
           <dd className="font-medium text-ink">{STATEMENT_PERIOD}</dd>
@@ -70,10 +72,19 @@ export function StatementAnchorPanel({ userId, healthScore }: { userId: string; 
           <p>
             {t(
               "stmt.anchor.honest",
-              "Heads-up: the printed \"SHA256:\" value is a short reference code derived from the account reference and period, not a digest of the statement's figures. Anchoring it proves that this reference and health score were recorded at a point in time; it does not prove the transaction data. Testnet, not a legal verdict.",
+              "This is a real SHA-256 digest of the figures printed on the statement (balances, income, expenses, health score, forecast and a digest of the transactions). Change any figure and the hash changes. Anchoring it proves these figures existed in this form at a point in time. Testnet, not a legal verdict.",
             )}
           </p>
         </Notice>
+        <details className="rounded-xl border border-mist bg-fog p-3 text-xs">
+          <summary className="cursor-pointer font-medium text-ink">
+            {t("stmt.anchor.how", "How to check it yourself")}
+          </summary>
+          <p className="mt-2 text-graphite">
+            {t("stmt.anchor.how.body", "SHA-256 of exactly this text (UTF-8, no trailing newline) gives the hash above, e.g. `printf '%s' '<text>' | sha256sum`:")}
+          </p>
+          <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-paper p-2 font-mono text-[11px] text-ink">{digest.canonical}</pre>
+        </details>
         <AttestDisclosure
           subject={subject}
           label={t("stmt.anchor.open", "Anchor this statement on Base Sepolia")}

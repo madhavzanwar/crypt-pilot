@@ -1,7 +1,7 @@
 "use client";
 
 import { useT } from "@/lib/i18n";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -25,6 +25,8 @@ import {
   ChartLine,
   ShieldCheck,
   Coins,
+  Ellipsis,
+  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -48,6 +50,8 @@ export interface NavLink {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Secondary pages live under a collapsed "More" group so the primary menu stays short and focused. */
+  more?: boolean;
 }
 
 export const NAV_GROUPS: { label: string; tone: string; links: NavLink[] }[] = [
@@ -71,21 +75,21 @@ export const NAV_GROUPS: { label: string; tone: string; links: NavLink[] }[] = [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { href: "/connect", label: "Connectors", icon: Link2 },
       { href: "/transactions", label: "Transactions", icon: ReceiptText },
-      { href: "/upload", label: "Upload document", icon: ScanText },
-      { href: "/budgets", label: "Budgets", icon: Wallet },
-      { href: "/goals", label: "Goals", icon: Target },
-      { href: "/household", label: "Household", icon: Users },
+      { href: "/upload", label: "Upload document", icon: ScanText, more: true },
+      { href: "/budgets", label: "Budgets", icon: Wallet, more: true },
+      { href: "/goals", label: "Goals", icon: Target, more: true },
+      { href: "/household", label: "Household", icon: Users, more: true },
     ],
   },
   {
     label: "Intelligence",
     tone: "text-[#e0540a]",
     links: [
-      { href: "/financial-security", label: "Financial Security", icon: ShieldAlert },
+      { href: "/financial-security", label: "Financial Security", icon: ShieldAlert, more: true },
       { href: "/simulate", label: "Simulate", icon: FlaskConical },
-      { href: "/plan", label: "Plan", icon: Route },
+      { href: "/plan", label: "Plan", icon: Route, more: true },
       { href: "/forecast-risk", label: "Forecast & Risk", icon: ChartLine },
-      { href: "/scenarios", label: "Compare, Tax & Timeline", icon: GitCompare },
+      { href: "/scenarios", label: "Compare, Tax & Timeline", icon: GitCompare, more: true },
     ],
   },
   {
@@ -102,16 +106,23 @@ export const NAV_GROUPS: { label: string; tone: string; links: NavLink[] }[] = [
       { href: "/evidence-room", label: "Evidence Council", icon: ScanSearch },
       { href: "/council", label: "Risk Council", icon: Users },
       { href: "/twin", label: "Twin Simulator", icon: Network },
-      { href: "/my-data", label: "My Data", icon: Database },
-      { href: "/profile", label: "Profile", icon: UserRound },
+      { href: "/my-data", label: "My Data", icon: Database, more: true },
+      { href: "/profile", label: "Profile", icon: UserRound, more: true },
     ],
   },
 ];
+
+const MORE_LINKS: (NavLink & { tone: string })[] = NAV_GROUPS.flatMap((g) =>
+  g.links.filter((l) => l.more).map((l) => ({ ...l, tone: g.tone })),
+);
 
 export function AppSidebar({ footer }: { footer?: ReactNode }) {
   const { t } = useT();
   const pathname = usePathname();
   const { setOpenMobile, state } = useSidebar();
+  const onMorePage = MORE_LINKS.some((l) => !!pathname?.startsWith(l.href));
+  const [moreOpen, setMoreOpen] = useState(false);
+  const showMore = moreOpen || onMorePage; // never hide the page you are on
 
   return (
     <Sidebar collapsible="icon" variant="floating">
@@ -133,12 +144,12 @@ export function AppSidebar({ footer }: { footer?: ReactNode }) {
       </SidebarHeader>
 
       <SidebarContent>
-        {NAV_GROUPS.map((group) => (
+        {NAV_GROUPS.filter((g) => g.links.some((l) => !l.more)).map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel>{t(`nav.${group.label}`, group.label)}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {group.links.map(({ href, label, icon: Icon }) => {
+                {group.links.filter((l) => !l.more).map(({ href, label, icon: Icon }) => {
                   const active = !!pathname?.startsWith(href);
                   return (
                     <SidebarMenuItem key={href}>
@@ -159,6 +170,41 @@ export function AppSidebar({ footer }: { footer?: ReactNode }) {
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip={t("nav.More", "More")}
+                  onClick={() => setMoreOpen((v) => !v)}
+                  aria-expanded={showMore}
+                  aria-controls="nav-more"
+                >
+                  <Ellipsis className="text-pewter" />
+                  <span>{t("nav.More", "More")}</span>
+                  <ChevronDown className={`ml-auto size-4 text-pewter transition-transform ${showMore ? "rotate-180" : ""}`} />
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+            {showMore && (
+              <SidebarMenu id="nav-more">
+                {MORE_LINKS.map(({ href, label, icon: Icon, tone }) => {
+                  const active = !!pathname?.startsWith(href);
+                  return (
+                    <SidebarMenuItem key={href}>
+                      <SidebarMenuButton asChild isActive={active} tooltip={t(`nav.${label}`, label)}>
+                        <Link href={href} aria-current={active ? "page" : undefined} onClick={() => setOpenMobile(false)}>
+                          <Icon className={active ? "text-ink" : tone} />
+                          <span>{t(`nav.${label}`, label)}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            )}
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter>

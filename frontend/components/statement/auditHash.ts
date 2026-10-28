@@ -1,20 +1,69 @@
+import { canonicalJson } from "@/lib/crypto/api/reportHash";
+import { sha256Hex } from "@/lib/crypto/sha256";
+import type { Account, DashboardSnapshot, Transaction } from "@/lib/types";
+
 /**
- * The statement's audit hash exactly as ExecutiveStatement prints it ("Hash: SHA256:<code>..."). The computation
- * lives here only so the printed value and the on-chain anchor panel can never drift apart; it is byte-for-byte the
- * expression that was inline in ExecutiveStatement.
+ * The statement's audit hash: SHA-256 of the canonical JSON of the figures the statement prints. Anyone holding the
+ * same figures can recompute it (the canonical JSON is shown next to the hash), so a changed figure changes the hash.
  *
- * HONESTY NOTE: despite the "SHA256:" prefix this is a 16-character base64 reference code derived from the account
- * reference and period (base64 of "FP-<userId>-<period>", truncated). It is NOT a digest of the statement's
- * figures. Anchoring it timestamps that reference together with the health score; it does not prove the numbers.
+ * Canonical JSON = keys sorted, no whitespace, money as fixed 2-decimal strings (floats are not allowed in the
+ * canonical form). Transactions are covered by a second SHA-256 over one line per transaction, sorted by id.
+ * Personal data stays out: no names, merchants or account numbers are part of the figures, only amounts, dates and ids.
  */
 export const STATEMENT_PERIOD = "2026-09";
+export const STATEMENT_HASH_VERSION = 1;
 
-/** The code printed after "SHA256:" on the statement. */
-export function auditCode(userId: string): string {
-  return Buffer.from(`FP-${userId}-${STATEMENT_PERIOD}`).toString("base64").substring(0, 16);
+export interface StatementData {
+  userId: string;
+  dashboard: DashboardSnapshot;
+  accounts: Account[];
+  transactions: Transaction[];
 }
 
-/** The full audit hash as shown on the statement, without the trailing ellipsis. */
-export function auditHashLabel(userId: string): string {
-  return `SHA256:${auditCode(userId)}`;
+const money = (n: number): string => (Math.round((Number.isFinite(n) ? n : 0) * 100) / 100).toFixed(2);
+
+/** One line per transaction, sorted by id: the leaf data behind `transactions.sha256`. */
+export function transactionLines(transactions: Transaction[]): string[] {
+  return [...transactions]
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .map((t) => `${t.id}|${t.date}|${money(t.amount)}|${t.category}|${t.account_id}`);
+}
+
+export function statementFigures(d: StatementData): Record<string, unknown> {
+  const { dashboard, accounts, transactions } = d;
+  const pts = dashboard.forecast.points ?? [];
+  const first = pts[0];
+  const last = pts[pts.length - 1];
+  const at = (p: { p10: number; p50: number; p90: number } | undefined) =>
+    p ? { p10: money(p.p10), p50: money(p.p50), p90: money(p.p90) } : null;
+  return {
+    version: STATEMENT_HASH_VERSION,
+    period: STATEMENT_PERIOD,
+    account: d.userId,
+    health: {
+      overall: Math.round(dashboard.health_score.overall),
+      subScores: dashboard.health_score.sub_scores.map((s) => ({ name: s.name, score: Math.round(s.score) })),
+    },
+    monthly: { income: money(dashboard.monthly_income), expenses: money(dashboard.monthly_expenses) },
+    netWorth: money(dashboard.net_worth),
+    accounts: accounts.map((a) => `${a.id}|${a.type}|${money(a.balance)}`).sort(),
+    debts: dashboard.debts.map((x) => money(x.principal)).sort(),
+    forecast: { days: pts.length, start: at(first), end: at(last) },
+    transactions: { count: transactions.length, sha256: sha256Hex(transactionLines(transactions).join("\n")) },
+  };
+}
+
+export interface StatementDigest {
+  /** 64 lowercase hex characters. */
+  hex: string;
+  /** "0x" + hex: a bytes32, so it can be attested on-chain as is. */
+  bytes32: string;
+  /** The exact string that was hashed. */
+  canonical: string;
+}
+
+export function statementDigest(d: StatementData): StatementDigest {
+  const canonical = canonicalJson(statementFigures(d));
+  const hex = sha256Hex(canonical);
+  return { hex, bytes32: `0x${hex}`, canonical };
 }
