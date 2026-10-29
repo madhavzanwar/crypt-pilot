@@ -218,3 +218,15 @@ def test_warmup_can_be_skipped_with_env_flag(monkeypatch):
     monkeypatch.delenv("FINPILOT_SKIP_WARMUP")
     asyncio.run(run())
     assert "_warm_models" in started
+
+
+def test_copilot_failure_reason_names_the_real_cause_without_leaking_bodies():
+    from app.copilot.engine import failure_reason
+
+    assert failure_reason(RuntimeError("NVIDIA 429: too many")) == ("it is busy right now", "NVIDIA HTTP 429, rate limited")
+    why, detail = failure_reason(RuntimeError("NVIDIA 401: {\"detail\":\"Authorization failed secret-body\"}"))
+    assert "rejected" in why and "401" in detail and "secret-body" not in detail
+    assert failure_reason(RuntimeError("NVIDIA 404: no such model"))[1] == "NVIDIA HTTP 404, model not found"
+    assert failure_reason(RuntimeError("NVIDIA 500: boom"))[1] == "NVIDIA HTTP 500"
+    assert failure_reason(TimeoutError("The read operation timed out"))[0] == "it did not respond in time"
+    assert failure_reason(None)[0] == "the AI service could not be used"
