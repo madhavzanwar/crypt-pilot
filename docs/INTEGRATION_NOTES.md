@@ -18,7 +18,7 @@ verification results are added by the lead after integration.
 
 ## CI and deployment (BUG-010)
 
-- **`ci.yml`** stays minimal and read-only: frontend `tsc --noEmit` after `npm ci`, and `compileall` for the FinPilot
+- **`ci.yml`** stays minimal and read-only: frontend `next typegen` then `tsc --noEmit` after `npm ci` (typegen is needed for the generated `LayoutProps` type), and `compileall` for the FinPilot
   API and crypto-service. No secrets, no deploy, no tests that need a database or network.
 - **`deploy-vercel.yml`** is `workflow_dispatch` only, bound to a `production` environment (configure required
   reviewers in GitHub settings), and fails early with a clear message when the three Vercel secrets are missing. It no
