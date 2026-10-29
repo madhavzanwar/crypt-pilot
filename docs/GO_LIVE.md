@@ -53,6 +53,21 @@ Path of a request: browser -> hosted frontend (`/api/crypto/*`) -> hosted FinPil
 **Check:** `curl <tunnel>/api/health` answers, then `https://<hosted site>/api/crypto/status` shows `"reachable":true`.
 Security note: the tunnel exposes the whole crypto-service, not just the bridge's route allowlist (admin routes need `ADMIN_TOKEN`; there is no shared secret between the bridge and the service yet). Fine for a demo; do not leave it up unattended.
 
+## 0c. Firebase (optional: real logins and persistence)
+
+The demo works without it (`FINPILOT_DEMO_MODE=true`, three seeded personas). For real accounts you need your own Firebase project
+(`.firebaserc` and `firebase.json` still point at the original FinPilot author's project, which you do not own).
+
+1. `npm i -g firebase-tools`, then `firebase login`.
+2. `scripts/setup_firebase.sh <your-unique-project-id> asia-south1` (Windows: `powershell -ExecutionPolicy Bypass -File scripts\setup_firebase.ps1 -Project <id>`).
+   It creates the project and web app, creates the Firestore database, deploys `firestore.rules`, tries to enable Email/Password and Google sign-in,
+   writes `frontend/.env.local` and replaces the old project id in `.firebaserc`, `firebase.json` and `.env.example`. Run `git diff` afterwards and commit those three files.
+3. By hand: confirm the two sign-in providers are on, add your Vercel domain under Authentication > Settings > Authorized domains, generate a service-account key
+   (Project settings > Service accounts; never commit or paste it) and set `GOOGLE_APPLICATION_CREDENTIALS` locally or `FIREBASE_SERVICE_ACCOUNT_JSON` + `FIREBASE_PROJECT_ID` on the host.
+
+**Check:** sign up with email in the app, add a transaction, reload: it is still there, and the document appears in Firestore.
+The script was tested only against a stubbed CLI; the PowerShell twin was not run.
+
 ## 1. (included in step 0)
 
 ## 2. Dodo Payments: one real test checkout
