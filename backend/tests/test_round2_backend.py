@@ -186,3 +186,35 @@ def test_cache_dir_moves_to_tmp_on_vercel(monkeypatch, tmp_path):
     assert writable_dir(tmp_path) != tmp_path and str(writable_dir(tmp_path)).startswith(("/tmp", os.sep))
     monkeypatch.setenv("FINPILOT_CACHE_DIR", str(tmp_path / "c"))
     assert writable_dir(Path("/ro")) == tmp_path / "c"
+
+
+def test_warmup_can_be_skipped_with_env_flag(monkeypatch):
+    """FINPILOT_SKIP_WARMUP=true must stop the CLIP/OCR warm-up thread (it OOM-kills a 512 MB host)."""
+    import asyncio
+    import threading
+
+    from app import main as app_main
+
+    started = []
+    real_thread = threading.Thread
+
+    class Spy(real_thread):
+        def __init__(self, *a, target=None, **k):
+            started.append(getattr(target, "__name__", ""))
+            super().__init__(*a, target=(lambda: None), **k)
+
+    monkeypatch.setattr(threading, "Thread", Spy)
+    monkeypatch.delenv("VERCEL", raising=False)
+
+    async def run():
+        async with app_main.lifespan(app_main.app):
+            pass
+
+    monkeypatch.setenv("FINPILOT_SKIP_WARMUP", "true")
+    asyncio.run(run())
+    assert "_warm_models" not in started
+
+    started.clear()
+    monkeypatch.delenv("FINPILOT_SKIP_WARMUP")
+    asyncio.run(run())
+    assert "_warm_models" in started
