@@ -43,11 +43,15 @@ function Scanner({ onFound, onBack }: { onFound: (t: UpiTarget) => void; onBack:
   useEffect(() => {
     let stream: MediaStream | null = null;
     let timer: ReturnType<typeof setInterval> | undefined;
+    let cancelled = false; // set on unmount, which can happen while the camera permission prompt is open
     (async () => {
       if (!window.BarcodeDetector) { setMsg("This browser cannot scan live. Use a photo of the QR, or type the UPI ID."); return; }
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        if (video.current) { video.current.srcObject = stream; await video.current.play(); }
+        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        if (cancelled) { s.getTracks().forEach((t) => t.stop()); return; }
+        stream = s;
+        if (video.current) { video.current.srcObject = s; await video.current.play(); }
+        if (cancelled) return;
         const det = new window.BarcodeDetector!({ formats: ["qr_code"] });
         timer = setInterval(async () => {
           if (!video.current || done.current || video.current.readyState < 2) return;
@@ -58,7 +62,7 @@ function Scanner({ onFound, onBack }: { onFound: (t: UpiTarget) => void; onBack:
         setMsg("Camera blocked or unavailable. Use a photo of the QR, or type the UPI ID.");
       }
     })();
-    return () => { clearInterval(timer); stream?.getTracks().forEach((t) => t.stop()); };
+    return () => { cancelled = true; clearInterval(timer); stream?.getTracks().forEach((t) => t.stop()); };
   }, [accept]);
 
   async function fromPhoto(f: File | undefined) {
