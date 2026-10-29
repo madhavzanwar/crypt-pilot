@@ -1,18 +1,25 @@
 name: Vercel Deployment
 
+# Manual and gated (BUG-010). This used to deploy to production on every push to main.
+# Now it only runs when someone triggers it from the Actions tab, and the job uses the
+# `production` environment: configure required reviewers on that environment in
+# GitHub > Settings > Environments > production so a human approves each deploy.
+# Needs repo/environment secrets VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID.
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@v4
 
       - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v20
+        uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
