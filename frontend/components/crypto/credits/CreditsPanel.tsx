@@ -67,10 +67,10 @@ export function CreditsPanel({ compact = false }: { compact?: boolean }) {
 
           <Tabs defaultValue="card" className="gap-3">
             <TabsList className="h-auto w-full rounded-full bg-fog p-1">
-              <TabsTrigger value="card" className="gap-1.5 rounded-full px-3 py-1.5 data-[state=active]:bg-lime data-[state=active]:text-ink data-[state=active]:shadow-none">
+              <TabsTrigger value="card" className="h-auto min-w-0 flex-1 gap-1.5 rounded-full px-3 py-1.5 whitespace-normal data-[state=active]:bg-lime data-[state=active]:text-ink data-[state=active]:shadow-none">
                 <CreditCard /> Card (Dodo, test mode)
               </TabsTrigger>
-              <TabsTrigger value="wallet" className="gap-1.5 rounded-full px-3 py-1.5 whitespace-normal data-[state=active]:bg-lime data-[state=active]:text-ink data-[state=active]:shadow-none">
+              <TabsTrigger value="wallet" className="h-auto min-w-0 flex-1 gap-1.5 rounded-full px-3 py-1.5 whitespace-normal text-center data-[state=active]:bg-lime data-[state=active]:text-ink data-[state=active]:shadow-none">
                 <Wallet /> Cake Wallet (BTC testnet / XMR demo)
               </TabsTrigger>
             </TabsList>
