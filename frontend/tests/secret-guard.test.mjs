@@ -105,3 +105,17 @@ test("QA3-5: a wallet question hides the generic snapshot but keeps real answers
   const { scanAddresses } = await import("@/lib/crypto/extractAddress");
   assert.equal(scanAddresses(`Is ${ADDR} safe to pay?`).scans.length, 1);
 });
+
+test("QA3-7/8: council summary lists every BLOCK wallet, flags unverified, fixes double period", async () => {
+  const { actionsWithBlocked, summariseWallets, tidyText } = await import("@/components/crypto/council/summary");
+  const w = (address, verdict, status = "ok") => ({ address, verdict, status });
+  const s = summariseWallets([w("A", "BLOCK"), w("B", "BLOCK"), w("C", "UNKNOWN", "not_in_dataset")]);
+  assert.deepEqual(s.blocked, ["A", "B"]);
+  assert.deepEqual(s.unchecked, ["C"]);
+  assert.equal(s.allUnchecked, false);
+  assert.equal(summariseWallets([w("C", "UNKNOWN", "not_in_dataset")]).allUnchecked, true);
+  assert.equal(summariseWallets([]).allUnchecked, false);
+  assert.deepEqual(actionsWithBlocked(["Do not send funds to A"], ["A", "B"]), ["Do not send funds to A", "Do not send funds to B."]);
+  assert.equal(tidyText("is not available right now. . The findings"), "is not available right now. The findings");
+  assert.equal(tidyText("Wait..."), "Wait...");
+});
