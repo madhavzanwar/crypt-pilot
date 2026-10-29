@@ -1,5 +1,5 @@
 import { validateAddress } from "@/lib/crypto/address/validate";
-import { looksLikeSecret } from "@/lib/crypto/address/seedGuard";
+import { isKeyShaped, looksLikeSecret } from "@/lib/crypto/address/seedGuard";
 import { BIP39_WORDS } from "@/lib/crypto/voice/bip39Words";
 
 /**
@@ -222,13 +222,49 @@ export function extractAddress(text: string, opts: { allowDemo?: boolean } = {})
 
 // ---------------------------------------------------------------- seed phrase / key guard for chat messages
 
-const INVISIBLE = /[​‌‍⁠﻿­]/g;
+const INVISIBLE = /[\u200b-\u200f\u2060\ufeff\u00ad]/g;
 const LIST_NUMBER = /(?:^|\s)\(?\d{1,2}[.):]\s*/g;
 const HEX64 = /(?<![0-9a-fA-F])(?:0x)?[0-9a-fA-F]{64}(?![0-9a-fA-F])/;
 const B58C = "[1-9A-HJ-NP-Za-km-z]";
 const WIF = new RegExp(`(?<!${B58C})(?:5${B58C}{50}|[KLc]${B58C}{51}|9${B58C}{50})(?!${B58C})`);
 const XPRV = new RegExp(`\\b[xyzt]prv${B58C}{100,112}\\b`);
 const SEED_LENGTHS = [12, 15, 18, 21, 24];
+
+/**
+ * A key split into pieces by spaces, hyphens or other separators, inside any sentence: consecutive hex-only pieces
+ * adding up to 64+ characters, or consecutive base58 pieces that join into exactly a WIF / extended private key.
+ */
+function hasSplitKey(text: string): boolean {
+  const parts = text.split(/[\s\-_.,:;]+/).filter(Boolean);
+  let hex = "";
+  let b58: string[] = [];
+  /** Any run of 2+ consecutive base58 pieces (words around the key allowed) that joins into exactly a key. */
+  const flushB58 = (): boolean => {
+    const run = b58;
+    b58 = [];
+    for (let i = 0; i < run.length - 1; i++) {
+      let joined = run[i];
+      for (let j = i + 1; j < run.length && joined.length <= 120; j++) {
+        joined += run[j];
+        const digits = (joined.match(/[0-9]/g) ?? []).length;
+        if (digits >= 2 && /[A-Z]/.test(joined) && isKeyShaped(joined)) return true;
+      }
+    }
+    return false;
+  };
+  for (const raw of parts) {
+    const part = raw.replace(/^0x/i, "");
+    if (/^[0-9a-fA-F]+$/.test(part)) {
+      hex += part;
+      if (hex.length >= 64) return true;
+    } else {
+      hex = "";
+    }
+    if (new RegExp(`^${B58C}+$`).test(raw)) b58.push(raw);
+    else if (flushB58()) return true;
+  }
+  return flushB58();
+}
 
 /**
  * True when a chat message contains something shaped like a seed phrase or a private key: a run of 12 or
@@ -240,6 +276,7 @@ export function messageHasSecret(message: string): boolean {
   if (looksLikeSecret(message)) return true;
   const text = message.normalize("NFKC").replace(INVISIBLE, "").replace(LIST_NUMBER, " ");
   if (HEX64.test(text) || WIF.test(text) || XPRV.test(text)) return true;
+  if (hasSplitKey(text)) return true;
 
   const tokens = text
     .toLowerCase()
