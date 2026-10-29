@@ -12,8 +12,9 @@ import { WalletTurn } from "@/components/copilot/WalletTurn";
 import MicButton from "@/components/crypto/voice/MicButton";
 import { VoiceProviderChip } from "@/components/crypto/voice/VoiceProviderChip";
 import type { CheckResponse, Lang as CryptoLang, VoiceProvider } from "@/lib/crypto/api";
-import { messageHasSecret, scanAddress } from "@/lib/crypto/extractAddress";
-import { useVoiceT, type VoiceStringKey } from "@/lib/crypto/voice/strings";
+import { messageHasSecret, scanAddresses } from "@/lib/crypto/extractAddress";
+import { toCryptoLang } from "@/lib/crypto/lang";
+import { engineLabel, useVoiceT, type VoiceStringKey } from "@/lib/crypto/voice/strings";
 import { useCryptoStatus } from "@/lib/crypto/voice/useCryptoStatus";
 import { SPEECH_LANG } from "@/lib/i18n";
 import { api } from "@/lib/api";
@@ -48,6 +49,11 @@ const FinPilotAvatar = ({ className }: { className?: string }) => (
 
 const nowMs = () => Date.now();
 
+/** Key of the wallet card for address number `k` under user message `ui`: the first keeps the plain `${chat}:${ui}` key. */
+const walletKey = (chat: string | null, ui: number, k: number) => (k === 0 ? `${chat}:${ui}` : `${chat}:${ui}#${k}`);
+/** A wallet question with no address in it: nothing to check yet, so ask for the address instead of sending it to the chat. */
+const WALLET_QUESTION = /\b(wallet|bitcoin|btc|crypto)\b/i;
+
 export default function CopilotPage() {
   const userId = useUserId();
   const { chats, save, remove } = useChats(userId);
@@ -55,11 +61,12 @@ export default function CopilotPage() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const { lang, tr } = useVoiceT();
-  // the crypto service speaks en/hi only: Marathi is sent as Hindi
-  const cryptoLang: CryptoLang = lang === "en" ? "en" : "hi";
+  // the crypto service speaks en/hi only: the shared mapping sends Marathi as Hindi, same as Wallet Guard
+  const cryptoLang: CryptoLang = toCryptoLang(lang);
   const cryptoStatus = useCryptoStatus();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [secretWarn, setSecretWarn] = useState(false);
+  const [needAddress, setNeedAddress] = useState(false);
   const [voiceProvider, setVoiceProvider] = useState<VoiceProvider | null>(null);
   // wallet cards, keyed `${chatId}:${index of the user turn}`; only messages sent in this visit run on their own
   const [armed, setArmed] = useState<Record<string, true>>({});
@@ -138,6 +145,7 @@ export default function CopilotPage() {
 
   function changeInput(v: string) {
     if (messageHasSecret(v)) return rejectSecret();
+    if (needAddress) setNeedAddress(false);
     setInput(v);
     if (v.trim() === "") setVoiceProvider(null);
   }
@@ -161,10 +169,11 @@ export default function CopilotPage() {
     requestAnimationFrame(() => textareaRef.current?.focus());
   }
 
-  /** "Explain the TigerGraph evidence": explains the latest wallet check of this chat, or prefills the question. */
+  /** "Explain the graph evidence": explains the latest wallet check of this chat, or prefills the question. */
   function explainEvidence() {
     const keys = Object.keys(walletResults).filter((k) => chatId && k.startsWith(`${chatId}:`));
-    const last = keys.sort((a, b) => Number(a.split(":")[1]) - Number(b.split(":")[1])).pop();
+    const order = (k: string) => Number(k.split(":")[1].replace("#", "."));
+    const last = keys.sort((a, b) => order(a) - order(b)).pop();
     if (last) setEvidenceOpen((o) => ({ ...o, [last]: true }));
     else prefill(tr("cp.chip.evidencePrefill"));
   }
@@ -173,7 +182,19 @@ export default function CopilotPage() {
     if (!message.trim() || loading) return;
     if (messageHasSecret(message)) return rejectSecret();
     const id = chatId ?? newChatId();
-    if (scanAddress(message)?.checksumValid) setArmed((a) => ({ ...a, [`${id}:${turns.length}`]: true }));
+    const found = scanAddresses(message).scans;
+    if (found.length === 0 && WALLET_QUESTION.test(message) && /\b(safe|pay|send|scam|check|trust)/i.test(message)) {
+      setNeedAddress(true);
+      return;
+    }
+    setNeedAddress(false);
+    setArmed((a) => {
+      const next = { ...a };
+      found.forEach((f, k) => {
+        if (f.checksumValid) next[walletKey(id, turns.length, k)] = true;
+      });
+      return next;
+    });
     setSecretWarn(false);
     setVoiceProvider(null);
     const history = turns.slice(-8).map((t) => ({ role: t.role, content: t.role === "user" ? t.message : t.answer?.narrative ?? "" }));
@@ -211,25 +232,31 @@ export default function CopilotPage() {
     [chats, today],
   );
   const current = ENGINES.find((e) => e.id === engine)!;
-  const scans = useMemo(() => turns.map((t) => (t.role === "user" ? scanAddress(t.message) : null)), [turns]);
+  const scans = useMemo(() => turns.map((t) => (t.role === "user" ? scanAddresses(t.message) : null)), [turns]);
 
   /** The wallet verdict (or checksum note) for the user message at index `ui`; talks to the crypto service, not the chat backend. */
   const walletFor = (ui: number) => {
-    const sc = scans[ui];
-    if (!sc) return null;
-    const key = `${chatId}:${ui}`;
+    const found = scans[ui];
+    if (!found || found.scans.length === 0) return null;
     return (
-      <motion.div key={`w${ui}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="ml-11 min-w-0">
-        <WalletTurn
-          address={sc.address}
-          checksumValid={sc.checksumValid}
-          lang={cryptoLang}
-          armed={!!armed[key]}
-          onArm={() => setArmed((a) => ({ ...a, [key]: true }))}
-          result={walletResults[key]}
-          onResult={(r) => setWalletResults((m) => ({ ...m, [key]: r }))}
-          evidenceOpen={!!evidenceOpen[key]}
-        />
+      <motion.div key={`w${ui}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="ml-11 flex min-w-0 flex-col gap-3">
+        {found.scans.map((sc, k) => {
+          const key = walletKey(chatId, ui, k);
+          return (
+            <WalletTurn
+              key={sc.address}
+              address={sc.address}
+              checksumValid={sc.checksumValid}
+              lang={cryptoLang}
+              armed={!!armed[key]}
+              onArm={() => setArmed((a) => ({ ...a, [key]: true }))}
+              result={walletResults[key]}
+              onResult={(r) => setWalletResults((m) => ({ ...m, [key]: r }))}
+              evidenceOpen={!!evidenceOpen[key]}
+            />
+          );
+        })}
+        {found.ignored > 0 && <p role="note" className="text-xs text-graphite">{tr("cp.wallet.more")}</p>}
       </motion.div>
     );
   };
@@ -479,6 +506,11 @@ export default function CopilotPage() {
               <DocumentsPanel userId={userId} />
             </div>
           )}
+          {needAddress && (
+            <p role="status" className="mb-2 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-800">
+              {tr("cp.wallet.needAddress")}
+            </p>
+          )}
           {secretWarn && (
             <div role="alert" className="mb-2 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50/70 p-3 text-xs text-rose-700">
               <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -521,6 +553,7 @@ export default function CopilotPage() {
                 <span data-testid="crypto-status">
                   {tr("cp.status.online")}
                   {cryptoStatus.mocks ? ` (${tr("cp.status.mocks")})` : ""}
+                  {engineLabel(cryptoStatus.engine) ? ` · ${tr("cp.status.engine")}: ${engineLabel(cryptoStatus.engine)}` : ""}
                   {cryptoStatus.voiceProvider ? ` · ${tr("cp.status.voice")}: ${tr(PROVIDER_KEYS[cryptoStatus.voiceProvider])}` : ""}
                 </span>
               )}

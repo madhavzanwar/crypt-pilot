@@ -47,13 +47,13 @@ function Fact({ icon, title, value, tone = "neutral" }: { icon: ReactNode; title
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-col gap-1 rounded-surface border p-3",
+        "flex min-w-0 flex-col gap-1 overflow-hidden rounded-surface border p-3",
         tone === "bad" ? "border-rose-200 bg-rose-50/60" : tone === "good" ? "border-emerald-200 bg-emerald-50/50" : "border-black/[0.06] bg-fog",
       )}
     >
       <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-pewter">
         <span className="shrink-0">{icon}</span>
-        <span className="min-w-0 break-words">{title}</span>
+        <span className="min-w-0 [overflow-wrap:anywhere]">{title}</span>
       </div>
       <p className="text-sm font-semibold text-ink">{value}</p>
     </div>
@@ -88,7 +88,7 @@ export default function VerdictCard({ result }: { result: CheckResponse }) {
         <RiskGauge score={result.riskScore} verdict={result.verdict} />
 
         <div className="flex min-w-0 items-center gap-1">
-          <span className="min-w-0 truncate font-mono text-xs text-graphite" title={result.address}>
+          <span data-no-translate translate="no" className="min-w-0 truncate font-mono text-xs text-graphite" title={result.address}>
             {middleEllipsis(result.address, 12, 8)}
           </span>
           <CopyAddress value={result.address} />

@@ -61,13 +61,24 @@ const S = {
     "यह बिटकॉइन पता जैसा है, पर इसका चेकसम मेल नहीं खाता, यानी शायद गलत लिखा या सुना गया। मैंने इसे नहीं जाँचा। कृपया सही करके फिर भेजें।",
     "हा बिटकॉइन पत्त्यासारखा दिसतो, पण चेकसम जुळत नाही, म्हणजे बहुधा चुकीचे लिहिले किंवा ऐकले गेले. मी तो तपासला नाही. कृपया दुरुस्त करून पुन्हा पाठवा.",
   ],
+  "cp.wallet.more": [
+    "Only the first 3 addresses were checked. Send the others in a separate message.",
+    "सिर्फ़ पहले 3 पते जाँचे गए। बाकी अलग संदेश में भेजें।",
+    "फक्त पहिले 3 पत्ते तपासले. बाकीचे वेगळ्या संदेशात पाठवा.",
+  ],
+  "cp.wallet.needAddress": [
+    "Paste the wallet address after your question (a public address starting with bc1, 1 or 3), then send.",
+    "अपने सवाल के बाद वॉलेट का पता डालें (bc1, 1 या 3 से शुरू होने वाला पब्लिक पता), फिर भेजें।",
+    "तुमच्या प्रश्नानंतर वॉलेटचा पत्ता टाका (bc1, 1 किंवा 3 ने सुरू होणारा सार्वजनिक पत्ता), मग पाठवा.",
+  ],
   "cp.chip.check": ["Check a wallet before I pay", "पैसे देने से पहले वॉलेट जाँचें", "पैसे देण्यापूर्वी वॉलेट तपासा"],
   "cp.chip.checkPrefill": ["Is this wallet safe to pay? ", "क्या इस वॉलेट में पैसे भेजना सुरक्षित है? ", "या वॉलेटमध्ये पैसे पाठवणे सुरक्षित आहे का? "],
-  "cp.chip.evidence": ["Explain the graph evidence", "TigerGraph के सबूत समझाएँ", "TigerGraph चे पुरावे समजवा"],
-  "cp.chip.evidencePrefill": ["Explain the graph evidence for this wallet: ", "इस वॉलेट के लिए TigerGraph के सबूत समझाएँ: ", "या वॉलेटसाठी TigerGraph चे पुरावे समजवा: "],
+  "cp.chip.evidence": ["Explain the graph evidence", "ग्राफ़ के सबूत समझाएँ", "ग्राफचे पुरावे समजवा"],
+  "cp.chip.evidencePrefill": ["Explain the graph evidence for this wallet: ", "इस वॉलेट के लिए ग्राफ़ के सबूत समझाएँ: ", "या वॉलेटसाठी ग्राफचे पुरावे समजवा: "],
   "cp.evidence.title": ["What the graph evidence says", "ग्राफ़ के सबूत क्या कहते हैं", "ग्राफचे पुरावे काय सांगतात"],
   "cp.status.online": ["Wallet checks online", "वॉलेट जाँच चालू", "वॉलेट तपासणी चालू"],
   "cp.status.voice": ["Voice service", "आवाज़ सेवा", "आवाज सेवा"],
+  "cp.status.engine": ["Graph engine", "ग्राफ़ इंजन", "ग्राफ इंजिन"],
   "cp.status.mocks": ["demo data", "डेमो डेटा", "डेमो डेटा"],
   "cp.input.placeholder": [
     "Ask about spending, debts, deadlines, schemes or a wallet address...",
@@ -77,6 +88,18 @@ const S = {
 } as const satisfies Record<string, readonly [string, string, string]>;
 
 export type VoiceStringKey = keyof typeof S;
+
+/**
+ * Provider and engine names are claims about what is running, so they are never written into the copy above: the status
+ * line shows what GET /api/crypto/status reports, and the wallet cards show what each answer reports.
+ */
+export function engineLabel(engine: string | null | undefined): string | null {
+  if (!engine) return null;
+  if (engine === "tigergraph") return "TigerGraph";
+  if (engine === "networkx") return "NetworkX";
+  if (engine === "replay") return "replay";
+  return engine;
+}
 
 /** The default text for `key` in `lang` (English when a translation is missing). */
 export function voiceString(lang: AppLang, key: VoiceStringKey): string {

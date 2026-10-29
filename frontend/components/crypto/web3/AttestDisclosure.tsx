@@ -11,7 +11,17 @@ import { AttestFrame } from "./AttestFrame";
 import { SimulatedAttest } from "./SimulatedAttest";
 
 // Wallet + signing code: a client-only chunk, requested only after the panel is opened and "real" mode is shown.
-const AttestScope = dynamic(() => import("./AttestScope"), {
+// If the chunk cannot load (a dependency such as the optional @x402/evm peer of the wallet SDK is not installed, or the
+// network dropped), show a plain message and keep the SIMULATED preview available instead of an error overlay.
+function WalletToolsUnavailable() {
+  return (
+    <Card role="alert" className="text-sm text-graphite">
+      Wallet tools could not be loaded here (a wallet dependency such as @x402/evm may not be installed, or the connection dropped). You can still preview the steps with the SIMULATED mode below.
+    </Card>
+  );
+}
+
+const AttestScope = dynamic(() => import("./AttestScope").catch(() => ({ default: WalletToolsUnavailable })), {
   ssr: false,
   loading: () => <Card className="animate-pulse text-sm text-pewter">Loading wallet tools…</Card>,
 });

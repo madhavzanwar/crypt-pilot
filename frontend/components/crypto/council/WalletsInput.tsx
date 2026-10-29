@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Plus, Wallet, X } from "lucide-react";
-import { shortAddress, validateAddress } from "@/lib/crypto/address/validate";
+import { shortAddress, validateAddressStrict as validateAddress } from "@/lib/crypto/address/validate";
 import { looksLikeSecret } from "@/lib/crypto/address/seedGuard";
 import { MAX_WALLETS } from "./types";
 
@@ -10,6 +10,7 @@ const REASON = {
   empty: "Paste a wallet address first.",
   format: "That does not look like a Bitcoin address (it starts with 1, 3 or bc1).",
   mixed_case: "Mixed-case bc1 addresses are invalid. Copy the address again.",
+  checksum: "The checksum does not match: that address has a typo or is incomplete. Copy it again.",
 } as const;
 
 /** "Crypto wallets to screen": up to five public addresses for the Chain Analyst. Seed phrases and keys are refused and cleared. */

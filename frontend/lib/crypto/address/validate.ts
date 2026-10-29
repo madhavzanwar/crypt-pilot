@@ -1,3 +1,5 @@
+import { hasValidChecksum } from "@/lib/crypto/address/checksum";
+
 /**
  * Client-side address checks. This is a *format* check only ("looks valid"): the backend does the real
  * checksum validation and answers `invalid_address` when a checksum fails.
@@ -7,14 +9,17 @@ export type AddressKind = "p2pkh" | "p2sh" | "bech32" | "demo";
 
 export type AddressCheck =
   | { ok: true; kind: AddressKind; address: string }
-  | { ok: false; reason: "empty" | "format" | "mixed_case" };
+  | { ok: false; reason: "empty" | "format" | "mixed_case" | "checksum" };
 
 const LEGACY = /^[13][1-9A-HJ-NP-Za-km-z]{25,34}$/;
 const BECH32 = /^bc1[ac-hj-np-z02-9]{11,87}$/i;
 const DEMO = /^DEMO-[A-Za-z0-9][A-Za-z0-9-]{1,40}$/;
 
+/** Zero-width characters and BOM that sneak in when copying from web pages and chats. */
+const INVISIBLE = /[\u200b-\u200f\u2060\ufeff\u00ad]/g;
+
 export function validateAddress(raw: string, opts: { allowDemo?: boolean } = {}): AddressCheck {
-  const address = raw.trim();
+  const address = raw.replace(INVISIBLE, "").trim();
   if (address === "") return { ok: false, reason: "empty" };
   if (opts.allowDemo && DEMO.test(address)) return { ok: true, kind: "demo", address };
   if (LEGACY.test(address)) return { ok: true, kind: address.startsWith("1") ? "p2pkh" : "p2sh", address };
@@ -25,6 +30,17 @@ export function validateAddress(raw: string, opts: { allowDemo?: boolean } = {})
     return { ok: true, kind: "bech32", address: address.toLowerCase() };
   }
   return { ok: false, reason: "format" };
+}
+
+/**
+ * Format check plus the real checksum (base58check, bech32, bech32m). A typo or a wrong-length bech32 string fails with
+ * reason "checksum" instead of getting the green "Format looks valid" hint and a 400 after submit. DEMO-... placeholders
+ * have no checksum and pass when `allowDemo` is set.
+ */
+export function validateAddressStrict(raw: string, opts: { allowDemo?: boolean } = {}): AddressCheck {
+  const r = validateAddress(raw, opts);
+  if (!r.ok || r.kind === "demo") return r;
+  return hasValidChecksum(r.address) ? r : { ok: false, reason: "checksum" };
 }
 
 /** Pulls the first thing that looks like an address out of free text (used for browser speech). */

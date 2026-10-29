@@ -91,6 +91,7 @@ export function checkEnteredHash(subject: AttestSubject, raw: string, keccak: Ke
   let entered: string;
   let derived = false;
   if (isBytes32(text)) entered = text.toLowerCase();
+  else if (/^0x/i.test(text) || /^[0-9a-f]{32,}$/i.test(text)) return { outcome: "invalid" }; // hash-shaped but malformed: same answer on every surface
   else if (subject.acceptRawInput) {
     entered = keccak(text).toLowerCase();
     derived = true;

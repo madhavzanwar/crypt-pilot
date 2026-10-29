@@ -2,6 +2,7 @@
 
 import { translate, useLang } from "@/lib/i18n";
 import type { Lang } from "@/lib/crypto/api";
+import { toCryptoLang } from "@/lib/crypto/lang";
 
 /**
  * Wallet Guard strings, English + Hindi. Looked up here first (FinPilot's own i18n table has no wallet-guard rows,
@@ -21,6 +22,10 @@ const COPY: Record<string, [string, string]> = {
   "wg.input.err.mixed": [
     "Mixed upper and lower case: please check the address.",
     "बड़े और छोटे अक्षर मिले हुए हैं: कृपया पता जाँचें।",
+  ],
+  "wg.input.err.checksum": [
+    "The checksum does not match: the address has a typo or is incomplete. Copy it again.",
+    "चेकसम मेल नहीं खाता: पते में गलती है या वह अधूरा है। इसे फिर से कॉपी करें।",
   ],
   "wg.input.paste": ["Paste", "पेस्ट करें"],
   "wg.input.clear": ["Clear", "साफ़ करें"],
@@ -204,8 +209,8 @@ export function useGuardT(): { g: (key: string, vars?: Record<string, string | n
   return {
     g: (key, vars) => gt(uiLang, key, vars),
     uiLang,
-    /** Language to request from the service: Hindi when the UI is Hindi, English otherwise. */
-    reqLang: uiLang === "hi" ? "hi" : "en",
+    /** Language to request from the service: the shared mapping (Hindi for hi and mr, English otherwise). */
+    reqLang: toCryptoLang(uiLang),
   };
 }
 

@@ -13,6 +13,7 @@ import {
   type Lang,
   type StepEvent,
 } from "@/lib/crypto/api";
+import { notifyCreditsChanged } from "@/lib/crypto/creditsEvents";
 
 export const STEP_IDS = ["validate", "graph", "hops", "score", "explain"] as const;
 export type StepId = (typeof STEP_IDS)[number];
@@ -61,21 +62,28 @@ interface Flight {
 
 const flights = new Map<string, Flight>();
 const recent = new Map<string, { at: number; result: CheckResponse }>();
-const keyOf = (address: string, lang: Lang) => `${address.trim().toLowerCase()}|${lang}`;
+/**
+ * Cache / in-flight key: the address only. The UI language must not be part of it, or switching language while a card
+ * is visible would start a second paid check. Base58 addresses are case-sensitive, so only bech32 (bc1...) is lower-cased.
+ */
+export const keyOf = (address: string): string => {
+  const a = address.trim();
+  return /^bc1/i.test(a) ? a.toLowerCase() : a;
+};
 
 const canFallBackToPlain = (e: unknown, sawStep: boolean): boolean =>
   isApiError(e) &&
   !sawStep &&
   (e.status === 404 || e.status === 405 || e.status === 501 || e.code === "invalid_response" || e.code === "stream_ended");
 
-function announceCredits(res: CheckResponse): void {
+export function announceCredits(res: CheckResponse): void {
   if (typeof window === "undefined" || res.creditsRemaining === undefined) return;
-  // Contract with the credits pill: it may listen to refresh its balance without another round trip.
-  window.dispatchEvent(new CustomEvent("cryptpilot:credits-updated", { detail: { balance: res.creditsRemaining } }));
+  // The pill, the drawer and /credits all listen for CREDITS_CHANGED_EVENT (the one shared name) and refetch.
+  notifyCreditsChanged();
 }
 
 function startFlight(address: string, lang: Lang): Flight {
-  const key = keyOf(address, lang);
+  const key = keyOf(address);
   const existing = flights.get(key);
   if (existing) return existing;
 
@@ -133,8 +141,8 @@ function startFlight(address: string, lang: Lang): Flight {
 }
 
 /** A result from the last 10 minutes, if there is one. */
-export function findRecent(address: string, lang: Lang, now = Date.now()): CheckResponse | undefined {
-  const hit = recent.get(keyOf(address, lang));
+export function findRecent(address: string, now = Date.now()): CheckResponse | undefined {
+  const hit = recent.get(keyOf(address));
   return hit && now - hit.at < RECENT_MS ? hit.result : undefined;
 }
 
@@ -190,7 +198,7 @@ export function useWalletCheck(): {
     const live = () => mounted.current && token.current === mine;
 
     if (opts?.reuse) {
-      const hit = findRecent(address, lang);
+      const hit = findRecent(address);
       if (hit) {
         const done: WalletCheckState = { phase: "done", result: hit, lang, reused: true };
         setState(done);
