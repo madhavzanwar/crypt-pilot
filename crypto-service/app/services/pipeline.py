@@ -136,15 +136,27 @@ class CheckPipeline:
             raise ApiError(400, "invalid_address") from exc
         with self.db.session() as s:
             ledger.ensure_for_request(s, self.s, session_id)
-            if ledger.balance(s, session_id) <= 0:
-                raise ApiError(402, "no_credits")
+            broke = ledger.balance(s, session_id) <= 0
+        if broke and not self._free_answer(info.address):
+            raise ApiError(402, "no_credits")
         return Prepared(info.address, lang, session_id)
+
+    def _free_answer(self, address: str) -> bool:
+        """At zero credits, answers that are never charged are still served (BUG-087): a cached result, a
+        sanctions (OFAC) hit, and a wallet that is not in the dataset (UNKNOWN). Only status "ok" is billed."""
+        if self.cache.get(address) is not None:
+            return True
+        if self.labels.hits(address)[0]:
+            return True
+        return self.scorer is not None and not self.scorer.has(address)
 
     # ------------------------------------------------------------------ run
     async def execute(self, p: Prepared) -> AsyncIterator[Step | Result]:
-        """Single-flight per address+lang: identical concurrent requests (double click, StrictMode
-        double effect, retry) queue behind the first one and are then served from the cache, uncharged."""
-        key = f"{p.address}|{p.lang}"
+        """Single-flight per address: identical concurrent requests (double click, StrictMode double effect,
+        retry, or a language switch) queue behind the first one and are then served from the cache, uncharged.
+        The cache is language-independent (BUG-006): it holds the evidence/verdict plus both explanations and
+        both reason lists, and the requested language is applied when serving."""
+        key = p.address
         lock, _ = self._inflight.get(key, (asyncio.Lock(), 0))
         self._inflight[key] = (lock, self._inflight.get(key, (lock, 0))[1] + 1)
         try:
@@ -160,10 +172,9 @@ class CheckPipeline:
 
     async def _execute_locked(self, p: Prepared) -> AsyncIterator[Step | Result]:
         yield Step(*STEPS[0])
-        cached = self.cache.get(f"{p.address}|{p.lang}")
+        cached = self.cache.get(p.address)
         if cached is not None:
-            resp = CheckResponse.model_validate(cached)
-            resp.cached = True
+            resp = await self._from_cache(cached, p)
             resp.credits_remaining = self._balance(p.session_id)
             self._log(p, resp.verdict, "cache", charged=False)
             yield Result(resp)
@@ -172,7 +183,8 @@ class CheckPipeline:
         if self.s.demo_replay:
             replayed = self._replay(p)
             if replayed is not None:
-                async for ev in self._finish(p, replayed, charge=replayed.status == "ok"):
+                async for ev in self._finish_cached(p, replayed, self._replay_reasons(p, replayed),
+                                                        {p.lang: replayed.audio_url} if replayed.audio_url else {}):
                     yield ev
                 return
 
@@ -189,7 +201,8 @@ class CheckPipeline:
                         addr=hash_address(p.address))
             replayed = self._replay(p) if self.s.replay_fallback else None
             if replayed is not None:
-                async for ev in self._finish(p, replayed, charge=replayed.status == "ok"):
+                async for ev in self._finish_cached(p, replayed, self._replay_reasons(p, replayed),
+                                                        {p.lang: replayed.audio_url} if replayed.audio_url else {}):
                     yield ev
                 return
             yield Result(self._error_response(p, "graph_unavailable"), 503)
@@ -200,23 +213,68 @@ class CheckPipeline:
             yield Result(self._error_response(p, "model_not_trained"), 503)
             return
         yield Step(*STEPS[3])
-        evidence, resp = self._assemble(p, exposure, lookup_ms)
+        evidence, resp, reasons = self._assemble(p, exposure, lookup_ms)
+        if resp.status == "ok" and self._balance(p.session_id) <= 0:
+            # lost a credit race (or reached zero) before the expensive step: stop now, cache nothing (BUG-089)
+            yield Result(None, 402, "no_credits")
+            return
         yield Step(*STEPS[4])
         en, hi = await self.explainer.explain(evidence)
         resp.explanation = Explanation(en=en, hi=hi)
+        audio: dict[str, str] = {}
         if self.tts is not None:
-            resp.audio_url = await self.tts.synthesize(en if p.lang == "en" else hi, p.lang)
-        self.cache.set(f"{p.address}|{p.lang}", resp.model_dump(mode="json", exclude={"credits_remaining"}))
-        async for ev in self._finish(p, resp, charge=resp.status == "ok"):
+            url = await self.tts.synthesize(en if p.lang == "en" else hi, p.lang)
+            if url:
+                audio[p.lang] = url
+            resp.audio_url = url
+        async for ev in self._finish_cached(p, resp, reasons, audio):
             yield ev
+
+    async def _finish_cached(self, p: Prepared, resp: CheckResponse, reasons: dict[str, list[str]],
+                             audio: dict[str, str]) -> AsyncIterator[Step | Result]:
+        """Charge first, cache only what was actually served: a request that lost the credit race (402) must
+        not leave its result in the cache for others (BUG-089)."""
+        async for ev in self._finish(p, resp, charge=resp.status == "ok"):
+            if isinstance(ev, Result) and ev.response is not None:
+                self.cache.set(p.address, {
+                    "resp": ev.response.model_dump(mode="json", exclude={"credits_remaining"}),
+                    "reasons": reasons, "audio": audio})
+            yield ev
+
+    async def _from_cache(self, cached: dict[str, Any], p: Prepared) -> CheckResponse:
+        resp = CheckResponse.model_validate(cached["resp"])
+        resp.cached = True
+        reasons = cached.get("reasons", {}).get(p.lang)
+        if reasons:
+            resp.top_reasons = list(reasons)
+        audio: dict[str, str] = cached.setdefault("audio", {})
+        if p.lang in audio:
+            resp.audio_url = audio[p.lang]
+        elif self.tts is not None and not resp.replay:
+            text = resp.explanation.en if p.lang == "en" else resp.explanation.hi
+            url = await self.tts.synthesize(text, p.lang)
+            if url:
+                audio[p.lang] = url
+            resp.audio_url = url
+        else:
+            resp.audio_url = None
+        return resp
+
+    def _replay_reasons(self, p: Prepared, resp: CheckResponse) -> dict[str, list[str]]:
+        out = {p.lang: list(resp.top_reasons)}
+        other: Lang = "hi" if p.lang == "en" else "en"
+        rec = self.replay.get(p.address, other)
+        if rec is not None:
+            out[other] = list(CheckResponse.model_validate(rec["response"]).top_reasons)
+        return out
 
     async def compute(self, address: str, lang: Lang) -> CheckResponse:
         """Full response without charging or caching (for record_replays.py)."""
         t0 = time.perf_counter()
         exposure = await anyio.to_thread.run_sync(self.engine.khop_exposure, address, self.s.max_hop,
                                                   self.s.max_subgraph_nodes)
-        evidence, resp = self._assemble(Prepared(address, lang, "-"), exposure,
-                                        (time.perf_counter() - t0) * 1000)
+        evidence, resp, _ = self._assemble(Prepared(address, lang, "-"), exposure,
+                                           (time.perf_counter() - t0) * 1000)
         en, hi = await self.explainer.explain(evidence)
         resp.explanation = Explanation(en=en, hi=hi)
         return resp
@@ -308,7 +366,7 @@ class CheckPipeline:
             credits_remaining=self._balance(p.session_id))
 
     def _assemble(self, p: Prepared, exp: Exposure | None, lookup_ms: float
-                  ) -> tuple[dict[str, Any], CheckResponse]:
+                  ) -> tuple[dict[str, Any], CheckResponse, dict[str, list[str]]]:
         assert self.scorer is not None
         ofac, ransom = self.labels.hits(p.address)
         ransom = ransom and self.s.ransomwhere_enabled
@@ -374,7 +432,7 @@ class CheckPipeline:
         explain_evidence = {**hash_evidence, "status": status, "maxHop": self.s.max_hop,
                             "datasetName": self.dataset_name,
                             "topReasons": [r[0] for r in reasons], "limitations": limitations}
-        return explain_evidence, resp
+        return explain_evidence, resp, {"en": [r[0] for r in reasons], "hi": [r[1] for r in reasons]}
 
 
 def now_iso() -> str:

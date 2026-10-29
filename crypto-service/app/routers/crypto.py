@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import hmac
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Request
 
 from app.deps import get_session_id, get_state
+from app.config import get_settings
 from app.errors import ApiError
+from app.ratelimit import client_ip_var, limiter
 from app.schemas.contract import CryptoInvoiceRequest, CryptoInvoiceResponse, CryptoInvoiceStatus, ErrorResponse
 from app.services.billing.crypto import CryptoInvoices
 from app.state import AppState
@@ -17,14 +19,20 @@ def _svc(state: AppState) -> CryptoInvoices:
     return CryptoInvoices(state.settings, state.db, state.http)
 
 
+def _invoice_limit() -> str:
+    return get_settings().rate_limit_invoice
+
+
 @router.post("/api/crypto-invoice", response_model=CryptoInvoiceResponse, response_model_exclude_none=True,
-             responses={404: {"model": ErrorResponse}, 503: {"model": ErrorResponse}})
-async def create_invoice(body: CryptoInvoiceRequest, state: AppState = Depends(get_state),
+             responses={404: {"model": ErrorResponse}, 429: {"model": ErrorResponse},
+                        503: {"model": ErrorResponse}})
+@limiter.limit(_invoice_limit)
+async def create_invoice(request: Request, body: CryptoInvoiceRequest, state: AppState = Depends(get_state),
                          sid: str = Depends(get_session_id)) -> CryptoInvoiceResponse:
     pack = state.settings.pack(body.pack_id)
     if pack is None:
         raise ApiError(404, "unknown_pack")
-    inv = _svc(state).create(sid, pack, body.coin)
+    inv = _svc(state).create(sid, pack, body.coin, client_ip=client_ip_var.get())
     return CryptoInvoiceResponse(invoice_id=inv.id, uri=inv.uri, address=inv.address, amount=inv.amount,
                                  coin=body.coin, expires_at=inv.expires_at.isoformat(),
                                  provider="explorer" if body.coin == "btc" else "demo")

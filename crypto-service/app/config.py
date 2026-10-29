@@ -106,6 +106,9 @@ class Settings(BaseSettings):
     btc_sats_per_usd: int = 0
     xmr_demo_address: str = ""
     invoice_ttl_minutes: int = 30
+    btc_offset_space: int = Field(default=9999, ge=999, le=99_999)  # invoice-specific 1..N sats added to the price
+    max_open_invoices_per_ip: int = Field(default=20, ge=1)
+    rate_limit_invoice: str = "20/hour"
 
     # verdict thresholds: overridden by artifacts/model_card.json (chosen on validation)
     threshold_warn: int = 35

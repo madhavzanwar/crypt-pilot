@@ -55,6 +55,7 @@ class Invoice(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_polled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    client_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
 
 class WebhookEvent(Base):
