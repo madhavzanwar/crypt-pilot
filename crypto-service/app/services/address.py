@@ -223,22 +223,41 @@ def _bip39_words() -> frozenset[str]:
     return frozenset(w.strip() for w in path.read_text().splitlines() if w.strip())
 
 
-_INVISIBLE = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u2060\ufeff\u00ad"), None)
-_LIST_NUMBER = re.compile(r"(?:(?<=\s)|^)\(?\d{1,2}[.):]\s*")
+# Common Cyrillic/Greek look-alikes of Latin letters ("аbandon" with a Cyrillic а must still count as "abandon").
+_HOMOGLYPHS = str.maketrans({
+    "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "х": "x", "у": "y", "і": "i", "ј": "j", "ѕ": "s",
+    "ԁ": "d", "һ": "h", "ԛ": "q", "ԝ": "w", "ɡ": "g", "ӏ": "l", "к": "k", "м": "m", "т": "t", "н": "h",
+    "в": "b", "α": "a", "ο": "o", "ρ": "p", "ν": "v", "ι": "i", "κ": "k", "τ": "t", "υ": "u", "χ": "x",
+})
+_SEP = re.compile(r"[\s,;.\-_/|:#\\()\[\]{}<>*+=~`'\"!?]+")
+_HEX_PAIRS = re.compile(r"(?<![0-9a-fA-F])(?:[0-9a-fA-F]{2}[ \t:,\-]+){31}[0-9a-fA-F]{2}(?![0-9a-fA-F])")
+
+
+def _is_format_char(ch: str) -> bool:
+    # Cf (zero-width, bidi marks/overrides, invisible operators) and soft hyphen
+    return unicodedata.category(ch) == "Cf"
+
+
+def _variants(text: str) -> list[str]:
+    """Normalised forms to test: invisible characters deleted (hidden INSIDE a word) and replaced by a
+    space (used AS a separator between words)."""
+    text = unicodedata.normalize("NFKC", text).translate(_HOMOGLYPHS)
+    deleted = "".join(ch for ch in text if not _is_format_char(ch))
+    spaced = "".join(" " if _is_format_char(ch) else ch for ch in text)
+    return [deleted] if deleted == spaced else [deleted, spaced]
 
 
 def _normalize(text: str) -> str:
-    """Remove invisible characters and list numbering ("1. word 2. word") that hide a seed phrase."""
-    text = unicodedata.normalize("NFKC", text).translate(_INVISIBLE)
-    return _LIST_NUMBER.sub(" ", text)
+    return _variants(text)[0]
 
 
 def _longest_bip39_run(text: str) -> int:
     words = _bip39_words()
     best = run = 0
-    for tok in re.split(r"[\s,;.\-]+", _normalize(text).lower()):
-        if not tok:
+    for tok in _SEP.split(text.lower()):
+        if not tok or tok.isdigit():  # list numbering ("1 abandon 2 ability", "#1 word") is skipped, not a break
             continue
+        tok = tok.lstrip("0123456789") or tok  # "1word"
         if tok in words:
             run += 1
             best = max(best, run)
@@ -252,15 +271,23 @@ def looks_like_secret(text: str, address_field: bool = False) -> bool:
 
     address_field=True adds a stricter rule for inputs that should be a single address: any
     12/15/18/21/24 lowercase words are rejected even if they are not all BIP-39 words.
+    Known limits: only the English BIP-39 list is checked, and a bare 64-hex string is rejected because it
+    cannot be told apart from a private key (a transaction hash is not an address anyway).
     """
-    text = _normalize(text)
-    if _HEX64.search(text) or _WIF.search(text) or _XPRV.search(text):
+    return any(_looks_like_secret(v, address_field) for v in _variants(text))
+
+
+def _looks_like_secret(text: str, address_field: bool) -> bool:
+    if _HEX64.search(text) or _WIF.search(text) or _XPRV.search(text) or _HEX_PAIRS.search(text):
+        return True
+    squeezed = "".join(text.split())
+    if squeezed != text and 51 <= len(squeezed) <= 52 and _WIF.fullmatch(squeezed):  # WIF broken by spaces
         return True
     if _longest_bip39_run(text) >= _SEED_LENGTHS[0]:
         return True
     if not address_field:
         return False
-    tokens = text.split()
+    tokens = [t for t in _SEP.split(text) if t and not t.isdigit()]
     return len(tokens) in _SEED_LENGTHS and all(_WORD.fullmatch(t) for t in tokens)
 
 

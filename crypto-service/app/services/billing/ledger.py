@@ -64,14 +64,17 @@ def ensure_session(s: Session, session_id: str, starting_credits: int, *, client
     return True
 
 
+class UnknownSessionError(LookupError):
+    """Credits were requested for a session id that does not exist (never minted implicitly)."""
+
+
 def add_credits(s: Session, session_id: str, delta: int, reason: str, ref: str) -> bool:
     """Idempotent grant: the (reason, ref) pair is unique, so a replayed event adds nothing.
 
-    Returns True if credits were added.
+    Returns True if credits were added. Raises UnknownSessionError for a session that does not exist.
     """
     if s.get(SessionRow, session_id) is None:
-        s.add(SessionRow(id=session_id))
-        s.flush()
+        raise UnknownSessionError(session_id)
     exists = s.scalar(select(CreditLedger.id).where(CreditLedger.reason == reason, CreditLedger.ref == ref))
     if exists is not None:
         return False

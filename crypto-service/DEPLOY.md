@@ -83,4 +83,7 @@ cd backend && uv run python -m scripts.smoke --base https://<app>.fly.dev
 - One machine, one uvicorn worker (SQLite + in-process cache). Don't scale horizontally without
   moving to Postgres and a shared cache.
 - Health check: `GET /api/health`. Logs: `fly logs` (addresses only appear as salted hashes).
-- Uvicorn runs with `--proxy-headers`, so rate limits see the real client IP behind Fly's proxy.
+- Uvicorn runs with `--no-proxy-headers` (docker-entrypoint.sh). Rate limits take the client IP from `Fly-Client-IP` when
+  `TRUST_FLY_CLIENT_IP=true` (Fly's proxy overwrites it) or from the bridge's `X-Forwarded-For` when `CRYPTO_TRUST_PROXY=true`;
+  never both on a host reachable by anything else. With proxy headers on, any loopback process could pick its own rate-limit bucket.
+- The image sets `APP_ENV=prod`: it refuses to start until `SESSION_SECRET` and `LOG_SALT` are real values.

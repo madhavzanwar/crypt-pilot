@@ -23,9 +23,12 @@ COPY --chown=cryptiq:cryptiq app ./app
 COPY --chown=cryptiq:cryptiq scripts ./scripts
 COPY --chown=cryptiq:cryptiq docker-entrypoint.sh ./docker-entrypoint.sh
 # data/ and artifacts/ are mounted (volume) or fetched at start-up; they are never in the image
-ENV PORT=8000 PATH="/app/.venv/bin:${PATH}"
+# Production by default (BUG-013): a bare `docker run` must never fall back to dev mode with the published
+# placeholder secrets. APP_ENV=prod makes the app refuse to start until SESSION_SECRET / LOG_SALT are set.
+ENV APP_ENV=prod PORT=8000 PATH="/app/.venv/bin:${PATH}"
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s CMD python -c "import os,sys,urllib.request as u; \
 sys.exit(0 if u.urlopen('http://127.0.0.1:%s/api/health' % os.environ.get('PORT','8000'), timeout=4).status == 200 else 1)"
-# X-Forwarded-For is NOT trusted (uvicorn default); rate limits key on Fly-Client-IP when TRUST_FLY_CLIENT_IP=true
+# uvicorn runs with --no-proxy-headers (docker-entrypoint.sh): the app resolves the client IP itself, keyed on
+# Fly-Client-IP when TRUST_FLY_CLIENT_IP=true or on the bridge's X-Forwarded-For when CRYPTO_TRUST_PROXY=true
 ENTRYPOINT ["./docker-entrypoint.sh"]

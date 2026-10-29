@@ -8,6 +8,7 @@ sentence is present.
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 
 from app.services.explain.templates import LIMITATION_EN, LIMITATION_HI
@@ -18,9 +19,22 @@ BANNED = [
     "guilty", "criminal", "scammer", "scam", "fraudster", "thief", "terrorist", "launder", "money laundering",
     "safe wallet", "is safe", "completely safe", "guaranteed", "guarantee", "definitely", "certainly",
     "100% safe", "proven", "legal advice", "you should report", "police", "lawyer", "owned by", "belongs to",
+    "all clear", "all-clear", "not risky", "no risk", "risk-free", "risk free", "nothing to worry",
     "दोषी", "अपराधी", "धोखेबाज़", "धोखेबाज", "ठग", "सुरक्षित वॉलेट", "गारंटी", "निश्चित रूप से", "पुलिस", "वकील",
 ]
 _VERDICTS = ("ALLOW", "WARN", "BLOCK", "UNKNOWN")
+_ORDINAL = re.compile(r"(?<![\w.])\d+(?:st|nd|rd|th)\b")  # "99th percentile": a number the digit regex skips
+_BIG_WORDS = re.compile(r"\b(?:eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen|twenty|thirty|forty|fifty|sixty|"
+                        r"seventy|eighty|ninety|hundred|thousand|million|billion|percent|percentile)\b")
+_SMALL_WORDS = {"two": "2", "three": "3", "four": "4", "five": "5", "six": "6", "seven": "7", "eight": "8",
+                "nine": "9", "ten": "10"}
+_SMALL = re.compile(r"\b(" + "|".join(_SMALL_WORDS) + r")\b")
+
+
+def _dev_share(text: str) -> float:
+    dev = sum(1 for c in text if "\u0900" <= c <= "\u097f")
+    latin = sum(1 for c in text if c.isascii() and c.isalpha())
+    return dev / (dev + latin) if dev + latin else 0.0
 
 
 def _evidence_numbers(ev: Any, out: set[str]) -> None:
@@ -51,13 +65,26 @@ def validate(text: str, evidence: dict[str, Any], lang: str) -> list[str]:
     problems: list[str] = []
     if not text or len(text) > 1200:
         return ["empty or too long"]
-    t = text.translate(_DEVANAGARI_DIGITS)
+    t = unicodedata.normalize("NFKC", text).translate(_DEVANAGARI_DIGITS)
+    t = "".join(c for c in t if unicodedata.category(c) != "Cf")  # "O<ZWSP>FAC" must still read OFAC
     low = t.lower()
+    share = _dev_share(t)
+    if lang == "hi" and share < 0.4:
+        problems.append("text is not Hindi")
+    elif lang != "hi" and share > 0.05:
+        problems.append("text is not English")
     allowed: set[str] = {"100"} | {str(i) for i in range(int(evidence.get("maxHop", 3)) + 1)}
     _evidence_numbers({k: v for k, v in evidence.items() if k not in ("address",)}, allowed)
     for raw in _NUM.findall(t):
         if _norm_num(raw) not in allowed:
             problems.append(f"ungrounded number {raw}")
+    for m in _ORDINAL.finditer(t):
+        problems.append(f"ungrounded number {m.group(0)}")
+    for m in _BIG_WORDS.finditer(low):
+        problems.append(f"number word {m.group(0)!r}")
+    for m in _SMALL.finditer(low):
+        if _SMALL_WORDS[m.group(1)] not in allowed:
+            problems.append(f"ungrounded number word {m.group(1)!r}")
     for phrase in BANNED:
         if phrase in low:
             problems.append(f"banned phrase {phrase!r}")
@@ -65,9 +92,10 @@ def validate(text: str, evidence: dict[str, Any], lang: str) -> list[str]:
         if re.search(rf"\b{v}\b", t) and v != evidence.get("verdict"):
             problems.append(f"wrong verdict {v}")
     hits = evidence.get("labelHits", {})
-    if ("ofac" in low or "sanction" in low or "प्रतिबंध" in t) and not hits.get("ofac"):
+    sanctions = any(w in low for w in ("ofac", "sanction", "treasury")) or re.search(r"\bsdn\b", low) or "प्रतिबंध" in t
+    if sanctions and not hits.get("ofac"):
         problems.append("mentions sanctions without an OFAC hit")
-    if ("ransom" in low or "रैनसमवेयर" in t) and not hits.get("ransomwhere"):
+    if ("ransom" in low or "extort" in low or "रैनसमवेयर" in t) and not hits.get("ransomwhere"):
         problems.append("mentions ransomware without a list hit")
     illicit_backed = evidence.get("datasetLabel") == "illicit" or evidence.get("hopsToNearestIllicit") is not None
     if re.search(r"\billicit\b", low) and not illicit_backed and evidence.get("status") == "ok":

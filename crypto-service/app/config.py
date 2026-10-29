@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     session_secret: SecretStr = SecretStr("change_me")
     starting_credits: int = 3
+    # A session idle for longer than this is expired server-side (the cookie signature has no timestamp), 0 = never.
+    session_ttl_days: int = Field(default=30, ge=0)
     cache_ttl_seconds: int = 600
     admin_token: SecretStr = SecretStr("")
     log_salt: SecretStr = SecretStr("change_me")
@@ -106,6 +108,9 @@ class Settings(BaseSettings):
     btc_sats_per_usd: int = 0
     xmr_demo_address: str = ""
     invoice_ttl_minutes: int = 30
+    btc_offset_space: int = Field(default=9999, ge=999, le=99_999)  # invoice-specific 1..N sats added to the price
+    max_open_invoices_per_ip: int = Field(default=20, ge=1)
+    rate_limit_invoice: str = "20/hour"
 
     # verdict thresholds: overridden by artifacts/model_card.json (chosen on validation)
     threshold_warn: int = 35

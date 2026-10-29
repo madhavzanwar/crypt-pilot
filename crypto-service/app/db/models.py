@@ -19,6 +19,7 @@ class SessionRow(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     dodo_customer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class FreeGrant(Base):
@@ -55,6 +56,7 @@ class Invoice(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_polled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    client_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
 
 class WebhookEvent(Base):
@@ -63,6 +65,23 @@ class WebhookEvent(Base):
     type: Mapped[str] = mapped_column(String(64))
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PaymentIssue(Base):
+    """Payments that need a human: a paid event that could not be matched to a session/pack (the webhook answers
+    non-2xx so Dodo retries), and refund/dispute events (recorded, credits are NOT revoked automatically)."""
+    __tablename__ = "payment_issues"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    kind: Mapped[str] = mapped_column(String(32))  # unmatched_payment | refund | dispute
+    event_id: Mapped[str] = mapped_column(String(128), index=True)
+    event_type: Mapped[str] = mapped_column(String(64))
+    payment_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    session_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    reason: Mapped[str] = mapped_column(String(64))
+    attempts: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    __table_args__ = (UniqueConstraint("kind", "event_id", name="uq_payment_issue_kind_event"),)
 
 
 class CheckLog(Base):

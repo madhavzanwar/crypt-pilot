@@ -227,7 +227,7 @@ bottom of each heading.
   address), `BTC_SATS_PER_USD` (testnet coins have no price; this is a demo conversion) and
   `BTC_EXPLORER_BASE_URL` (Esplora API, e.g. `https://mempool.space/testnet4/api` or
   `https://mempool.space/signet/api`; **liveness not verified from the build sandbox**). Amount = price
-  x rate + a unique 1..999 sats; a clash with an open invoice returns 409 `try_again`. Explorer polling
+  x rate + a unique 1..`BTC_OFFSET_SPACE` sats (default 9999; was 999); a clash with an open invoice is redrawn up to 5 times, then 409 `try_again`. Invoice creation is limited per IP (`RATE_LIMIT_INVOICE`, default 20/hour; `MAX_OPEN_INVOICES_PER_IP`, default 20). Explorer polling
   happens at most every 10 s per invoice. Payments older than the invoice (minus 5 minutes) are
   ignored. Required confirmations: `BTC_CONFIRMATIONS` (0 or 1 for demos).
 - Monero: `monero:` URI only, `provider: "demo"`, 0.01 XMR per credit (demo amount, not a price). No
@@ -363,7 +363,10 @@ Found but NOT fixed (known issues, in rough priority):
   includes the existence lookup (two round trips) and the worst case is about 16 s.
 - A wallet in the dataset but outside a documented TigerGraph *subset* is reported "not in the research
   dataset".
-- Free credits are per cookie (3 per new cookie); the per-IP rate limit is the only brake.
+- Free credits are per cookie (3 per new cookie). ACCEPTED RISK (BUG-049): clearing cookies yields a new session; the brakes are
+  the per-IP daily cap on free grants (`FREE_SESSIONS_PER_IP_PER_DAY`, default 25 sessions x `STARTING_CREDITS`) and the per-IP
+  check limiter. `GET /api/credits` itself creates a session without a limit; a determined attacker rotating IPs gets credits
+  unbounded by design of a free tier. Stronger options (proof of work, auth) are out of scope for the demo.
 - If `DODO_USAGE_METER_EVENT` is set while packs are prepaid, customers would be billed twice: leave it unset.
 - `ffmpeg -f wav pipe:1` writes unseekable size fields; a strict STT parser may reject it.
 - NetworkX engine: ~2.5 GB+ memory on the full graph, and a hub's neighbours are re-sorted on every visit.
