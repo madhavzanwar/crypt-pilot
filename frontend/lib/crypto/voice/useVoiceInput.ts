@@ -229,9 +229,11 @@ export function useVoiceInput(options: UseVoiceInputOptions): VoiceInput {
     };
     recorder.onstop = () => {
       const heldMs = Date.now() - startedAtRef.current;
+      // A stale stop (from a recording that was cancelled) must not touch the refs or the stream of a newer recording.
+      if (gen !== generation.current) return;
       const blob = new Blob(chunksRef.current, { type: recorder.mimeType || mime || "audio/webm" });
       releaseMedia();
-      if (discardRef.current || gen !== generation.current) return move("idle");
+      if (discardRef.current) return move("idle");
       if (heldMs < MIN_RECORD_MS || blob.size < 800) return fail("empty");
       void transcribe(blob, gen);
     };
@@ -273,9 +275,11 @@ export function useVoiceInput(options: UseVoiceInputOptions): VoiceInput {
               : "failed";
     };
     rec.onend = () => {
+      // A stale end (from a recognition that was cancelled) must not clear the ref or stop the stream of a newer one.
+      if (gen !== generation.current) return;
       recognitionRef.current = null;
       releaseMedia();
-      if (discardRef.current || gen !== generation.current) return move("idle");
+      if (discardRef.current) return move("idle");
       const text = transcriptRef.current.trim();
       if (text === "") return fail(recErrorRef.current ?? "empty");
       deliver(text, null, "browser");
