@@ -101,3 +101,22 @@ def test_inr_uses_indian_grouping():
     from app.recommend.engine import _inr
 
     assert _inr(9833) == "₹9,833" and _inr(123456) == "₹1,23,456" and _inr(12) == "₹12" and _inr(1000000) == "₹10,00,000"
+
+
+# --- BUG-060 notifications ---------------------------------------------------------------------------------------------
+
+
+def test_notifications_use_the_transaction_date_not_today_and_typed_actions():
+    items = client.get("/api/notifications/demo-priya").json()
+    today = date.today()
+    anomalies = [i for i in items if i["type"] == "anomaly"]
+    assert anomalies
+    assert all((today - date.fromisoformat(i["date"])).days <= 45 for i in anomalies)
+    assert any(i["date"] != today.isoformat() for i in anomalies)  # dated by the transaction, not stamped "today"
+    for i in items:
+        assert i["action_href"] and i["action_label"]
+        if i["type"] == "anomaly":
+            assert i["action_href"] == "/transactions" and "Budget" not in i["action_label"]
+    for i in items:
+        if i["type"] == "upcoming_bill":
+            assert not any(w in i["text"].lower() for w in ("dmart", "zomato", "starbucks"))  # habits are not bills

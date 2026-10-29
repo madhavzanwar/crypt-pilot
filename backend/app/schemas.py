@@ -606,6 +606,9 @@ class NotificationItem(BaseModel):
     text: str
     date: date
     source_ref: Optional[str] = None
+    # Where the bell's action button should go, decided from the item's type (not guessed from its wording).
+    action_href: Optional[str] = None
+    action_label: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
