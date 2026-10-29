@@ -26,7 +26,7 @@ export function VerdictBadge({ verdict, size = "md", className }: { verdict: Ver
     >
       <Icon className={cn(size === "lg" ? "size-6" : size === "md" ? "size-5" : "size-4")} aria-hidden />
       <span>{meta.word}</span>
-      {uiLang === "hi" && <span className="sr-only">{verdictWord(uiLang, verdict)}</span>}
+      {(uiLang === "hi" || uiLang === "mr") && <span className="sr-only">{verdictWord(uiLang, verdict)}</span>}
     </span>
   );
 }
