@@ -129,7 +129,14 @@ def test_connected_guest_inherits_declared_reserve_and_six_periods():
     c = TestClient(app)
     uid = "guest-plantest0000001"
     try:
-        assert c.post(f"/api/connectors/{uid}/google_pay/connect", json={"profile": "priya"}).status_code == 200
+        from datetime import datetime, timezone
+
+        from app.api.connectors_router import _seed_from_persona
+        from app.core import store
+        from app.models import ConnectionRow
+
+        _seed_from_persona(uid, "priya")  # the retired connect route is gone (410); seed + link the way the AA flow does
+        store.put(ConnectionRow(id=f"{uid}:google_pay", user_id=uid, connector="google_pay", detail="Priya", connected_at=datetime.now(timezone.utc)))
         out = c.get(f"/api/plan/{uid}").json()
         assert out["constraints"]["min_reserve"] == PLAN_PROFILES["demo-priya"]["reserve"]
         assert out["constraints"]["goal"] is not None
@@ -152,3 +159,23 @@ def test_monthly_flows_always_drops_in_progress_month(monkeypatch, today):
     out = history.monthly_flows(df)
     assert t.strftime("%Y-%m") not in set(out["month"])
     assert (pd.Timestamp(t.year, t.month, 1) - pd.DateOffset(months=1)).strftime("%Y-%m") in set(out["month"])
+
+
+def test_retired_google_pay_connect_is_gone_and_does_not_wipe_a_guest_ledger():
+    """BUG-035: connecting the unlisted legacy connector returns 410 and leaves the ledger alone."""
+    from app.api.connectors_router import _seed_from_persona
+    from app.core import store
+    from app.models import TransactionRow
+
+    c = TestClient(app)
+    uid = "guest-legacytest00001"
+    try:
+        _seed_from_persona(uid, "priya")
+        before = len(store.query(TransactionRow, user_id=uid))
+        assert before > 0
+        r = c.post(f"/api/connectors/{uid}/google_pay/connect", json={"profile": "arjun"})
+        assert r.status_code == 410
+        assert len(store.query(TransactionRow, user_id=uid)) == before
+    finally:
+        for m in (TransactionRow,):
+            store.delete_where(m, user_id=uid)
