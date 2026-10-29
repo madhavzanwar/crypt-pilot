@@ -1,8 +1,6 @@
 import { getLang, getSimpleNow } from "@/lib/i18n";
 
 import type {
-  OpsOverview,
-  OpsProbe,
   Account,
   AnswerContract,
   ChatEngine,
@@ -30,7 +28,6 @@ import type {
   Profile,
   ProfileLevel,
   ProfileQuestion,
-  Household,
   HouseholdInvite,
   HouseholdSummary,
   AddManagedMemberRequest,
@@ -165,12 +162,6 @@ export const api = {
     apiFetch<{ translations: Record<string, string> }>("/api/translate", { method: "POST", body: JSON.stringify({ lang, texts }) }),
   voiceAct: (text: string, path: string, lang: string, screen: unknown, history: string[], userId = "") =>
     apiFetch<{ thinking?: string; say: string; ask_copilot: boolean; actions: import("@/lib/voiceAgent").VoiceAction[] }>("/api/voice/act", { method: "POST", body: JSON.stringify({ text, path, lang, screen, history, user_id: userId }) }),
-  schemeAnalyst: (scheme: string, question: string) =>
-    apiFetch<import("@/lib/types").SchemeAnalysis>("/api/web/scheme-analyst", { method: "POST", body: JSON.stringify({ scheme, question }) }),
-  web: (kind: "search" | "extract" | "crawl" | "map", body: Record<string, string>) =>
-    apiFetch<{ answer?: string; results?: Record<string, unknown>[]; failed_results?: unknown[]; base_url?: string }>(`/api/web/${kind}`, { method: "POST", body: JSON.stringify(body) }),
-  opsOverview: () => request<OpsOverview>("/api/ops/overview"),
-  opsProbe: (env: string) => request<OpsProbe>(`/api/ops/probe/${env}`, { method: "POST" }),
   dashboard: (userId: string) => apiFetch<DashboardSnapshot>(`/api/dashboard/${userId}`),
   // user_id must be threaded through explicitly -- ChatRequest defaults to
   // "demo-priya" server-side, so omitting it here would silently ignore
