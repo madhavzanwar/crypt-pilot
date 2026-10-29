@@ -171,6 +171,10 @@ export interface Debt {
 
 export interface DashboardSnapshot {
   user_id: string;
+  /** Statement window, provided by the backend (e.g. "2026-10"); use instead of a hard-coded period. */
+  period?: string;
+  period_start?: string;
+  period_end?: string;
   health_score: HealthScore;
   net_worth: number;
   monthly_income: number;

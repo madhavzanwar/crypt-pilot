@@ -434,9 +434,9 @@ export const api = {
   notifications: (userId: string) => apiFetch<NotificationItem[]>(`/api/notifications/${userId}`),
 
   // Household & Collaboration (Pillar 5D)
-  household: (userId: string) => apiFetch<HouseholdSummary>(`/api/household/${userId}`),
+  household: (userId: string) => apiFetch<HouseholdSummary | null>(`/api/household/${userId}`),
   householdSpending: (userId: string, days = 30) =>
-    apiFetch<HouseholdSpending>(`/api/household/${userId}/spending?days=${days}`),
+    apiFetch<HouseholdSpending | null>(`/api/household/${userId}/spending?days=${days}`),
   createHousehold: (userId: string, req: CreateHouseholdRequest) =>
     apiFetch<HouseholdSummary>(`/api/household/${userId}`, { method: "POST", body: JSON.stringify(req) }),
   createInvite: (userId: string, req: CreateInviteRequest) =>
@@ -450,7 +450,7 @@ export const api = {
     apiFetch<{ revoked: boolean; id: string }>(`/api/household/${userId}/invites/${inviteId}`, { method: "DELETE" }),
   addManagedMember: (userId: string, req: AddManagedMemberRequest) =>
     apiFetch<HouseholdSummary>(`/api/household/${userId}/managed-members`, { method: "POST", body: JSON.stringify(req) }),
-  householdInsights: (userId: string) => apiFetch<HouseholdInsights>(`/api/household/${userId}/insights`),
+  householdInsights: (userId: string) => apiFetch<HouseholdInsights | null>(`/api/household/${userId}/insights`),
   memberLedger: (userId: string, memberUserId: string) =>
     apiFetch<MemberLedger>(`/api/household/${userId}/members/${memberUserId}/ledger`),
   addManagedTransaction: (userId: string, memberUserId: string, req: AddManagedTransactionRequest) =>
