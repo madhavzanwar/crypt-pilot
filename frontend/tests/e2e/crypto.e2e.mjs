@@ -154,7 +154,6 @@ test("BUG-030: the Dodo pay button resets on a bfcache pageshow", async (browser
   await page.waitForFunction(() => /Opening Dodo/.test([...document.querySelectorAll("button")].map((x) => x.textContent).join("|")), null, { timeout: 5000 });
   await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })));
   await page.waitForFunction(() => /Pay by card/.test([...document.querySelectorAll("button")].map((x) => x.textContent).join("|")), null, { timeout: 5000 });
-});
   assert.ok(await page.getByRole("button", { name: /Pay by card/ }).isEnabled());
 });
 
