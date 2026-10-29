@@ -1,4 +1,4 @@
-# Connects the phone to adb and forwards localhost ports so http://localhost:3000/pay works on it.
+# Connects the phone to adb and forwards localhost ports so http://localhost:3000 works on it. (The old /pay page was removed with FinPilot Pay.)
 #   First time, USB plugged in:           scripts\phone.ps1 -Wifi      (switches adb to Wi-Fi; then you can unplug)
 #   Android 11+ without USB:              scripts\phone.ps1 -Pair 192.168.1.5:37123 123456   (Developer options > Wireless debugging > Pair with code)
 #   Afterwards (USB or Wi-Fi):            scripts\phone.ps1
@@ -20,4 +20,4 @@ if (-not (Devices)) { Write-Host 'No phone found. Plug USB, or run with -Wifi / 
 $target = @(Devices) | Where-Object { $_ -match ':\d+$' } | Select-Object -First 1   # prefer the Wi-Fi link when USB is also plugged in
 if (-not $target) { $target = @(Devices)[0] }
 & $adb -s $target reverse tcp:3000 tcp:3000; & $adb -s $target reverse tcp:8000 tcp:8000
-Write-Host 'Phone ready. Open Chrome on it: http://localhost:3000/pay'
+Write-Host 'Phone ready. Open Chrome on it: http://localhost:3000'

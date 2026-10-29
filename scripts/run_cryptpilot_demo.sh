@@ -11,7 +11,7 @@
 #   3. frontend                   npm run dev -- -p 3100                 http://localhost:3100
 #
 # Keys and settings are NEVER written here. They are read from the environment, or from an untracked .env file in the
-# repo root (sourced as shell: KEY=value lines). Names that matter are listed in docs/CRYPTPILOT_ARCHITECTURE.md.
+# repo root (parsed as plain KEY=value lines, not executed). Names that matter are listed in docs/CRYPTPILOT_ARCHITECTURE.md.
 # Data: the Elliptic++ data and model are not in git (no stated licence). If ARTIFACTS_REPO is set, they are fetched
 # from that PRIVATE Hugging Face repo with crypto-service/scripts/fetch_artifacts.py using HF_TOKEN from the environment.
 # Otherwise crypto-service/data and crypto-service/artifacts must already be on disk, or the service starts without a model.
@@ -99,12 +99,30 @@ do_start() {
   mkdir -p "$LOGS"
 
   # Optional local .env (untracked). Variables already in the environment win.
+  # The file is parsed as KEY=value lines, never executed as shell: a value such as PACKS_JSON=[{"id":"starter"}] must
+  # arrive exactly as written (sourcing it would strip the quotes and glob the brackets). One pair of matching outer
+  # quotes is removed, like the PowerShell launcher does.
   if [ -f "$ROOT/.env" ]; then
     say "Reading $ROOT/.env"
-    set -a
-    # shellcheck disable=SC1091
-    . "$ROOT/.env"
-    set +a
+    local line key val
+    while IFS= read -r line || [ -n "$line" ]; do
+      line="${line%$'\r'}"
+      line="${line#"${line%%[![:space:]]*}"}"
+      case "$line" in ''|'#'*) continue ;; esac
+      line="${line#export }"
+      case "$line" in *=*) ;; *) continue ;; esac
+      key="${line%%=*}"; val="${line#*=}"
+      key="${key%"${key##*[![:space:]]}"}"
+      val="${val#"${val%%[![:space:]]*}"}"; val="${val%"${val##*[![:space:]]}"}"
+      [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+      if [ "${#val}" -ge 2 ]; then
+        case "$val" in
+          \"*\") val="${val:1:${#val}-2}" ;;
+          \'*\') val="${val:1:${#val}-2}" ;;
+        esac
+      fi
+      if [ -z "${!key:-}" ]; then export "$key=$val"; fi
+    done <"$ROOT/.env"
   fi
 
   command -v uv >/dev/null 2>&1 || die "uv is required for crypto-service (https://docs.astral.sh/uv/)."

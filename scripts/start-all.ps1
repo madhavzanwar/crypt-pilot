@@ -16,4 +16,4 @@ if (-not (Listening 3000)) {
   else { Spawn "$root\frontend" 'cmd' '/c','npm run dev' }
 }
 if (-not $NoPhone) { & "$PSScriptRoot\phone.ps1" }
-Write-Host 'Backend http://localhost:8000/docs   Frontend http://localhost:3000   Phone http://localhost:3000/pay'
+Write-Host 'Backend http://localhost:8000/docs   Frontend http://localhost:3000   Phone http://localhost:3000'
