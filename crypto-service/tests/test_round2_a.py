@@ -413,6 +413,7 @@ def test_bug045_invoice_creation_is_rate_limited_per_ip(settings: Any, monkeypat
                                            "packs_json": __import__("tests.test_payments", fromlist=["PACKS"]).PACKS,
                                            "trust_proxy": True, **BTC})
     monkeypatch.setattr(crypto_router, "get_settings", lambda: s)
+    monkeypatch.setattr("app.ratelimit.get_settings", lambda: s)  # client_key reads trust_proxy from here
     from app.main import build_state, create_app
 
     limiter.reset()
