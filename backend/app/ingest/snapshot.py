@@ -96,7 +96,8 @@ def _transactions_df(rows: list[TransactionRow]) -> pd.DataFrame:
     return df.sort_values("date").reset_index(drop=True)
 
 
-def _debts_schema(rows: list[DebtRow], user_id: str) -> list[Debt]:
+def _debts_schema(rows: list[DebtRow], user_id: str, accounts: Optional[list[AccountRow]] = None) -> list[Debt]:
+    names = {a.id: a.name for a in accounts or []}
     return [
         Debt(
             id=d.id,
@@ -106,6 +107,7 @@ def _debts_schema(rows: list[DebtRow], user_id: str) -> list[Debt]:
             interest_rate_apr=d.interest_rate_apr,
             minimum_payment=d.minimum_payment,
             due_day_of_month=d.due_day_of_month,
+            account_name=names.get(d.account_id),
         )
         for d in rows
     ]
@@ -249,7 +251,7 @@ def _build_dashboard_snapshot(user_id: str) -> DashboardSnapshot:
     store.query(IncomeRow, user_id=user_id)
 
     df = _transactions_df(list(txn_rows))
-    debts = _debts_schema(list(debt_rows), user_id)
+    debts = _debts_schema(list(debt_rows), user_id, accounts)
 
     starting_balance = _starting_balance(list(accounts))
     net_worth = _net_worth(list(accounts))

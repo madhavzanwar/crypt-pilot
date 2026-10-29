@@ -216,3 +216,48 @@ def test_generate_recommendations_ranks_gap_resolving_candidate_first(monkeypatc
     # first under the tiered logic.
     assert recs[0].action == ActionType.shift_payment_date
     assert recs[1].action == ActionType.cancel_subscription
+
+
+# --- BUG-021: statement text built by the backend ---------------------------------------------------------------
+
+
+def test_inr_groups_like_india_and_puts_sign_before_symbol():
+    from app.recommend.engine import _inr
+
+    assert _inr(0) == "₹0"
+    assert _inr(999) == "₹999"
+    assert _inr(9833) == "₹9,833"
+    assert _inr(123456) == "₹1,23,456"
+    assert _inr(1234567.4) == "₹12,34,567"
+    assert _inr(-1490) == "-₹1,490"
+    assert _inr(-0.2) == "₹0"  # no "-₹0"
+
+
+def test_descriptions_use_names_and_separators_not_ids_or_python_lists():
+    from types import SimpleNamespace
+
+    from app.recommend.engine import _describe
+    from app.schemas import ActionType
+
+    res = SimpleNamespace(impact=SimpleNamespace(delta=1490.0, metric="free_cash_flow"))
+    text = _describe(ActionType.cancel_subscription, {"group_ids": ["rg-cult.fit-membership"], "labels": ["cult.fit membership"]}, res)
+    assert text == "Cancel cult.fit membership -- frees up ₹1,490/month of free cash flow."
+    assert "[" not in text and "rg-" not in text and "+" not in text
+    interest = _describe(ActionType.prepay_debt, {"debt_label": "your HDFC Loan", "extra_payment": 5000}, SimpleNamespace(impact=SimpleNamespace(delta=-9833.0)))
+    assert "₹5,000/month" in interest and "~₹9,833" in interest
+
+
+def test_recommendation_text_for_demo_personas_has_no_internal_ids():
+    import re
+
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    c = TestClient(app)
+    for uid in ("demo-priya", "demo-arjun", "demo-meera"):
+        body = c.get(f"/api/dashboard/{uid}").json()
+        for rec in body["insights"]["recommendations"]:
+            assert not re.search(r"\[|rg-|[0-9a-f]{8}-[0-9a-f]{4}-", rec["text"]), rec["text"]
+        for d in body["debts"]:
+            assert d["account_name"] and d["account_name"] != d["account_id"]

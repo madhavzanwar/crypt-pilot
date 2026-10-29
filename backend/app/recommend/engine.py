@@ -85,7 +85,7 @@ def _candidate_requests(
         # Debt has no human-readable name in the contract (only ids) -- describe
         # it by its salient numbers so recommendation text never surfaces a raw
         # UUID to the user.
-        debt_label = f"your {debt.interest_rate_apr:.1f}% APR debt (₹{debt.principal:,.0f})"
+        debt_label = f"your {debt.account_name or 'debt'} ({debt.interest_rate_apr:.1f}% APR, {_inr(debt.principal)})"
         candidates.append(
             (
                 ActionType.prepay_debt,
@@ -108,7 +108,7 @@ def _candidate_requests(
             candidates.append(
                 (
                     ActionType.cancel_subscription,
-                    {"group_ids": [item.group_id]},
+                    {"group_ids": [item.group_id], "labels": [item.merchant]},
                     f"{item.merchant} (~{abs(item.amount):.0f}/mo) is a recurring "
                     f"subscription; cancelling frees up cash flow immediately.",
                 )
@@ -125,7 +125,7 @@ def _candidate_requests(
                 candidates.append(
                     (
                         ActionType.shift_payment_date,
-                        {"group_id": target.group_id, "shift_days": 5},
+                        {"group_id": target.group_id, "shift_days": 5, "label": target.merchant},
                         f"A projected cash-flow gap on {forecast.first_gap_date.isoformat()} "
                         f"is within 30 days; shifting {target.merchant}'s payment date by a "
                         f"few days may avoid the collision with other due dates.",
@@ -269,27 +269,53 @@ def generate_recommendations(
     return [rec for _, rec in scored[:top_n]]
 
 
+def _inr(x: float) -> str:
+    """Rupee amount with Indian digit grouping and the sign before the symbol: 9833 -> ₹9,833, -1490 -> -₹1,490, 1234567 -> ₹12,34,567."""
+    n = int(round(abs(x)))
+    head, tail = str(n)[:-3], str(n)[-3:]
+    if head:
+        parts = []
+        while len(head) > 2:
+            parts.insert(0, head[-2:])
+            head = head[:-2]
+        if head:
+            parts.insert(0, head)
+        tail = ",".join(parts) + "," + tail
+    return f"{'-' if x < 0 and n else ''}₹{tail}"
+
+
+def _names(params: dict, key: str, ids_key: str) -> str:
+    """Human names for the recurring items an action touches; never a raw id or a Python list."""
+    names = params.get(key)
+    if isinstance(names, str):
+        names = [names]
+    names = [str(n) for n in (names or []) if n]
+    if not names:
+        return "this item" if ids_key == "group_id" else "the selected subscription(s)"
+    return ", ".join(names)
+
+
 def _describe(action: ActionType, params: dict, result) -> str:
     impact = result.impact
     if action == ActionType.prepay_debt:
-        debt_label = params.get("debt_label") or f"debt {params.get('debt_id')}"
+        debt_label = params.get("debt_label") or "your debt"
         return (
-            f"Pay an extra ₹{params.get('extra_payment', 0):.0f}/month toward "
-            f"{debt_label} -- saves ~₹{abs(impact.delta):.0f} in interest."
+            f"Pay an extra {_inr(params.get('extra_payment', 0))}/month toward "
+            f"{debt_label} -- saves ~{_inr(abs(impact.delta))} in interest."
         )
     if action == ActionType.cancel_subscription:
         return (
-            f"Cancel subscription(s) {params.get('group_ids')} -- "
-            f"+{impact.delta:.0f}/month free cash flow."
+            f"Cancel {_names(params, 'labels', 'group_ids')} -- "
+            f"frees up {_inr(abs(impact.delta))}/month of free cash flow."
         )
     if action == ActionType.shift_payment_date:
         return (
-            f"Shift {params.get('group_id')}'s due date by {params.get('shift_days', 0)} day(s) "
+            f"Shift {_names(params, 'label', 'group_id')}'s due date by {params.get('shift_days', 0)} day(s) "
             f"-- moves first projected gap by {impact.delta} day(s)."
         )
     if action == ActionType.reduce_category_spend:
         return (
             f"Reduce {params.get('category')} spend by {params.get('percent')}% -- "
-            f"saves ~{abs(impact.delta):.0f}/month."
+            f"saves ~{_inr(abs(impact.delta))}/month."
         )
     return f"{action.value}: {impact.metric} changes by {impact.delta}."
