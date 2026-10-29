@@ -73,3 +73,23 @@ def payment_fields(event: dict[str, Any]) -> tuple[str | None, str | None, str |
     customer = obj(data.get("customer"))
     return (text(data.get("payment_id")), text(meta.get("session_id")), text(meta.get("pack_id")),
             text(customer.get("customer_id")))
+
+
+def pack_mismatch(event: dict[str, Any], pack: Pack) -> str | None:
+    """Reason the payment does not correspond to `pack`, or None. Only fields Dodo actually sent are checked:
+    the product in `product_cart` must include the pack's product id, and a USD `total_amount` (cents, may
+    include tax) must not be below the pack price."""
+    data = event.get("data")
+    if not isinstance(data, dict):
+        return None
+    cart = data.get("product_cart")
+    if isinstance(cart, list) and cart and pack.dodo_product_id:
+        ids = {c.get("product_id") for c in cart if isinstance(c, dict)}
+        if pack.dodo_product_id not in ids:
+            return "product_mismatch"
+    total = data.get("total_amount")
+    cur = data.get("currency")
+    if isinstance(total, int) and not isinstance(total, bool) and isinstance(cur, str) and cur.upper() == "USD":
+        if total < round(pack.price_usd * 100):
+            return "amount_too_low"
+    return None
