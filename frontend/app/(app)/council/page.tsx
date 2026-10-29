@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Users } from "lucide-react";
 import { api } from "@/lib/api";
 import { useUserId } from "@/lib/hooks";
+import { useLang } from "@/lib/i18n";
 import type { CouncilEvent, CouncilVerdict, CouncilVote } from "@/lib/types";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -33,6 +34,7 @@ export default function CouncilPage() {
   const [votes, setVotes] = useState<(CouncilVote | ChainVote)[]>([]);
   const [debate, setDebate] = useState<string[] | null>(null);
   const [verdict, setVerdict] = useState<CouncilVerdict | null>(null);
+  const lang = useLang();
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,7 +55,7 @@ export default function CouncilPage() {
       };
       // With no wallets this is the original request; with wallets the Chain Analyst joins as an extra specialist.
       if (wallets.length === 0) await api.convene(userId, onEvent);
-      else await postNdjson<CouncilEvent>(`/api/security/${userId}/council`, { wallets, lang: "en" }, onEvent, "Council failed", (abortRef.current = new AbortController()).signal);
+      else await postNdjson<CouncilEvent>(`/api/security/${userId}/council`, { wallets, lang }, onEvent, "Council failed", (abortRef.current = new AbortController()).signal);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "The council could not convene");
