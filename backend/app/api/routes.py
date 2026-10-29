@@ -93,6 +93,28 @@ def health_check() -> dict:
     return {"status": "ok", "time": datetime.now(timezone.utc).isoformat()}
 
 
+@router.get("/health/store")
+def store_health() -> dict:
+    """Which data store is live and whether a read works. Reports the project id and an error class/message, never a credential.
+
+    "memory" means no Firebase credentials were usable (data is per-process and lost on restart); "firestore" means the
+    Admin SDK client exists. `ok` is the result of reading one document, which is what every page needs."""
+    from app.core import store as _store
+
+    settings = get_settings()
+    out: dict = {"mode": "memory", "projectId": settings.firestore_project_id, "ok": True, "error": None}
+    try:
+        db = _store._db()
+        if db is None:
+            return out
+        out["mode"] = "firestore"
+        next(iter(db.collection("accounts").limit(1).stream()), None)
+    except Exception as exc:  # noqa: BLE001 - this endpoint exists to report the failure
+        out["ok"] = False
+        out["error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+    return out
+
+
 @router.get("/dashboard/{user_id}", response_model=DashboardSnapshot)
 def get_dashboard(user_id: str = Depends(resolve_user_id)) -> DashboardSnapshot:
     return build_dashboard_snapshot(user_id)

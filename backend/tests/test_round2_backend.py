@@ -230,3 +230,15 @@ def test_copilot_failure_reason_names_the_real_cause_without_leaking_bodies():
     assert failure_reason(RuntimeError("NVIDIA 500: boom"))[1] == "NVIDIA HTTP 500"
     assert failure_reason(TimeoutError("The read operation timed out"))[0] == "it did not respond in time"
     assert failure_reason(None)[0] == "the AI service could not be used"
+
+
+def test_store_health_reports_mode_without_credentials():
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    r = TestClient(app).get("/api/health/store")
+    assert r.status_code == 200
+    j = r.json()
+    assert set(j) == {"mode", "projectId", "ok", "error"} and j["mode"] in ("memory", "firestore")
+    assert "private_key" not in r.text and "BEGIN" not in r.text
