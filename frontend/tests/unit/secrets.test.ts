@@ -42,3 +42,15 @@ test("addresses: checksum is verified, invisible characters are trimmed (BUG-104
   assert.equal(validateAddress("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa").ok, true);
   assert.deepEqual(validateAddress("1Q8f6cESGGLkiExCwhnPCTzyLqmAUZg3Wv"), { ok: false, reason: "checksum" });
 });
+
+import { scanAddresses } from "@/lib/crypto/extractAddress";
+
+test("scanAddresses returns one entry per address, capped at 3, and counts the ignored (BUG-103)", () => {
+  const a = "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh";
+  const b = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa";
+  const c = "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy";
+  const d = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+  assert.deepEqual(scanAddresses(`compare ${a} and ${b}`), { addresses: [a, b], ignored: 0 });
+  assert.deepEqual(scanAddresses(`${a} ${b} ${c} ${d}`), { addresses: [a, b, c], ignored: 1 });
+  assert.deepEqual(scanAddresses("is this wallet safe to pay?"), { addresses: [], ignored: 0 });
+});
