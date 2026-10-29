@@ -38,6 +38,21 @@ Prerequisites (Windows: `winget install ...`): Git, Node 20+, Python 3.11+, `uv`
 Then open `https://<tunnel>`, press "Explore Demo App", open Wallet Guard, run the BLOCK example.
 (The PowerShell script has never been run on Windows. If it fails, the error is in `.demo-logs/*.err.log`. The bash script is the one that has been exercised, on Linux only.)
 
+## 0b. Hosted site + crypto-service on your laptop (free split deployment)
+
+Use this instead of step 0 when the frontend and FinPilot API are hosted (Vercel / Render) and only the heavy crypto-service
+(about 2.6 GB RAM with the NetworkX engine, and a SQLite credit ledger that needs a disk that survives restarts) stays on your laptop.
+Path of a request: browser -> hosted frontend (`/api/crypto/*`) -> hosted FinPilot API bridge -> Cloudflare tunnel -> crypto-service.
+
+1. On the laptop run `scripts/run_crypto_service_laptop.sh` (Windows: `powershell -ExecutionPolicy Bypass -File scripts\run_crypto_service_laptop.ps1`).
+   It fetches the data/model if `ARTIFACTS_REPO`/`HF_TOKEN` are set, starts the service, opens a quick tunnel and prints `CRYPTO_SERVICE_URL=https://....trycloudflare.com`.
+2. Set `CRYPTO_SERVICE_URL` to that value on the hosted FinPilot API and redeploy/restart it. The frontend needs `BACKEND_URL` = the hosted API (not the tunnel).
+3. Set the Dodo webhook to `https://<hosted API or site>/api/crypto/webhooks/dodo` (events `payment.succeeded`, `payment.refunded`, `refund.succeeded`, `dispute.accepted`, `dispute.lost`) and `FRONTEND_URL` to the hosted site.
+4. The quick-tunnel URL changes on every start. Repeat step 2 each time, or use a named Cloudflare tunnel (free, needs a domain) for a stable URL.
+
+**Check:** `curl <tunnel>/api/health` answers, then `https://<hosted site>/api/crypto/status` shows `"reachable":true`.
+Security note: the tunnel exposes the whole crypto-service, not just the bridge's route allowlist (admin routes need `ADMIN_TOKEN`; there is no shared secret between the bridge and the service yet). Fine for a demo; do not leave it up unattended.
+
 ## 1. (included in step 0)
 
 ## 2. Dodo Payments: one real test checkout
