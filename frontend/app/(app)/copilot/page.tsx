@@ -14,7 +14,7 @@ import { VoiceProviderChip } from "@/components/crypto/voice/VoiceProviderChip";
 import type { CheckResponse, Lang as CryptoLang, VoiceProvider } from "@/lib/crypto/api";
 import { messageHasSecret, scanAddress } from "@/lib/crypto/extractAddress";
 import { toCryptoLang } from "@/lib/crypto/lang";
-import { useVoiceT, type VoiceStringKey } from "@/lib/crypto/voice/strings";
+import { engineLabel, useVoiceT, type VoiceStringKey } from "@/lib/crypto/voice/strings";
 import { useCryptoStatus } from "@/lib/crypto/voice/useCryptoStatus";
 import { SPEECH_LANG } from "@/lib/i18n";
 import { api } from "@/lib/api";
@@ -162,7 +162,7 @@ export default function CopilotPage() {
     requestAnimationFrame(() => textareaRef.current?.focus());
   }
 
-  /** "Explain the TigerGraph evidence": explains the latest wallet check of this chat, or prefills the question. */
+  /** "Explain the graph evidence": explains the latest wallet check of this chat, or prefills the question. */
   function explainEvidence() {
     const keys = Object.keys(walletResults).filter((k) => chatId && k.startsWith(`${chatId}:`));
     const last = keys.sort((a, b) => Number(a.split(":")[1]) - Number(b.split(":")[1])).pop();
@@ -522,6 +522,7 @@ export default function CopilotPage() {
                 <span data-testid="crypto-status">
                   {tr("cp.status.online")}
                   {cryptoStatus.mocks ? ` (${tr("cp.status.mocks")})` : ""}
+                  {engineLabel(cryptoStatus.engine) ? ` · ${tr("cp.status.engine")}: ${engineLabel(cryptoStatus.engine)}` : ""}
                   {cryptoStatus.voiceProvider ? ` · ${tr("cp.status.voice")}: ${tr(PROVIDER_KEYS[cryptoStatus.voiceProvider])}` : ""}
                 </span>
               )}

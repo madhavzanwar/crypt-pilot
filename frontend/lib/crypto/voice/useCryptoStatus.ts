@@ -8,6 +8,8 @@ import { VOICE_MODE } from "@/lib/crypto/env";
 export interface CryptoStatus {
   /** The provider the service is configured to try first. "wispr" means a Wispr Flow key is set there, not that a given clip used it. */
   voiceProvider: VoiceProvider | null;
+  /** Graph engine the service reports ("tigergraph", "networkx", "replay"...), or null when it does not say. */
+  engine: string | null;
   /** The service is answering from demo / fixture data. */
   mocks: boolean;
 }
@@ -37,7 +39,11 @@ export function useCryptoStatus(): CryptoStatus | null {
       const body = (await fetchJson("/status", ctrl.signal)) ?? (await fetchJson("/health", ctrl.signal));
       if (ctrl.signal.aborted || !body) return;
       const vp = typeof body.voiceProvider === "string" && PROVIDERS.includes(body.voiceProvider) ? (body.voiceProvider as VoiceProvider) : null;
-      setStatus({ voiceProvider: VOICE_MODE === "browser" ? "browser" : vp, mocks: body.mocks === true });
+      setStatus({
+        voiceProvider: VOICE_MODE === "browser" ? "browser" : vp,
+        engine: typeof body.engine === "string" && body.engine !== "" && body.engineOk !== false ? body.engine : null,
+        mocks: body.mocks === true,
+      });
     })();
     return () => ctrl.abort();
   }, []);
