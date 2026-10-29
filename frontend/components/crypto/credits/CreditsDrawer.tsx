@@ -5,10 +5,29 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { CreditsPanel } from "./CreditsPanel";
 
 /** Right-side sheet with the balance, packs and both test-mode payment paths. Controlled by CreditsPill. */
-export function CreditsDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function CreditsDrawer({
+  open,
+  onOpenChange,
+  returnFocusTo,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Element that gets focus back when the drawer closes (Escape, the close button, the overlay). */
+  returnFocusTo?: () => HTMLElement | null;
+}) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full gap-0 overflow-y-auto sm:max-w-md">
+      <SheetContent
+        side="right"
+        className="w-full gap-0 overflow-y-auto sm:max-w-md"
+        onCloseAutoFocus={(e) => {
+          const el = returnFocusTo?.();
+          if (el && el.isConnected) {
+            e.preventDefault();
+            el.focus();
+          }
+        }}
+      >
         <SheetHeader className="pr-12">
           <SheetTitle className="font-display text-xl text-ink">Credits</SheetTitle>
           <SheetDescription>One credit pays for one new wallet check. Test mode only.</SheetDescription>
