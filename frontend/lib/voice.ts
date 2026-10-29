@@ -13,7 +13,12 @@ interface Recognition {
   onerror: ((e: { error: string }) => void) | null;
   start: () => void;
   stop: () => void;
+  abort: () => void;
 }
+
+// Only one recognizer may own the microphone: a second hook instance (e.g. the floating chat while
+// /copilot is open) cancels the first one instead of running two at once.
+let activeSession: { cancel: () => void } | null = null;
 
 function recognitionCtor(): (new () => Recognition) | null {
   if (typeof window === "undefined") return null;
@@ -34,6 +39,7 @@ export function useVoiceInput(onText: (text: string) => void, onProblem?: (messa
   const supported = useSyncExternalStore(() => () => {}, () => recognitionCtor() !== null, () => false);
   const [listening, setListening] = useState(false);
   const rec = useRef<Recognition | null>(null);
+  const cancelRef = useRef<(() => void) | null>(null);
   const cb = useRef(onText);
   const problem = useRef(onProblem);
   const live = useRef(onLive);
@@ -43,9 +49,13 @@ export function useVoiceInput(onText: (text: string) => void, onProblem?: (messa
     live.current = onLive;
   });
 
+  // Unmount: abort the recognizer, drop its handlers and clear its timers.
+  useEffect(() => () => cancelRef.current?.(), []);
+
   const start = useCallback(() => {
     const Ctor = recognitionCtor();
     if (!Ctor) return;
+    activeSession?.cancel();
     const r = new Ctor();
     r.lang = SPEECH_LANG[getLang()];
     r.interimResults = true;
@@ -65,6 +75,8 @@ export function useVoiceInput(onText: (text: string) => void, onProblem?: (messa
     r.onend = () => {
       clearTimeout(silence);
       clearTimeout(hardStop);
+      if (activeSession?.cancel === cancelRef.current) activeSession = null;
+      cancelRef.current = null;
       setListening(false);
       if (said) cb.current(said);
       else if (!failed) problem.current?.("I did not hear anything. Tap the mic and try again.");
@@ -75,6 +87,26 @@ export function useVoiceInput(onText: (text: string) => void, onProblem?: (messa
       setListening(false);
       problem.current?.(MIC_PROBLEMS[e.error] ?? `Voice input failed (${e.error}).`);
     };
+    const session = {
+      cancel: () => {
+        clearTimeout(silence);
+        clearTimeout(hardStop);
+        r.onresult = null;
+        r.onend = null;
+        r.onerror = null;
+        try {
+          r.abort();
+        } catch {
+          /* already stopped */
+        }
+        if (rec.current === r) rec.current = null;
+        if (cancelRef.current === session.cancel) cancelRef.current = null;
+        if (activeSession === session) activeSession = null;
+        setListening(false);
+      },
+    };
+    activeSession = session;
+    cancelRef.current = session.cancel;
     rec.current = r;
     setListening(true);
     r.start();
