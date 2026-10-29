@@ -177,25 +177,27 @@ def tally(votes: list[dict]) -> dict:
             "actions": actions[:3]}
 
 
-async def _chain_vote(wallets: list[str], lang: str) -> tuple[dict, int]:
+async def _chain_vote(wallets: list[str], lang: str, rejected: list[str] | None = None) -> tuple[dict, int]:
     """Chain Analyst's vote: no model, no tokens. It never joins the debate (it reports graph evidence, not an opinion)."""
+    bad = [chain_analyst.local_rejected(a) for a in rejected or []]
     try:
-        return chain_analyst.council_vote(await chain_analyst.screen_wallets(wallets, lang)), 0
+        return chain_analyst.council_vote((await chain_analyst.screen_wallets(wallets, lang) if wallets else []) + bad), 0
     except Exception:  # noqa: BLE001 - a bad reply from the crypto service must never take the existing council down
-        return chain_analyst.council_vote([chain_analyst._offline(w, 0) for w in wallets]), 0
+        return chain_analyst.council_vote([chain_analyst._offline(w, 0) for w in wallets] + bad), 0
 
 
-async def convene(user_id: str, wallets: list[str] | None = None, lang: str = "en") -> AsyncIterator[dict]:
+async def convene(user_id: str, wallets: list[str] | None = None, lang: str = "en", rejected: list[str] | None = None) -> AsyncIterator[dict]:
     """Progress events: facts, vote (as each agent finishes), debate, then the final verdict.
 
     With `wallets` (already cleaned by chain_analyst.clean_wallets) an eighth specialist, Chain Analyst, screens them on the
     crypto service and votes. Without wallets it does not run and everything below is exactly the seven-agent council."""
     wallets = list(wallets or [])
+    rejected = list(rejected or [])  # bad-checksum addresses: kept as 'rejected' entries, counted unverified
     facts = await asyncio.to_thread(compact_facts, user_id)
     facts_s = facts_json(facts)
     s = get_settings()
     use_model = bool(s.nvidia_chat_api_key)
-    key = hashlib.sha1(f"{facts_s}|{s.nvidia_council_model}|{use_model}|{lang}{'|w:' + ','.join(wallets) if wallets else ''}".encode()).hexdigest()
+    key = hashlib.sha1(f"{facts_s}|{s.nvidia_council_model}|{use_model}|{lang}{'|w:' + ','.join(wallets) if wallets else ''}{'|r:' + ','.join(rejected) if rejected else ''}".encode()).hexdigest()
     hit = _cache.get(key)
     if hit and time.monotonic() - hit[0] < _TTL:
         yield {"type": "verdict", "cached": True, **hit[1]}
@@ -205,8 +207,8 @@ async def convene(user_id: str, wallets: list[str] | None = None, lang: str = "e
     tokens = 0
     async with httpx.AsyncClient() as client:
         tasks = [asyncio.create_task(_first_vote(client, facts_s, facts, p, use_model)) for p in PERSONAS]
-        if wallets:
-            tasks.append(asyncio.create_task(_chain_vote(wallets, lang)))
+        if wallets or rejected:
+            tasks.append(asyncio.create_task(_chain_vote(wallets, lang, rejected)))
         votes: list[dict] = []
         chain_vote: dict | None = None
         for done in asyncio.as_completed(tasks):
@@ -246,14 +248,14 @@ async def convene(user_id: str, wallets: list[str] | None = None, lang: str = "e
             result["actions"] = [chain_vote["do"]] + [a for a in result["actions"] if a.lower() != chain_vote["do"].lower()][:2]
     chain_results = chain_vote["chain"]["wallets"] if chain_vote else []
     offline = any(r["status"] in chain_analyst.NO_ANSWER and r["status"] != "rejected" for r in chain_results)
-    if wallets:
-        unverified = chain_analyst.unverified_count(chain_results) if chain_results else len(wallets)
-        result["chain"] = {"wallets": len(wallets), "voted": bool(chain_vote) and not chain_vote.get("abstain"), "offline": offline,
-                           "unverified": unverified}
+    if wallets or rejected:
+        unverified = chain_analyst.unverified_count(chain_results) if chain_results else len(wallets) + len(rejected)
+        result["chain"] = {"wallets": len(wallets) + len(rejected), "voted": bool(chain_vote) and not chain_vote.get("abstain"), "offline": offline,
+                           "unverified": unverified, **({"rejected": len(rejected)} if rejected else {})}
         if unverified:
             # UNKNOWN is not safe: a run whose wallets could not be verified must never read like an all-clear.
             result["unverified"] = unverified
-            result["caveat"] = f"{unverified} wallet{'s' if unverified != 1 else ''} unverified: not in the dataset or the crypto service did not answer. This is not a safe signal."
+            result["caveat"] = f"{unverified} wallet{'s' if unverified != 1 else ''} unverified: not in the dataset, invalid, or the crypto service did not answer. This is not a safe signal."
             rest = [a for a in result["actions"] if a != chain_analyst.UNVERIFIED_CAVEAT]
             hard_stop = bool(chain_vote) and not chain_vote.get("abstain") and chain_vote.get("level") == "high"
             result["actions"] = (rest[:1] + [chain_analyst.UNVERIFIED_CAVEAT] + rest[1:2]) if hard_stop else [chain_analyst.UNVERIFIED_CAVEAT] + rest[:2]

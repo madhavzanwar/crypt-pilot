@@ -280,7 +280,7 @@ def _pace() -> float:
         return 0.35
 
 
-def investigate(user_id: str, pace: float | None = None, wallets: list[str] | None = None, lang: str = "en"):
+def investigate(user_id: str, pace: float | None = None, wallets: list[str] | None = None, lang: str = "en", rejected: list[str] | None = None):
     """Generator of progress events; the last one is the saved report.
 
     With `wallets` (cleaned by chain_analyst.clean_wallets) the Chain Analyst joins as a tenth stage, just before the Risk
@@ -290,8 +290,9 @@ def investigate(user_id: str, pace: float | None = None, wallets: list[str] | No
     all_findings, summaries = [], {}
     run, score, unverified = uuid.uuid4().hex[:8], 0, 0
     wallets = list(wallets or [])
+    rejected = list(rejected or [])  # bad-checksum addresses: shown as 'rejected', counted unverified
     stages = list(AGENTS)
-    if wallets:
+    if wallets or rejected:
         stages.insert(next(i for i, a in enumerate(stages) if a[0] == "risk_scorer"), (chain_analyst.AGENT_ID, chain_analyst.AGENT_NAME, chain_analyst.AGENT_JOB))
     telemetry.record(kind="run", run=run, user=user_id, transactions=len(rows), parts=len(stages), via="stream")
     for key, name, _ in stages:
@@ -306,7 +307,7 @@ def investigate(user_id: str, pace: float | None = None, wallets: list[str] | No
             score, extra = ai_agents.calibrate(risk_score(scored(all_findings)), scored(all_findings), run)
             res, extra = [], {**extra, "score": score}
         elif key == chain_analyst.AGENT_ID:
-            res, extra = chain_analyst.evidence_step(wallets, lang)
+            res, extra = chain_analyst.evidence_step(wallets, lang, rejected)
             unverified = int(extra.get("unverified", 0))
             all_findings += res
         elif key == "verdict_writer":
@@ -322,7 +323,8 @@ def investigate(user_id: str, pace: float | None = None, wallets: list[str] | No
         telemetry.record(kind="stage", run=run, agent=key, step="agent", ms=summaries[key]["ms"], findings=len(res))
         yield {"type": "agent", "agent": key, "status": "done", **summaries[key]}
     report = save_report(user_id, run, rows, all_findings, score, list(summaries.values()), verdict, source, error,
-                         {"wallets_screened": wallets, "wallets_unverified": unverified} if wallets else None)
+                         {"wallets_screened": wallets, "wallets_unverified": unverified, **({"wallets_rejected": rejected} if rejected else {})}
+                         if wallets or rejected else None)
     yield {"type": "report", "report": report}
 
 

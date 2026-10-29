@@ -123,6 +123,22 @@ def clean_wallets(raw: list[str] | None) -> tuple[list[str], int]:
     return out, rejected
 
 
+def bad_checksum_wallets(raw: list[str] | None) -> list[str]:
+    """Inputs shaped like a Bitcoin address (so safe to show back) whose checksum fails. Anything else (seed phrases, junk)
+    is never echoed. Deduplicated; capped like the valid wallets."""
+    out: list[str] = []
+    for item in raw or []:
+        a = str(item).strip()
+        if (_LEGACY.fullmatch(a) or _BECH32.fullmatch(a)) and valid_address(a) is None and a not in out:
+            out.append(a)
+    return out[:MAX_WALLETS]
+
+
+def local_rejected(address: str) -> dict[str, Any]:
+    """A result for a wallet rejected locally (bad checksum / format): never sent to the crypto service."""
+    return {**_offline(address, 0, "rejected"), "reason": "Invalid checksum / format: this is not a valid Bitcoin address, so it is unverified."}
+
+
 def _reason(verdict: str, r: dict[str, Any], engine: str | None) -> str:
     """One plain-language line built from the structured fields (the explanation text is not reused)."""
     if verdict == "UNKNOWN":
@@ -276,29 +292,33 @@ def wallet_finding(r: dict[str, Any]) -> dict[str, Any] | None:
 _ERROR_NOTE = {"offline": OFFLINE_NOTE, "rate_limited": RATE_LIMITED_NOTE, "rejected": REJECTED_NOTE}
 
 
-def evidence_step(wallets: list[str], lang: str = "en") -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Failure-isolated: anything unexpected from the crypto service becomes an 'offline' step, never a crashed investigation."""
+def evidence_step(wallets: list[str], lang: str = "en", rejected: list[str] | None = None) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Failure-isolated: anything unexpected from the crypto service becomes an 'offline' step, never a crashed investigation.
+    `rejected` = bad-checksum addresses: kept as 'rejected' entries and counted as unverified."""
+    rejected = list(rejected or [])
     try:
-        return _evidence_step(wallets, lang)
+        return _evidence_step(wallets, lang, rejected)
     except Exception:  # noqa: BLE001
-        return [], {"error": OFFLINE_NOTE, "findings": 0, "unverified": len(wallets)}
+        return [], {"error": OFFLINE_NOTE, "findings": 0, "unverified": len(wallets) + len(rejected)}
 
 
-def _evidence_step(wallets: list[str], lang: str = "en") -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def _evidence_step(wallets: list[str], lang: str = "en", rejected: list[str] | None = None) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """(findings, summary fields) for the Evidence Council's Chain Analyst stage."""
-    results = run_sync(screen_wallets(wallets, lang))
+    results = (run_sync(screen_wallets(wallets, lang)) if wallets else []) + [local_rejected(a) for a in rejected or []]
     findings = [f for f in (wallet_finding(r) for r in results) if f]
     answered = [r for r in results if r["status"] not in NO_ANSWER]
     engines = sorted({r["engine"] for r in answered if r["engine"]})
     extra: dict[str, Any] = {
         "findings": sum(1 for f in findings if not f["info"]),  # problems only: this drives the red/green node
-        "wallets": len(wallets), "screened": len(answered),
+        "wallets": len(results), "screened": len(answered),
         "engine": engines[0] if len(engines) == 1 else ("mixed" if engines else None),
         "tigergraph": bool(answered) and all(r["tigergraph"] for r in answered),
         "graph_ms": max((r["ms"] for r in answered if r["ms"] is not None), default=None),
         "ai": "off",
         "unverified": unverified_count(results),
     }
+    if rejected:
+        extra["rejected"] = [r for r in results if r["status"] == "rejected"]
     if not answered:
         kinds = {r["status"] for r in results}
         extra["error"] = _ERROR_NOTE[kinds.pop()] if len(kinds) == 1 else OFFLINE_NOTE

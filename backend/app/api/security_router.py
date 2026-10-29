@@ -27,13 +27,15 @@ class Screening(BaseModel):
     lang: str = Field(default="en", max_length=8)
 
 
-def _wallets(body: Screening | None) -> tuple[list[str], str, str]:
-    """(valid wallets, language, audit note). Anything that is not an address is dropped without being stored or logged."""
+def _wallets(body: Screening | None) -> tuple[list[str], str, str, list[str]]:
+    """(valid wallets, language, audit note, bad-checksum addresses). Address-shaped input that fails its checksum is returned
+    as a 'rejected' list so the stream can say so; anything else that is not an address is dropped without being stored or logged."""
     if body is None or not body.wallets:
-        return [], "en", ""
+        return [], "en", "", []
     wallets, rejected = chain_analyst.clean_wallets(body.wallets)
     note = f" and sent {len(wallets)} public wallet address(es) to the crypto graph service for the Chain Analyst" if wallets else ""
-    return wallets, body.lang if body.lang in ("en", "hi") else "en", note + (f" ({rejected} ignored)" if rejected else "")
+    return (wallets, body.lang if body.lang in ("en", "hi") else "en", note + (f" ({rejected} ignored)" if rejected else ""),
+            chain_analyst.bad_checksum_wallets(body.wallets))
 
 
 def _log(request: Request, user_id: str, what: str) -> None:
@@ -43,9 +45,9 @@ def _log(request: Request, user_id: str, what: str) -> None:
 
 @router.post("/{user_id}/investigate")
 def investigate(request: Request, body: Screening | None = None, user_id: str = Depends(resolve_user_id)) -> StreamingResponse:
-    wallets, lang, note = _wallets(body)
+    wallets, lang, note, bad = _wallets(body)
     _log(request, user_id, "Evidence Room investigation read your transactions and accounts" + note)
-    return StreamingResponse((json.dumps(e, default=str) + "\n" for e in agents.investigate(user_id, wallets=wallets, lang=lang)), media_type="application/x-ndjson")
+    return StreamingResponse((json.dumps(e, default=str) + "\n" for e in agents.investigate(user_id, wallets=wallets, lang=lang, rejected=bad)), media_type="application/x-ndjson")
 
 
 @router.post("/{user_id}/investigate-job")
@@ -57,11 +59,11 @@ def investigate_job(request: Request, user_id: str = Depends(resolve_user_id)) -
 
 @router.post("/{user_id}/council")
 async def convene_council(request: Request, body: Screening | None = None, user_id: str = Depends(resolve_user_id)) -> StreamingResponse:
-    wallets, lang, note = _wallets(body)
+    wallets, lang, note, bad = _wallets(body)
     _log(request, user_id, "Risk Council read a summary of your finances (no raw transactions)" + note)
 
     async def events():
-        async for e in council.convene(user_id, wallets=wallets, lang=lang):
+        async for e in council.convene(user_id, wallets=wallets, lang=lang, rejected=bad):
             yield json.dumps(e, default=str) + "\n"
 
     return StreamingResponse(events(), media_type="application/x-ndjson")
