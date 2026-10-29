@@ -34,7 +34,6 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-force-graph-2d": "^1.29.2",
-    "react-plaid-link": "^5.0.0",
     "recharts": "^3.8.0",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.7.0",

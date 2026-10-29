@@ -364,7 +364,7 @@ SECTIONS.append(feature("Feature 8", "Phone pairing and live sync", "Connect the
      "<li><b>Phone auth.</b> The phone sends <code>X-Pair-Code</code>; a dependency <code>payer</code> accepts either that or a normal bearer token. The phone stores <code>{u, code}</code> in localStorage so the installed app remembers the account.</li>"
      "<li><b>Live sync.</b> <code>LiveSync</code> (mounted in the app layout) polls <code>/api/pay/{u}/live</code> every <b>1 second</b>, only while the tab is visible. The server returns a global write counter; when it changes, the API cache is cleared and <code>DATA_CHANGED_EVENT</code> makes every mounted <code>useAsync</code> refetch. A toast announces new heavy payments.</li>"
      "<li><b>Phone history.</b> The home screen polls <code>/history</code> every 4 seconds from the same ledger.</li></ul>"
-     "<p>The Connect page has a <b>Phone payments</b> tile next to Google Pay, Sheets and Plaid; the dashboard has the same pairing card.</p>"),
+     "<p>The Connect page has a <b>Phone payments</b> tile next to Google Pay and Sheets; the dashboard has the same pairing card.</p>"),
     ("Why polling, not websockets", "<p>A one-line counter endpoint is cheap, works through any proxy and needs no connection state. A websocket or Firestore listener is the upgrade path if many users poll at once.</p>"),
     ("Limits", "<p>The pairing link points at <code>localhost:3000</code>, so it only works while the USB forward is active. Pairing a different account means pairing again from that account's session.</p>")]))
 

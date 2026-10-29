@@ -8,7 +8,7 @@ from app.main import app
 def test_catalogue_has_rails_and_no_google_pay():
     assert "google_pay" not in cr.CATALOG
     assert {"dodo", "cake_wallet"} <= set(cr.CATALOG)
-    for other in ("bank", "google_sheets", "invoices", "investments", "plaid"):
+    for other in ("bank", "google_sheets", "invoices", "investments"):
         assert other in cr.CATALOG
 
 

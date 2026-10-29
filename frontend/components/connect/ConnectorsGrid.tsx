@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Banknote, CreditCard, Download, FileText, Landmark, Link2, LineChart, Sheet, Unlink, Wallet, type LucideIcon } from "lucide-react";
+import { Banknote, CreditCard, Download, FileText, Link2, LineChart, Sheet, Unlink, Wallet, type LucideIcon } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Connector } from "@/lib/types";
 import { useConnectors } from "@/lib/connectors";
@@ -13,7 +13,6 @@ import { Card, CardContent } from "@/components/shadcn/card";
 import { Skeleton } from "@/components/shadcn/skeleton";
 import { LinkSheetDialog } from "@/components/connect/LinkSheetDialog";
 import { AddCardDialog } from "@/components/connect/AddCardDialog";
-import { PlaidLauncher } from "@/components/connect/PlaidLauncher";
 import { WalletCardsIcon } from "@animateicons/react/lucide";
 import { LoopIcon } from "@/components/ui/LoopIcon";
 import { openCreditsDrawer } from "@/components/crypto/credits/openCredits";
@@ -23,7 +22,6 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   invoices: { icon: FileText, tone: "bg-tint-ember text-ember-dark" },
   investments: { icon: LineChart, tone: "bg-tint-leaf text-leaf" },
   google_sheets: { icon: Sheet, tone: "bg-tint-leaf text-leaf" },
-  plaid: { icon: Landmark, tone: "bg-tint-sky text-sky" },
   dodo: { icon: CreditCard, tone: "bg-tint-sun text-ember-dark" },
   cake_wallet: { icon: Wallet, tone: "bg-tint-ember text-ember-dark" },
 };
@@ -34,7 +32,6 @@ const CATALOG: Omit<Connector, "detail" | "connected_at">[] = [
   { id: "google_sheets", name: "Google Sheets", description: "A live expense sheet: edit it and the app updates", available: true, connected: false },
   { id: "invoices", name: "Gmail & Drive invoices", description: "Bills and invoices parsed automatically", available: true, connected: false },
   { id: "investments", name: "Mutual funds & stocks", description: "SIPs and holdings from your depository", available: true, connected: false },
-  { id: "plaid", name: "Plaid", description: "Link a US or European bank (sandbox) to import accounts and transactions", available: true, connected: false },
 ];
 
 // Payment rails: not data sources. Always available (test mode / testnet only); they open the credits drawer.
@@ -137,7 +134,6 @@ export function ConnectorsGrid() {
   const { data, loading, error, userId } = useConnectors();
   const [cardDialog, setCardDialog] = useState(false);
   const [sheetDialog, setSheetDialog] = useState(false);
-  const [plaidToken, setPlaidToken] = useState("");
 
   async function unlink(c: Connector) {
     try {
@@ -150,14 +146,6 @@ export function ConnectorsGrid() {
 
   async function link(c: Connector) {
     if (c.id === "google_sheets") return setSheetDialog(true);
-    if (c.id === "plaid") {
-      try {
-        setPlaidToken((await api.plaidLinkToken(userId)).link_token);
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Could not start Plaid");
-      }
-      return;
-    }
     try {
       await api.connectConnector(userId, c.id, "priya");
       toast(`${c.name} connected.`);
@@ -199,7 +187,6 @@ export function ConnectorsGrid() {
           <span className="text-xs text-graphite">Credit or debit, demo only</span>
         </button>
       </div>
-      {plaidToken && <PlaidLauncher token={plaidToken} userId={userId} onClose={() => setPlaidToken("")} />}
       <AddCardDialog open={cardDialog} onOpenChange={setCardDialog} />
       <LinkSheetDialog open={sheetDialog} onOpenChange={setSheetDialog} userId={userId} />
     </>

@@ -118,7 +118,7 @@ A printable monthly health statement with a **real SHA-256 audit hash** of the f
 - **Risk Council**: seven AI specialists (Strict Auditor, Cash-Flow Realist, Debt Hawk, Fraud Sentinel, Behavioural Coach, Growth Optimist, Peer Benchmarker) read a short summary of your finances, never your raw transactions, vote on your risk and record their dissent. List a wallet and an eighth, the **Chain Analyst**, adds graph evidence.
 - **Evidence Council**: nine agents examine your ledger one after another; with a wallet listed, the Chain Analyst runs as a tenth stage before the Risk Scorer.
 - **Twin Simulator**: simulate a fraud attempt against your spending pattern, optionally with a wallet.
-- **Connectors**: bank accounts, Google Sheets, Gmail & Drive invoices, mutual funds, Plaid, plus the Dodo and Cake Wallet payment rails.
+- **Connectors**: bank accounts, Google Sheets, Gmail & Drive invoices, mutual funds, plus the Dodo and Cake Wallet payment rails.
 - **Household, Goals, Budgets, Transactions, Timeline, Security (TOTP MFA)**, English / Hindi / Marathi UI, INR and other currencies, three demo personas.
 
 </details>
