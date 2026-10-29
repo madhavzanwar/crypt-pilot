@@ -13,8 +13,11 @@ const LEGACY = /^[13][1-9A-HJ-NP-Za-km-z]{25,34}$/;
 const BECH32 = /^bc1[ac-hj-np-z02-9]{11,87}$/i;
 const DEMO = /^DEMO-[A-Za-z0-9][A-Za-z0-9-]{1,40}$/;
 
+/** Zero-width characters and BOM that sneak in when copying from web pages and chats. */
+const INVISIBLE = /[\u200b-\u200f\u2060\ufeff\u00ad]/g;
+
 export function validateAddress(raw: string, opts: { allowDemo?: boolean } = {}): AddressCheck {
-  const address = raw.trim();
+  const address = raw.replace(INVISIBLE, "").trim();
   if (address === "") return { ok: false, reason: "empty" };
   if (opts.allowDemo && DEMO.test(address)) return { ok: true, kind: "demo", address };
   if (LEGACY.test(address)) return { ok: true, kind: address.startsWith("1") ? "p2pkh" : "p2sh", address };

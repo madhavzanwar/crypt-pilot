@@ -38,3 +38,10 @@ test("addresses and ordinary messages are not secrets", () => {
     assert.equal(looksLikeSecret(ok), false, ok);
   }
 });
+
+test("BUG-105: a trailing zero-width space does not make a valid address invalid", async () => {
+  const { validateAddress } = await import("@/lib/crypto/address/validate");
+  const r = validateAddress(`${ADDR}​`);
+  assert.equal(r.ok, true);
+  assert.equal(r.address, ADDR);
+});
