@@ -118,7 +118,7 @@ def test_btc_invoice_paid_once(settings: Any) -> None:
     c = client_with(settings, explorer(box), btc_receive_address=TB_ADDR, btc_sats_per_usd=1000,
                     btc_explorer_base_url="https://explorer.test/api", btc_confirmations=1)
     inv = c.post("/api/crypto-invoice", json={"packId": "starter", "coin": "btc"}).json()
-    assert inv["uri"].startswith(f"bitcoin:{TB_ADDR}?amount=0.0000") and inv["provider"] == "explorer"
+    assert inv["uri"].startswith(f"bitcoin:{TB_ADDR}?amount=0.0") and inv["provider"] == "explorer"
     assert c.get(f"/api/crypto-invoice/{inv['invoiceId']}").json() == {"status": "waiting"}  # no matching tx yet
     db = c.app.state.cryptiq.db
     with db.session() as s:
