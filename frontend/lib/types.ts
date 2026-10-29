@@ -439,6 +439,9 @@ export interface NotificationItem {
   text: string;
   date: string;
   source_ref: string | null;
+  /** Decided by the backend from the item type. Absent on older backends. */
+  action_href?: string | null;
+  action_label?: string | null;
 }
 
 // ---------------------------------------------------------------------------

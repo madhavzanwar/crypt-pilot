@@ -173,6 +173,11 @@ interface ActionLinkConfig {
 }
 
 function getActionLink(item: NotificationItem): ActionLinkConfig | null {
+  // The backend decides the action from the item type. A key that is present (even null = no action) wins;
+  // only an older backend that sends neither falls through to the wording heuristics below.
+  if ("action_href" in item) {
+    return item.action_href ? { href: item.action_href, label: item.action_label || "Open" } : null;
+  }
   const text = item.text.toLowerCase();
 
   if (text.includes("deficit") || text.includes("gap") || text.includes("shortfall") || item.type === "cash_flow_gap") {
