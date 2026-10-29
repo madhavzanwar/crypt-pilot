@@ -35,7 +35,7 @@ fixture:          ## SYNTHETIC fake dataset (DEMO- addresses) + trained model, f
 	$(FIXTURE_ENV) $(PY) -m scripts.export_demo_wallets
 
 run-fixture:      ## run the API on the synthetic fixture (responses carry isMock: true)
-	$(FIXTURE_ENV) uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+	$(FIXTURE_ENV) uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --no-proxy-headers
 
 train:            ## train baseline + graph model, calibrate, choose thresholds, write model card
 	$(PY) -m scripts.train
@@ -57,7 +57,7 @@ compare-engines:  ## TigerGraph vs NetworkX on demo + random wallets, latency p5
 	$(PY) -m scripts.compare_engines --random 50 --calls 60 --hubs 5
 
 run:
-	uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+	uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --no-proxy-headers
 
 test:
 	uv run pytest -q -m "not tigergraph"

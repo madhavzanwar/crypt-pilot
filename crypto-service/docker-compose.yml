@@ -2,6 +2,8 @@ services:
   api:
     build: .
     env_file: .env
+    environment:
+      APP_ENV: prod   # the image default; refuses to start with placeholder secrets (set them in .env)
     ports: ["8000:8000"]
     volumes:
       - ./data:/app/data

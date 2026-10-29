@@ -5,4 +5,6 @@ set -u
 if [ -n "${ARTIFACTS_REPO:-}" ]; then
   python -m scripts.fetch_artifacts || echo "fetch_artifacts failed: starting without artifacts" >&2
 fi
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
+# --no-proxy-headers: uvicorn must not rewrite the peer address from X-Forwarded-For for loopback callers
+# (any local process could spoof it); app/ratelimit.py trusts the header only when CRYPTO_TRUST_PROXY=true.
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --no-proxy-headers
