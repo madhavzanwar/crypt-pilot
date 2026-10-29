@@ -4,10 +4,11 @@ from __future__ import annotations
 import json
 from collections import defaultdict
 from datetime import date, timedelta
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, StringConstraints
 
 from app.api.connectors_router import CATALOG, DATASET_FILES, _dataset
 from app.api.jobs_router import enqueue_evidence
@@ -22,8 +23,8 @@ router = APIRouter(prefix="/api/security", tags=["security"])
 
 class Screening(BaseModel):
     """Optional body for the councils: public crypto wallet addresses for the Chain Analyst to screen (never seed phrases or keys)."""
-    wallets: list[str] = []
-    lang: str = "en"
+    wallets: list[Annotated[str, StringConstraints(max_length=100)]] = Field(default_factory=list, max_length=20)  # BUG-043: bounded body
+    lang: str = Field(default="en", max_length=8)
 
 
 def _wallets(body: Screening | None) -> tuple[list[str], str, str]:
@@ -136,7 +137,7 @@ def graph(request: Request, months: int = 6, user_id: str = Depends(resolve_user
 class FraudSim(BaseModel):
     merchant: str
     amount: float
-    wallet: str | None = None  # optional: a crypto wallet the payment would go to, screened by the Chain Analyst
+    wallet: Annotated[str, StringConstraints(max_length=100)] | None = None  # optional: a crypto wallet the payment would go to, screened by the Chain Analyst
 
 
 @router.post("/{user_id}/simulate-fraud")

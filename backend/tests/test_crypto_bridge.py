@@ -513,7 +513,10 @@ def test_check_wallet_real_unreachable_port_returns_none(monkeypatch):
 def test_router_is_included_in_finpilot_app():
     from app.main import app
 
-    paths = {getattr(r, "path", "") for r in app.routes}
+    paths = set()
+    for r in app.routes:  # newer FastAPI keeps included routers as lazy wrappers around their original router
+        paths.add(getattr(r, "path", ""))
+        paths |= {getattr(x, "path", "") for x in getattr(getattr(r, "original_router", None), "routes", [])}
     assert "/api/crypto/status" in paths and "/api/crypto/{path:path}" in paths
 
 

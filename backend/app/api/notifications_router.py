@@ -33,6 +33,7 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends
 
 from app.analytics.anomalies import detect_anomalies
+from app.analytics.cashflow_basis import is_committed
 from app.core.auth import resolve_user_id
 from app.core import store
 from app.ingest.snapshot import _transactions_df, build_dashboard_snapshot
@@ -46,6 +47,14 @@ _CASH_FLOW_GAP_WINDOW_DAYS = 30
 _MAX_RECOMMENDATIONS = 2
 
 _SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2}
+_ANOMALY_WINDOW_DAYS = 45  # an anomaly older than this is history, not a notification
+_ACTIONS = {
+    "anomaly": ("/transactions", "Review transactions"),
+    "recommendation": ("/simulate", "Review Simulation"),
+    "upcoming_bill": ("/budgets", "Adjust Budget"),
+    "cash_flow_gap": ("/simulate", "Simulate Fix"),
+    "over_budget": ("/budgets", "Adjust Budget"),
+}
 
 
 def _stable_id(*parts: str) -> str:
@@ -69,15 +78,19 @@ def get_notifications(user_id: str = Depends(resolve_user_id)) -> list[Notificat
     # --- anomalies -----------------------------------------------------
     try:
         df = _transactions_df(list(txn_rows))
+        txn_date = {r.id: r.date for r in txn_rows}
         for fact in detect_anomalies(df):
             source_ref = fact.source_txn_ids[0] if fact.source_txn_ids else None
+            when = max((txn_date[i] for i in fact.source_txn_ids if i in txn_date), default=today)  # the transaction's own date
+            if (today - when).days > _ANOMALY_WINDOW_DAYS:
+                continue
             items.append(
                 NotificationItem(
-                    id=_stable_id("anomaly", source_ref or "", fact.text, today.isoformat()),
+                    id=_stable_id("anomaly", source_ref or "", fact.text, when.isoformat()),
                     type="anomaly",
                     severity="warning",
                     text=fact.text,
-                    date=today,
+                    date=when,
                     source_ref=source_ref,
                 )
             )
@@ -104,7 +117,7 @@ def get_notifications(user_id: str = Depends(resolve_user_id)) -> list[Notificat
     try:
         horizon = today + timedelta(days=_UPCOMING_BILL_WINDOW_DAYS)
         for ob in snapshot.recurring_obligations:
-            if today <= ob.next_expected_date <= horizon:
+            if is_committed(ob) and today <= ob.next_expected_date <= horizon:  # bills, not shopping habits
                 items.append(
                     NotificationItem(
                         id=_stable_id("upcoming_bill", ob.group_id, ob.next_expected_date.isoformat()),
@@ -176,6 +189,8 @@ def get_notifications(user_id: str = Depends(resolve_user_id)) -> list[Notificat
     except Exception:
         pass
 
+    for i in items:
+        i.action_href, i.action_label = _ACTIONS.get(i.type, (None, None))
     items.sort(key=lambda i: (_SEVERITY_ORDER.get(i.severity, 3), i.date))
     # ids are React keys on the client: never ship two items with the same one
     return list({i.id: i for i in reversed(items)}.values())[::-1]

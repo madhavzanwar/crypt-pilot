@@ -187,6 +187,10 @@ def connect(connector: str, body: ConnectRequest, user_id: str = Depends(resolve
         raise HTTPException(404, "Unknown connector")
     if connector in CATALOG and not CATALOG[connector][2]:
         raise HTTPException(409, f"{_label(connector)} isn't available yet")
+    if connector in LEGACY_IDS:
+        # retired connector: still honoured for disconnect/export of existing links, but it can no longer be linked
+        # (connecting used to wipe a guest's ledger and re-seed persona data for a connector that is not listed)
+        raise HTTPException(410, f"{_label(connector)} is no longer available")
     if connector in RAILS:
         # nothing to link: the rail is always available (test mode / testnet only)
         return {"connected": True, "rail": True}
@@ -196,17 +200,9 @@ def connect(connector: str, body: ConnectRequest, user_id: str = Depends(resolve
         store.put(ConnectionRow(id=f"{user_id}:{connector}", user_id=user_id, connector=connector, detail=f"{n} rows, live",
                                 source_url=csv_url, content_hash=digest, connected_at=datetime.now(timezone.utc)))
         return {"connected": True, "transactions": n}
-    if connector == "google_pay" and user_id in DEMO_USER_IDS:
-        # demo personas already hold their fixture data: record the link, never reseed or wipe it
-        stats = {"transactions": len(store.query(TransactionRow, user_id=user_id))}
-        detail = user_id.removeprefix("demo-").capitalize()
-    elif connector == "google_pay":
-        stats = _seed_from_persona(user_id, body.profile)
-        detail = body.profile.capitalize()
-    else:
-        # shortcut: dataset-only link (doesn't touch dashboard data), upgrade when a real adapter lands
-        stats = {k: len(v) for k, v in _dataset(connector).items()}
-        detail = f"{sum(stats.values())} records"
+    # shortcut: dataset-only link (doesn't touch dashboard data), upgrade when a real adapter lands
+    stats = {k: len(v) for k, v in _dataset(connector).items()}
+    detail = f"{sum(stats.values())} records"
     store.delete_where(InsightsSnapshotRow, user_id=user_id)
     store.put(ConnectionRow(id=f"{user_id}:{connector}", user_id=user_id, connector=connector,
                             detail=detail, connected_at=datetime.now(timezone.utc)))

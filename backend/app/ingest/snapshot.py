@@ -54,6 +54,7 @@ from app.core import store
 
 from app.analytics.anomalies import detect_anomalies
 from app.analytics.benchmarks import benchmark_context
+from app.analytics.cashflow_basis import avg_income_expenses
 from app.analytics.debt import compute_dti, credit_utilization as _credit_utilization
 from app.analytics.health_score import compute_health_score
 from app.analytics.recurring import detect_recurring
@@ -96,7 +97,8 @@ def _transactions_df(rows: list[TransactionRow]) -> pd.DataFrame:
     return df.sort_values("date").reset_index(drop=True)
 
 
-def _debts_schema(rows: list[DebtRow], user_id: str) -> list[Debt]:
+def _debts_schema(rows: list[DebtRow], user_id: str, accounts: list[AccountRow] | None = None) -> list[Debt]:
+    names = {a.id: a.name for a in accounts or []}
     return [
         Debt(
             id=d.id,
@@ -106,6 +108,7 @@ def _debts_schema(rows: list[DebtRow], user_id: str) -> list[Debt]:
             interest_rate_apr=d.interest_rate_apr,
             minimum_payment=d.minimum_payment,
             due_day_of_month=d.due_day_of_month,
+            name=names.get(d.account_id),
         )
         for d in rows
     ]
@@ -130,23 +133,9 @@ def _aggregate_credit_utilization(accounts: list[AccountRow]) -> Optional[float]
 
 
 def _avg_income_expenses(df: pd.DataFrame, months: int = _TRAILING_MONTHS) -> tuple[float, float]:
-    """Trailing-`months`-month average monthly income/expenses, same window
-    convention as `app.analytics.savings.trailing_savings_rate`."""
-    if df.empty:
-        return 0.0, 0.0
-    work = df.copy()
-    work["date"] = pd.to_datetime(work["date"])
-    as_of = work["date"].max()
-    window_start = as_of - pd.DateOffset(months=months)
-    window = work[(work["date"] > window_start) & (work["date"] <= as_of)]
-    # Same exclusion as app.analytics.savings.trailing_savings_rate (transfers
-    # and credit-card bill payments are not new spend -- see that module for
-    # why credit_card_payment is excluded here).
-    _excluded = {TxnCategory.transfer.value, TxnCategory.credit_card_payment.value}
-    window = window[~window["category"].isin(_excluded)]
-    income_total = float(window.loc[window["amount"] > 0, "amount"].sum())
-    expense_total = float(-window.loc[window["amount"] < 0, "amount"].sum())
-    return income_total / months, expense_total / months
+    """Trailing-`months`-month average monthly income/expenses; one definition shared with the budgets page
+    (app.analytics.cashflow_basis)."""
+    return avg_income_expenses(df, months)
 
 
 def _spending_consistency_cov(df: pd.DataFrame) -> float:
@@ -249,7 +238,7 @@ def _build_dashboard_snapshot(user_id: str) -> DashboardSnapshot:
     store.query(IncomeRow, user_id=user_id)
 
     df = _transactions_df(list(txn_rows))
-    debts = _debts_schema(list(debt_rows), user_id)
+    debts = _debts_schema(list(debt_rows), user_id, list(accounts))
 
     starting_balance = _starting_balance(list(accounts))
     net_worth = _net_worth(list(accounts))
@@ -346,7 +335,10 @@ def _build_dashboard_snapshot(user_id: str) -> DashboardSnapshot:
         data_gaps=[],
     )
 
+    period_end = df["date"].max().date() if not df.empty else None
+    period_start = (df["date"].max() - pd.DateOffset(months=_TRAILING_MONTHS) + pd.Timedelta(days=1)).date() if not df.empty else None
     snapshot = DashboardSnapshot(
+        period_start=period_start, period_end=period_end, period=period_end.strftime("%Y-%m") if period_end else None,
         user_id=user_id,
         health_score=health_score,
         net_worth=net_worth,

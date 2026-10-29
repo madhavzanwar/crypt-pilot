@@ -5,7 +5,9 @@ they pay or hold, and each one is checked by the crypto service (`app.crypto_bri
 k-hop query, or the NetworkX / replay fallback when TigerGraph is not the engine). Nothing here invents a finding:
 
 * no wallets  -> the agent does not run (callers skip it);
-* service unreachable (check_wallet returns None) -> that wallet is "offline" and the agent abstains;
+* service unreachable or failing (network error, 5xx, check_wallet returns None) -> that wallet is "offline" and the agent abstains;
+* service answered 429 -> "rate_limited" (retry later); 400 -> "rejected" (the service refused the address). Neither is "offline";
+* every wallet that could not be verified (offline, rate limited, rejected, not in dataset) is UNVERIFIED, never "all clear";
 * verdict UNKNOWN -> "not in dataset", an abstention. Absence from the dataset is NOT a safe signal;
 * BLOCK -> high risk, WARN -> medium, ALLOW -> low.
 
@@ -15,22 +17,29 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import hashlib
 import re
 import time
 from typing import Any
 
-from app.crypto_bridge.client import check_wallet
+from app.crypto_bridge import upstream
 
 AGENT_ID = "chain_analyst"
 AGENT_NAME = "Chain Analyst"
 AGENT_JOB = "Screens crypto wallets you pay or hold against a transaction graph"
 MAX_WALLETS = 5
 OFFLINE_NOTE = "Chain Analyst offline"
+RATE_LIMITED_NOTE = "Chain Analyst rate limited"
+REJECTED_NOTE = "Chain Analyst rejected the address"
+# Statuses where the service gave no verdict about the wallet. Together with "not_in_dataset" these are the UNVERIFIED wallets.
+NO_ANSWER = ("offline", "rate_limited", "rejected")
+UNVERIFIED_CAVEAT = "Unverified wallet(s) are not a safe signal: treat them with caution."
+_CHECK_TIMEOUT = 30.0
 
 # Format check only (the crypto service does the real checksum validation). DEMO-... is the synthetic fixture.
-_LEGACY = re.compile(r"^[13][1-9A-HJ-NP-Za-km-z]{25,34}$")
-_BECH32 = re.compile(r"^bc1[ac-hj-np-z02-9]{11,87}$", re.IGNORECASE)
-_DEMO = re.compile(r"^DEMO-[A-Za-z0-9][A-Za-z0-9-]{1,40}$")
+_LEGACY = re.compile(r"[13][1-9A-HJ-NP-Za-km-z]{25,34}")
+_BECH32 = re.compile(r"bc1[ac-hj-np-z02-9]{11,87}", re.IGNORECASE)
+_DEMO = re.compile(r"DEMO-[A-Za-z0-9][A-Za-z0-9-]{1,40}")
 
 _ENGINES = {"tigergraph": "TigerGraph", "networkx": "NetworkX fallback", "replay": "Recorded replay"}
 _SEVERITY = {"BLOCK": "high", "WARN": "medium", "ALLOW": "low", "UNKNOWN": "low"}
@@ -43,13 +52,56 @@ def short(address: str, head: int = 6, tail: int = 6) -> str:
     return address if len(address) <= head + tail + 1 else f"{address[:head]}…{address[-tail:]}"
 
 
+_B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+_BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+_BECH32_CONST, _BECH32M_CONST = 1, 0x2BC830A3
+
+
+def _base58check_ok(a: str) -> bool:
+    n = 0
+    for ch in a:
+        n = n * 58 + _B58.index(ch)
+    raw = n.to_bytes(25, "big") if n < 1 << 200 else b""
+    if len(raw) != 25:
+        return False
+    pad = len(a) - len(a.lstrip("1"))
+    if pad and raw[:pad] != b"\x00" * pad:
+        return False
+    return hashlib.sha256(hashlib.sha256(raw[:-4]).digest()).digest()[:4] == raw[-4:] and raw[0] in (0, 5)
+
+
+def _bech32_polymod(values: list[int]) -> int:
+    gen = (0x3B6A57B2, 0x26508E6D, 0x1EA119FA, 0x3D4233DD, 0x2A1462B3)
+    chk = 1
+    for v in values:
+        top = chk >> 25
+        chk = (chk & 0x1FFFFFF) << 5 ^ v
+        for i in range(5):
+            chk ^= gen[i] if (top >> i) & 1 else 0
+    return chk
+
+
+def _bech32_ok(a: str) -> bool:
+    a = a.lower()
+    pos = a.rfind("1")
+    hrp, data = a[:pos], a[pos + 1:]
+    if hrp != "bc" or len(data) < 7 or any(c not in _BECH32_CHARSET for c in data):
+        return False
+    vals = [_BECH32_CHARSET.index(c) for c in data]
+    const = _bech32_polymod([ord(c) >> 5 for c in hrp] + [0] + [ord(c) & 31 for c in hrp] + vals)
+    version = vals[0]
+    return const == (_BECH32_CONST if version == 0 else _BECH32M_CONST) and version <= 16
+
+
 def valid_address(raw: str) -> str | None:
-    """The normalised address when it looks like a Bitcoin address (or a DEMO- placeholder), else None."""
+    """The normalised address when it is a Bitcoin address with a valid checksum (or a DEMO- placeholder), else None."""
     a = (raw or "").strip()
-    if _DEMO.match(a) or _LEGACY.match(a):
+    if _DEMO.fullmatch(a):
         return a
-    if _BECH32.match(a) and a in (a.lower(), a.upper()):  # mixed case is invalid bech32
-        return a
+    if _LEGACY.fullmatch(a):
+        return a if _base58check_ok(a) else None
+    if _BECH32.fullmatch(a) and a in (a.lower(), a.upper()):  # mixed case is invalid bech32
+        return a if _bech32_ok(a) else None
     return None
 
 
@@ -95,15 +147,52 @@ def _reason(verdict: str, r: dict[str, Any], engine: str | None) -> str:
     return (text[0].upper() + text[1:] + ".")[:220]
 
 
-def _offline(address: str, rtt_ms: int) -> dict[str, Any]:
-    return {"address": address, "status": "offline", "verdict": None, "risk_score": None, "hops": None, "ofac": False,
-            "reason": f"{OFFLINE_NOTE}: the crypto service could not be reached.", "engine": None, "engine_label": None,
+_NO_ANSWER_REASON = {
+    "offline": f"{OFFLINE_NOTE}: the crypto service could not be reached.",
+    "rate_limited": "The crypto service is rate limiting checks right now; retry in a minute. This wallet is unverified.",
+    "rejected": "The crypto service rejected this address as invalid. This wallet is unverified.",
+}
+
+
+def _offline(address: str, rtt_ms: int, status: str = "offline") -> dict[str, Any]:
+    """A wallet the service gave no verdict on. `status` is offline (unreachable / 5xx), rate_limited (429) or rejected (400)."""
+    status = status if status in NO_ANSWER else "offline"
+    return {"address": address, "status": status, "verdict": None, "risk_score": None, "hops": None, "ofac": False,
+            "reason": _NO_ANSWER_REASON[status], "engine": None, "engine_label": None,
             "tigergraph": False, "ms": None, "rtt_ms": rtt_ms, "vote": None, "mock": False, "limitations": []}
+
+
+def unverified_count(results: list[dict[str, Any]]) -> int:
+    """Wallets with no verdict: unreachable, rate limited, rejected, or simply not in the dataset (UNKNOWN is not safe)."""
+    return sum(1 for r in results if r["status"] in NO_ANSWER or r["status"] == "not_in_dataset")
+
+
+async def check_wallet(address: str, lang: str = "en") -> dict[str, Any] | None:
+    """The crypto service's /api/check JSON for one address. Never raises. A non-200 answer is returned as
+    {"status": "error", "error": "rejected" | "rate_limited" | "offline"} so the council can tell them apart from
+    an unreachable service (None)."""
+    try:
+        if not upstream.is_configured():
+            return None
+        async with upstream.new_client(_CHECK_TIMEOUT) as client:
+            resp = await client.post("/api/check", json={"address": address.strip(), "lang": lang if lang in ("en", "hi") else "en"})
+        if resp.status_code == 400:
+            return {"status": "error", "error": "rejected"}
+        if resp.status_code == 429:
+            return {"status": "error", "error": "rate_limited"}
+        if resp.status_code != 200:
+            return {"status": "error", "error": "offline"}
+        data = upstream.json_or_none(resp)
+        return data if isinstance(data, dict) else None
+    except Exception:  # noqa: BLE001 - network failure
+        return None
 
 
 def summarise(address: str, resp: dict[str, Any] | None, rtt_ms: int = 0) -> dict[str, Any]:
     """One wallet's result in a fixed shape; `vote` is high / medium / low, or None when the agent abstains on it."""
-    if not isinstance(resp, dict) or resp.get("status") == "error" or resp.get("verdict") not in ("ALLOW", "WARN", "BLOCK", "UNKNOWN"):
+    if isinstance(resp, dict) and resp.get("status") == "error":
+        return _offline(address, rtt_ms, str(resp.get("error") or "offline"))
+    if not isinstance(resp, dict) or resp.get("verdict") not in ("ALLOW", "WARN", "BLOCK", "UNKNOWN"):
         return _offline(address, rtt_ms)
     verdict = resp["verdict"]
     engine = resp.get("engine") if resp.get("engine") in _ENGINES else None
@@ -158,7 +247,7 @@ def run_sync(coro):
 
 
 def _engine_tag(r: dict[str, Any]) -> str:
-    if r["status"] == "offline":
+    if r["status"] in NO_ANSWER:
         return OFFLINE_NOTE
     ms = f" in {r['ms']} ms" if r.get("ms") is not None else ""
     return f"{r['engine_label']}{ms}"
@@ -167,7 +256,7 @@ def _engine_tag(r: dict[str, Any]) -> str:
 def wallet_finding(r: dict[str, Any]) -> dict[str, Any] | None:
     """One finding per wallet the service answered about. `info` marks findings that are not a problem (ALLOW, UNKNOWN):
     they are shown but never counted in the risk score."""
-    if r["status"] == "offline":
+    if r["status"] in NO_ANSWER:
         return None
     v = r["verdict"]
     score = f", risk {r['risk_score']}/100" if r["risk_score"] is not None else ""
@@ -184,19 +273,22 @@ def wallet_finding(r: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+_ERROR_NOTE = {"offline": OFFLINE_NOTE, "rate_limited": RATE_LIMITED_NOTE, "rejected": REJECTED_NOTE}
+
+
 def evidence_step(wallets: list[str], lang: str = "en") -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Failure-isolated: anything unexpected from the crypto service becomes an 'offline' step, never a crashed investigation."""
     try:
         return _evidence_step(wallets, lang)
     except Exception:  # noqa: BLE001
-        return [], {"error": OFFLINE_NOTE, "findings": 0}
+        return [], {"error": OFFLINE_NOTE, "findings": 0, "unverified": len(wallets)}
 
 
 def _evidence_step(wallets: list[str], lang: str = "en") -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """(findings, summary fields) for the Evidence Council's Chain Analyst stage."""
     results = run_sync(screen_wallets(wallets, lang))
     findings = [f for f in (wallet_finding(r) for r in results) if f]
-    answered = [r for r in results if r["status"] != "offline"]
+    answered = [r for r in results if r["status"] not in NO_ANSWER]
     engines = sorted({r["engine"] for r in answered if r["engine"]})
     extra: dict[str, Any] = {
         "findings": sum(1 for f in findings if not f["info"]),  # problems only: this drives the red/green node
@@ -205,9 +297,11 @@ def _evidence_step(wallets: list[str], lang: str = "en") -> tuple[list[dict[str,
         "tigergraph": bool(answered) and all(r["tigergraph"] for r in answered),
         "graph_ms": max((r["ms"] for r in answered if r["ms"] is not None), default=None),
         "ai": "off",
+        "unverified": unverified_count(results),
     }
     if not answered:
-        extra["error"] = OFFLINE_NOTE
+        kinds = {r["status"] for r in results}
+        extra["error"] = _ERROR_NOTE[kinds.pop()] if len(kinds) == 1 else OFFLINE_NOTE
     return findings, extra
 
 
@@ -220,11 +314,18 @@ def council_vote(results: list[dict[str, Any]]) -> dict[str, Any]:
     voting = [r for r in results if r["vote"]]
     base = {"agent": AGENT_ID, "name": AGENT_NAME, "source": "graph", "round": 1, "chain": chain}
     if not voting:
-        offline = [r for r in results if r["status"] == "offline"]
-        if len(offline) == len(results):
-            why, do = f"{OFFLINE_NOTE}: the crypto service could not be reached, so it abstains.", ""
+        gone = [r for r in results if r["status"] in NO_ANSWER]
+        if len(gone) == len(results):
+            kinds = {r["status"] for r in gone}
+            if kinds == {"rate_limited"}:
+                why = "Abstains: the crypto service is rate limiting checks, so these wallets are unverified. Retry in a minute."
+            elif kinds == {"rejected"}:
+                why = "Abstains: the crypto service rejected the address(es) as invalid, so they are unverified."
+            else:
+                why = f"{OFFLINE_NOTE}: the crypto service could not be reached, so it abstains and the wallets are unverified."
+            do = "Treat unverified wallets with caution."
         else:
-            n = len(results) - len(offline)
+            n = len(results) - len(gone)
             why = f"Abstains: {n} wallet{'s' if n != 1 else ''} not in dataset. Not in dataset does not mean safe."
             do = "Treat unknown wallets with caution."
         return {**base, "score": 0, "level": "abstain", "abstain": True, "why": why[:160], "do": do}
@@ -237,12 +338,12 @@ def council_vote(results: list[dict[str, Any]]) -> dict[str, Any]:
     tail = ""
     if extra:
         unknown = sum(1 for r in results if r is not worst and r["status"] == "not_in_dataset")
-        off = sum(1 for r in results if r is not worst and r["status"] == "offline")
+        off = sum(1 for r in results if r is not worst and r["status"] in NO_ANSWER)
         bits = [f"{extra} other wallet{'s' if extra != 1 else ''} screened"]
         if unknown:
             bits.append(f"{unknown} not in dataset")
         if off:
-            bits.append(f"{off} offline")
+            bits.append(f"{off} unverified (service did not answer)")
         tail = f" ({', '.join(bits)})"
     room = 160 - len(tail)  # the vote line is capped at 160 characters: shorten the reason, never the wallet count
     why = (head if len(head) <= room else head[: room - 1].rstrip() + "…") + tail

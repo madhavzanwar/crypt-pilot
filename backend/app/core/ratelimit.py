@@ -44,6 +44,9 @@ class RateLimiter:
 # (falls back to a constant key only if user_id somehow isn't available yet).
 chat_limiter = RateLimiter(max_calls=30, window_seconds=3600)  # 30 copilot msgs/hour
 upload_limiter = RateLimiter(max_calls=10, window_seconds=3600)  # 10 CSV uploads/hour
+# Per client address, across every user id: guest ids are self-minted, so a per-user limit alone is bypassed by rotating them.
+chat_ip_limiter = RateLimiter(max_calls=60, window_seconds=3600)
+voice_ip_limiter = RateLimiter(max_calls=60, window_seconds=600)
 
 
 def client_ip(request: Request | None) -> str:

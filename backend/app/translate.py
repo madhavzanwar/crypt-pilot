@@ -13,12 +13,13 @@ import httpx
 
 from app import telemetry
 from app.core.config import get_settings
+from app.core.paths import writable_file
 
 log = logging.getLogger("finpilot.translate")
 LANGS = {"hi": "Hindi", "mr": "Marathi"}
 _GEMINI = "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent"
 _NVIDIA = "https://integrate.api.nvidia.com/v1/chat/completions"
-_FILE = Path(__file__).resolve().parent.parent / ".translation_cache.json"
+_FILE = writable_file(Path(__file__).resolve().parent.parent / ".translation_cache.json")  # /tmp when the code directory is read-only
 _CHUNK = 40
 _lock = threading.Lock()
 _cache: dict[str, dict[str, str]] = {}  # lang -> {english: translated}

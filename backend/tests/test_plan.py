@@ -128,7 +128,16 @@ def test_connected_guest_inherits_declared_reserve_and_six_periods():
     c = TestClient(app)
     uid = "guest-plantest0000001"
     try:
-        assert c.post(f"/api/connectors/{uid}/google_pay/connect", json={"profile": "priya"}).status_code == 200
+        # the retired google_pay connect route is gone (410); the Account Aggregator flow seeds the same way
+        assert c.post(f"/api/connectors/{uid}/google_pay/connect", json={"profile": "priya"}).status_code == 410
+        from datetime import datetime, timezone
+
+        from app.api.connectors_router import _seed_from_persona
+        from app.core import store
+        from app.models import ConnectionRow
+
+        _seed_from_persona(uid, "priya")
+        store.put(ConnectionRow(id=f"{uid}:google_pay", user_id=uid, connector="google_pay", detail="Priya", connected_at=datetime.now(timezone.utc)))
         out = c.get(f"/api/plan/{uid}").json()
         assert out["constraints"]["min_reserve"] == PLAN_PROFILES["demo-priya"]["reserve"]
         assert out["constraints"]["goal"] is not None

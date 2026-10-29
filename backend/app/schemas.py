@@ -121,6 +121,8 @@ class Debt(BaseModel):
     interest_rate_apr: float
     minimum_payment: float
     due_day_of_month: int
+    # Human-readable name of the account the debt sits on (never a raw id); None when the account is unknown.
+    name: Optional[str] = None
 
 
 class Income(BaseModel):
@@ -333,6 +335,11 @@ class DashboardSnapshot(BaseModel):
     # False for a real signed-in user who hasn't added any accounts yet --
     # the snapshot is then an all-zero placeholder, not demo data.
     has_data: bool = True
+    # The window the income/expense figures cover (trailing 3 months ending at the latest transaction) and its label
+    # "YYYY-MM" (the month of the window's end): the statement's period, derived from the data rather than hard-coded.
+    period_start: Optional[date] = None
+    period_end: Optional[date] = None
+    period: Optional[str] = None
 
 
 class CreateAccountRequest(BaseModel):
@@ -522,6 +529,9 @@ class SafeToSpend(BaseModel):
     amount: float
     basis: str  # human-readable explanation of the formula/data used
     as_of_date: date
+    # "ok" | "tight" | "none": zero is never an "ok" state. `shortfall` is how far spend + commitments exceed income (0 when not over).
+    status: str = "ok"
+    shortfall: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -596,6 +606,9 @@ class NotificationItem(BaseModel):
     text: str
     date: date
     source_ref: Optional[str] = None
+    # Where the bell's action button should go, decided from the item's type (not guessed from its wording).
+    action_href: Optional[str] = None
+    action_label: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

@@ -27,7 +27,17 @@ from app.security import agents, chain_analyst
 URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 _SPREAD = 25  # an agent this many points from the median gets a second turn
 _TTL = 600.0
+_CACHE_MAX = 256  # the key includes user-supplied wallet sets, so the cache must be bounded
 _cache: dict[str, tuple[float, dict]] = {}
+
+
+def _cache_put(key: str, result: dict) -> None:
+    now = time.monotonic()
+    for k in [k for k, (t, _) in _cache.items() if now - t >= _TTL]:
+        del _cache[k]
+    while len(_cache) >= _CACHE_MAX:  # dicts keep insertion order: drop the oldest entry
+        del _cache[next(iter(_cache))]
+    _cache[key] = (now, result)
 
 
 def _clamp(x: float) -> int:
@@ -185,7 +195,7 @@ async def convene(user_id: str, wallets: list[str] | None = None, lang: str = "e
     facts_s = facts_json(facts)
     s = get_settings()
     use_model = bool(s.nvidia_chat_api_key)
-    key = hashlib.sha1(f"{facts_s}|{s.nvidia_council_model}|{use_model}{'|w:' + ','.join(wallets) if wallets else ''}".encode()).hexdigest()
+    key = hashlib.sha1(f"{facts_s}|{s.nvidia_council_model}|{use_model}|{lang}{'|w:' + ','.join(wallets) if wallets else ''}".encode()).hexdigest()
     hit = _cache.get(key)
     if hit and time.monotonic() - hit[0] < _TTL:
         yield {"type": "verdict", "cached": True, **hit[1]}
@@ -234,9 +244,19 @@ async def convene(user_id: str, wallets: list[str] | None = None, lang: str = "e
         result["level"] = level(result["score"])
         if chain_vote.get("do"):
             result["actions"] = [chain_vote["do"]] + [a for a in result["actions"] if a.lower() != chain_vote["do"].lower()][:2]
-    offline = bool(chain_vote) and any(r["status"] == "offline" for r in chain_vote["chain"]["wallets"])
+    chain_results = chain_vote["chain"]["wallets"] if chain_vote else []
+    offline = any(r["status"] in chain_analyst.NO_ANSWER and r["status"] != "rejected" for r in chain_results)
     if wallets:
-        result["chain"] = {"wallets": len(wallets), "voted": bool(chain_vote) and not chain_vote.get("abstain"), "offline": offline}
-    if not offline:  # an unreachable crypto service must not be remembered for ten minutes
-        _cache[key] = (time.monotonic(), result)
+        unverified = chain_analyst.unverified_count(chain_results) if chain_results else len(wallets)
+        result["chain"] = {"wallets": len(wallets), "voted": bool(chain_vote) and not chain_vote.get("abstain"), "offline": offline,
+                           "unverified": unverified}
+        if unverified:
+            # UNKNOWN is not safe: a run whose wallets could not be verified must never read like an all-clear.
+            result["unverified"] = unverified
+            result["caveat"] = f"{unverified} wallet{'s' if unverified != 1 else ''} unverified: not in the dataset or the crypto service did not answer. This is not a safe signal."
+            rest = [a for a in result["actions"] if a != chain_analyst.UNVERIFIED_CAVEAT]
+            hard_stop = bool(chain_vote) and not chain_vote.get("abstain") and chain_vote.get("level") == "high"
+            result["actions"] = (rest[:1] + [chain_analyst.UNVERIFIED_CAVEAT] + rest[1:2]) if hard_stop else [chain_analyst.UNVERIFIED_CAVEAT] + rest[:2]
+    if not offline:  # an unreachable or rate-limited crypto service must not be remembered for ten minutes
+        _cache_put(key, result)
     yield {"type": "verdict", "cached": False, **result}

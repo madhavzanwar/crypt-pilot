@@ -79,7 +79,7 @@ def _coefficient_of_variation(values: list[float]) -> float:
     return abs(stdev / mean)
 
 
-def detect_recurring(df: pd.DataFrame) -> list[RecurringObligation]:
+def detect_recurring(df: pd.DataFrame, as_of: date | None = None) -> list[RecurringObligation]:
     """Group transactions by normalized merchant and flag recurring series.
 
     Criteria:
@@ -94,7 +94,11 @@ def detect_recurring(df: pd.DataFrame) -> list[RecurringObligation]:
     Confidence blends amount-tightness and interval-tightness: a clean
     monthly subscription at a fixed price scores near 1.0; a series with
     loose timing or drifting amounts scores lower.
+
+    `next_expected_date` is rolled forward by whole intervals until it is no earlier than `as_of` (default: today), so a
+    missed or late charge never shows a "next" date in the past.
     """
+    as_of = as_of or date.today()
     if df.empty:
         return []
 
@@ -147,6 +151,9 @@ def detect_recurring(df: pd.DataFrame) -> list[RecurringObligation]:
 
         last_date = dates[-1]
         next_expected_date = last_date + timedelta(days=typical_interval)
+        if next_expected_date < as_of:
+            steps = -(-(as_of - next_expected_date).days // typical_interval)  # ceil
+            next_expected_date += timedelta(days=steps * typical_interval)
 
         # representative amount: median (robust to outlier one-off surcharges)
         rep_amount = statistics.median(amounts)

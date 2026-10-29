@@ -201,7 +201,7 @@ def test_council_with_a_blocked_wallet_adds_an_eighth_vote_that_counts(risk_coun
     chain = [e["vote"] for e in events if e["type"] == "vote" and e["vote"]["agent"] == "chain_analyst"]
     assert len(chain) == 1 and chain[0]["level"] == "high" and len(verdict["votes"]) == 8
     assert sum(verdict["counts"].values()) == 8 and verdict["counts"]["high"] == base["counts"].get("high", 0) + 1
-    assert verdict["chain"] == {"wallets": 1, "voted": True, "offline": False}
+    assert verdict["chain"] == {"wallets": 1, "voted": True, "offline": False, "unverified": 0}
     assert any(a.startswith("Do not send funds") for a in verdict["actions"]) or len(verdict["actions"]) == 3
     assert service == [BLOCK_ADDR]
 
@@ -276,7 +276,9 @@ def test_evidence_with_wallets_adds_one_finding_per_wallet_before_the_risk_score
 def test_evidence_clean_and_unknown_wallets_do_not_raise_the_score(ledger, service):
     report = investigate([ALLOW_ADDR, UNKNOWN_ADDR])[-1]["report"]
     assert report["risk_score"] == 0 and len([f for f in report["findings"] if f["agent"] == "chain_analyst"]) == 2
-    assert report["verdict"]["headline"] == "No security problems found."
+    # BUG-017: an UNKNOWN wallet is not an all-clear
+    assert report["verdict"]["headline"] != "No security problems found." and "unverified" in report["verdict"]["headline"]
+    assert report["wallets_unverified"] == 1
 
 
 def test_evidence_offline_service_abstains(ledger, monkeypatch):
@@ -342,4 +344,4 @@ def test_a_malformed_service_reply_does_not_break_the_council_or_the_investigati
     verdict = convene([BLOCK_ADDR])[-1]  # must still produce a verdict
     assert verdict["type"] == "verdict" and verdict["chain"]["wallets"] == 1
     monkeypatch.setattr(chain_analyst, "_evidence_step", lambda w, lang="en": (_ for _ in ()).throw(RuntimeError("boom")))
-    assert chain_analyst.evidence_step([BLOCK_ADDR]) == ([], {"error": chain_analyst.OFFLINE_NOTE, "findings": 0})
+    assert chain_analyst.evidence_step([BLOCK_ADDR]) == ([], {"error": chain_analyst.OFFLINE_NOTE, "findings": 0, "unverified": 1})
