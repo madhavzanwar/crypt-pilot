@@ -117,7 +117,7 @@ export default function AttestFlow({ subject }: { subject: AttestSubject }) {
   if (!uid) {
     if (step === 0) {
       action = (
-        <Button variant="primary" className="self-start" onClick={openConnectModal} disabled={!openConnectModal}>
+        <Button variant="primary" className="self-start" onClick={openConnectModal} disabled={!openConnectModal || !schemaValid}>
           {t("web3.button.connectFirst", "Connect wallet")}
         </Button>
       );
@@ -153,23 +153,33 @@ export default function AttestFlow({ subject }: { subject: AttestSubject }) {
           <p className="font-semibold">{t("web3.setup.title", "Real attestation is not configured")}</p>
           <p>
             {t(
-              "web3.setup.schema",
-              "Set NEXT_PUBLIC_EAS_SCHEMA_UID (the UID of the registered EAS schema on Base Sepolia) to enable signing. Until then the sign button stays disabled; use the SIMULATED preview to see the steps.",
+              "web3.setup.schemaUser",
+              "Signing is switched off on this site for now. Use the SIMULATED preview to see the steps.",
             )}
           </p>
+          <details className="mt-1 text-xs">
+            <summary className="cursor-pointer font-medium">{t("web3.setup.owner", "For the site owner")}</summary>
+            <p className="mt-1">
+              {t(
+                "web3.setup.schema",
+                "Set NEXT_PUBLIC_EAS_SCHEMA_UID (the UID of the registered EAS schema on Base Sepolia) to enable signing.",
+              )}
+            </p>
+          </details>
         </Notice>
       )}
       {schemaSet && !schemaValid && (
         <Notice tone="error">
-          {t("web3.setup.schemaInvalid", "NEXT_PUBLIC_EAS_SCHEMA_UID is not a 0x-prefixed 32-byte value, so signing is disabled.")}
+          <p>{t("web3.setup.schemaInvalidUser", "Signing is switched off because this site's attestation setup is invalid.")}</p>
+          <details className="mt-1 text-xs">
+            <summary className="cursor-pointer font-medium">{t("web3.setup.owner", "For the site owner")}</summary>
+            <p className="mt-1">{t("web3.setup.schemaInvalid", "NEXT_PUBLIC_EAS_SCHEMA_UID is not a 0x-prefixed 32-byte value, so signing is disabled.")}</p>
+          </details>
         </Notice>
       )}
       {!HAS_WALLETCONNECT && step === 0 && (
         <p className="text-xs text-pewter">
-          {t(
-            "web3.connect.noProject",
-            "Browser and extension wallets only. WalletConnect (mobile wallets) needs NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID.",
-          )}
+          {t("web3.connect.noProject", "Browser and extension wallets only. Mobile wallets (WalletConnect) are not set up on this site.")}
         </p>
       )}
       <SubjectSummary subject={subject} />
