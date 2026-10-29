@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import type { Transaction } from "@/lib/types";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const NON_SPEND = new Set(["transfer", "credit_card_payment", "income"]);
@@ -61,7 +61,7 @@ export function WeeklyCompare({ txns }: { txns: Transaction[] }) {
         </div>
       </div>
       <div className="mt-4 h-56">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
           <AreaChart data={rows} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
             <defs>
               <linearGradient id="wkThis" x1="0" y1="0" x2="0" y2="1">

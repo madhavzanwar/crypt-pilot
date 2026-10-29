@@ -6,7 +6,7 @@ import { Check, Link2, Mic, Plus, Volume2 } from "lucide-react";
 import { Button } from "@/components/shadcn/button";
 import { api } from "@/lib/api";
 import { useUserId } from "@/lib/hooks";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { openAssistant } from "@/lib/copilotBus";
 import { useT } from "@/lib/i18n";
 import { speak } from "@/lib/voice";

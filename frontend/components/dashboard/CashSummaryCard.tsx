@@ -3,7 +3,8 @@
 import { useT } from "@/lib/i18n";
 import { useCallback } from "react";
 import { PiggyBank, TrendingDown, TrendingUp } from "lucide-react";
-import { formatCurrency, formatPercent } from "@/lib/format";
+import { formatPercent } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { BigAmount } from "@/components/dashboard/BigAmount";
 import { api } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";

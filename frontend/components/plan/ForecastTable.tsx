@@ -1,5 +1,6 @@
 import type { PeriodForecast, ForecastMethod, PlanQuantiles } from "@/lib/types";
-import { formatCurrency, formatPercent } from "@/lib/format";
+import { formatPercent } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 
 const q = (v: PlanQuantiles) => `${formatCurrency(v.p10)} / ${formatCurrency(v.p50)} / ${formatCurrency(v.p90)}`;
 

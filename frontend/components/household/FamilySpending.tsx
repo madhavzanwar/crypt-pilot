@@ -1,5 +1,6 @@
 "use client";
 
+import { categoryLabel } from "@/components/ui/categoryLabel";
 import { useState } from "react";
 import { Eye, TrendingDown, TrendingUp } from "lucide-react";
 import { api } from "@/lib/api";
@@ -18,8 +19,7 @@ const PERIODS = [
   { days: 30, label: "30 days" },
   { days: 90, label: "90 days" },
 ];
-const label = (c: string) =>
-  c.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()).replace(/\bEmi\b/, "EMI").replace(/\bSip\b/, "SIP");
+const label = categoryLabel;
 
 function Avatar({ m, colour, size = 40 }: { m: MemberSpending; colour: string; size?: number }) {
   return (

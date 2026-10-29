@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import type { TaxOptimizationAnalysis } from "@/lib/types";
 import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";

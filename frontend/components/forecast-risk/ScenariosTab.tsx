@@ -72,7 +72,7 @@ export function ScenariosTab({ r }: { r: ForecastRiskReport }) {
 
       <Section title="Median cash by scenario" sub="Solid lines are medians; the dashed line is your reserve">
         <div className="h-64 w-full sm:h-72">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
             <LineChart data={data} margin={{ left: 8, right: 16, top: 12, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
               <XAxis dataKey="month" tick={AXIS} tickLine={false} />

@@ -1,5 +1,6 @@
 "use client";
 
+import { categoryLabel } from "@/components/ui/categoryLabel";
 import { useCallback, useState } from "react";
 import { Baby, Eye, Plus, Receipt, UserPlus } from "lucide-react";
 import { api } from "@/lib/api";
@@ -285,7 +286,7 @@ export function ManagedMembersPanel({
                         <tr key={t.id}>
                           <td className="py-2.5 font-semibold text-ink">{t.merchant}</td>
                           <td className="py-2.5">
-                            <Chip tone="neutral" className="text-[10px] capitalize">{String(t.category).replace(/_/g, " ")}</Chip>
+                            <Chip tone="neutral" className="text-[10px] capitalize">{categoryLabel(String(t.category))}</Chip>
                           </td>
                           <td className="py-2.5 text-pewter">{formatDate(t.date)}</td>
                           <td className={`py-2.5 text-right font-bold tnum ${t.amount < 0 ? "text-rose-700" : "text-emerald-700"}`}>

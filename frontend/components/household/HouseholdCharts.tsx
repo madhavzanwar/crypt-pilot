@@ -1,5 +1,6 @@
 "use client";
 
+import { categoryLabel } from "@/components/ui/categoryLabel";
 import {
   Bar,
   BarChart,
@@ -73,7 +74,7 @@ export function NetWorthDonut({ summary, className }: { summary: HouseholdNetWor
         <Empty />
       ) : (
         <div className="relative h-52">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
             <PieChart>
               <Pie data={data} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="92%" paddingAngle={2} stroke="none">
                 {data.map((d) => (
@@ -107,7 +108,7 @@ export function AssetsLiabilitiesChart({ summary, className }: { summary: Househ
   return (
     <ChartCard title="Assets vs Liabilities" subtitle="Balance sheet by member" className={className}>
       <div className="h-52">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
           <BarChart data={data} barGap={4}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.06)" />
             <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={11} />
@@ -144,7 +145,7 @@ export function SpendTrendChart({
         <Empty />
       ) : (
         <div className="h-60">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
             <BarChart data={data}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.06)" />
               <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
@@ -168,14 +169,14 @@ export function SpendTrendChart({
 
 /** Horizontal bars: where the household's money goes. */
 export function CategoryChart({ insights, className }: { insights: HouseholdInsights | null; className?: string }) {
-  const top = (insights?.categories ?? []).slice(0, 6).map((c) => ({ name: c.category.replace(/_/g, " "), value: c.total }));
+  const top = (insights?.categories ?? []).slice(0, 6).map((c) => ({ name: categoryLabel(c.category), value: c.total }));
   return (
     <ChartCard title="Top Spending Categories" subtitle={insights?.window_label ?? "Last 90 days"} className={className}>
       {top.length === 0 ? (
         <Empty />
       ) : (
         <div className="h-60">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
             <BarChart data={top} layout="vertical" margin={{ left: 8 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(0,0,0,0.06)" />
               <XAxis type="number" tickFormatter={compact} tickLine={false} axisLine={false} fontSize={11} />
@@ -201,7 +202,7 @@ export function CashflowChart({ insights, className }: { insights: HouseholdInsi
       ) : (
         <>
           <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
               <BarChart data={data} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.06)" />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={11} />
