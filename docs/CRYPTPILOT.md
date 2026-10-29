@@ -49,7 +49,7 @@ Three kinds of statement are kept apart, so nothing here is claimed beyond what 
 
 | Area | Status | Evidence / what is missing |
 |---|---|---|
-| crypto-service tests | **Measured** | `crypto-service`: 219 passed, 3 skipped at `d010b1a` (unit level; the services are mocked or local). This is not a live end-to-end result. |
+| crypto-service tests | **Measured by the round-2 baseline run** | `crypto-service`: 219 passed, 3 skipped at `d010b1a` (unit level; the services are mocked or local; not a live end-to-end result). Not re-run by the author of this table: a re-run on a busy machine did not finish in time. |
 | FinPilot backend tests | **Measured, 4 failing** | `cd backend && FINPILOT_DEMO_MODE=true python -m pytest --noconftest tests`: 508 passed, 4 failed (`test_household::test_managed_member_lifecycle`, `test_plan::test_demo_personas_get_seeded_plan_profiles`, `test_rag::test_retrieve_dining_first`, `test_seed_realism[demo-arjun]`). The same tests failed on the untouched FinPilot code; the plan test depends on today's date. |
 | Frontend type-check | **Measured** | `npx next typegen && npx tsc --noEmit` in `frontend/`: 0 errors. Without `next typegen` (or a `next build`) a clean checkout reports one error, `LayoutProps` in `app/layout.tsx`, because Next generates that type. `next build` passes (35 routes, per the audit). |
 | Statement audit hash | **Measured** | `node frontend/scripts/check-statement-hash.mjs`: 314 inputs, 0 mismatches between the browser implementation and Node's `crypto`. It fingerprints the printed figures; it is not a signature. The anchored period was hard-coded to "2026-09" at audit time (BUG-040). |
