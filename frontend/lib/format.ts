@@ -1,6 +1,19 @@
+/** Rounds to `digits` and turns -0 (and values that round to 0) into plain 0, so nothing renders as "-₹0". */
+export function noNegativeZero(value: number, digits = 0): number {
+  const f = 10 ** digits;
+  const r = Math.round(value * f) / f;
+  return r === 0 ? 0 : value;
+}
+
 export function formatCurrency(value: number, currencyCode?: string): string {
+  value = noNegativeZero(value);
   if (typeof window !== "undefined" && !currencyCode) {
-    const saved = localStorage.getItem("finpilot_currency");
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem("finpilot_currency");
+    } catch {
+      /* storage blocked: format in INR */
+    }
     if (saved && saved !== "INR") {
       const rates: Record<string, { rate: number; locale: string; code: string }> = {
         USD: { rate: 0.0116, locale: "en-US", code: "USD" },
@@ -11,11 +24,12 @@ export function formatCurrency(value: number, currencyCode?: string): string {
       };
       const cfg = rates[saved];
       if (cfg) {
+        const digits = Math.abs(value * cfg.rate) >= 100 ? 0 : 2;
         return new Intl.NumberFormat(cfg.locale, {
           style: "currency",
           currency: cfg.code,
-          maximumFractionDigits: Math.abs(value * cfg.rate) >= 100 ? 0 : 2,
-        }).format(value * cfg.rate);
+          maximumFractionDigits: digits,
+        }).format(noNegativeZero(value * cfg.rate, digits));
       }
     }
   }

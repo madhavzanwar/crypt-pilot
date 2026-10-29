@@ -171,6 +171,10 @@ export interface Debt {
 
 export interface DashboardSnapshot {
   user_id: string;
+  /** Statement window, provided by the backend (e.g. "2026-10"); use instead of a hard-coded period. */
+  period?: string;
+  period_start?: string;
+  period_end?: string;
   health_score: HealthScore;
   net_worth: number;
   monthly_income: number;
@@ -350,6 +354,9 @@ export interface BudgetStatus {
 
 export interface SafeToSpend {
   amount: number;
+  /** Backend verdict (e.g. "ok" | "low" | "none"). Optional for older servers; the page falls back to the amount. */
+  status?: string;
+  amount_note?: string | null;
   basis: string;
   as_of_date: string;
 }

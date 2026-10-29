@@ -331,6 +331,58 @@ const S: Record<string, string[]> = {
   "sc.last": ["Last {n} months", "पिछले {n} माह", "मागील {n} महिने"],
   "sc.lastthis": ["Last month {a}, this month {b}", "पिछला महीना {a}, इस महीने {b}", "मागील महिना {a}, या महिन्यात {b}"],
   "h.w": ["Weight:", "भार:", "भार:"],
+  "nav.More": ["More", "और", "अधिक"],
+  "web3.chip.network": ["Base Sepolia testnet", "Base Sepolia टेस्टनेट", "Base Sepolia टेस्टनेट"],
+  "stmt.anchor.title": ["Anchor this statement on-chain", "इस विवरण को ऑन-चेन दर्ज करें", "हे विवरण ऑन-चेन नोंदवा"],
+  "stmt.anchor.intro": [
+    "Optionally publish a tamper-evident fingerprint of this statement as an EAS attestation, so you can later prove it existed in this form. This is not printed on the statement.",
+    "चाहें तो इस विवरण का छेड़छाड़-प्रमाणित फिंगरप्रिंट EAS अटेस्टेशन के रूप में प्रकाशित करें, ताकि आप बाद में साबित कर सकें कि यह इसी रूप में मौजूद था। यह विवरण पर छपा नहीं होता।",
+    "हवे असल्यास या विवरणाचा छेडछाड-दर्शक फिंगरप्रिंट EAS अटेस्टेशन म्हणून प्रकाशित करा, म्हणजे हे याच स्वरूपात होते हे तुम्ही नंतर सिद्ध करू शकता. हे विवरणावर छापले जात नाही.",
+  ],
+  "stmt.anchor.audit": ["SHA-256 of this statement's figures", "इस विवरण के आँकड़ों का SHA-256", "या विवरणातील आकड्यांचा SHA-256"],
+  "stmt.anchor.period": ["Period", "अवधि", "कालावधी"],
+  "stmt.anchor.score": ["Health score", "हेल्थ स्कोर", "हेल्थ स्कोअर"],
+  "stmt.anchor.hashesOnly": [
+    "Hashes only: no transactions, balances, names or account data go on-chain.",
+    "केवल हैश: कोई लेन-देन, बैलेंस, नाम या खाता डेटा ऑन-चेन नहीं जाता।",
+    "फक्त हॅश: कोणतेही व्यवहार, शिल्लक, नावे किंवा खाते डेटा ऑन-चेन जात नाही.",
+  ],
+  "stmt.anchor.public": [
+    "What is published: document type, period, health score, and two hashes. The attestation is public and permanent, and your connected wallet address appears as the attester.",
+    "क्या प्रकाशित होता है: दस्तावेज़ का प्रकार, अवधि, हेल्थ स्कोर और दो हैश। अटेस्टेशन सार्वजनिक और स्थायी है, और आपका जुड़ा वॉलेट पता अटेस्टर के रूप में दिखता है।",
+    "काय प्रकाशित होते: दस्तावेजाचा प्रकार, कालावधी, हेल्थ स्कोअर आणि दोन हॅश. अटेस्टेशन सार्वजनिक आणि कायमस्वरूपी आहे, आणि तुमचा जोडलेला वॉलेट पत्ता अटेस्टर म्हणून दिसतो.",
+  ],
+  "stmt.anchor.honest": [
+    "This is a real SHA-256 digest of the figures printed on the statement (balances, income, expenses, health score, forecast and a digest of the transactions). Change any figure and the hash changes. Anchoring it proves these figures existed in this form at a point in time. Testnet, not a legal verdict.",
+    "यह विवरण पर छपे आँकड़ों (बैलेंस, आय, खर्च, हेल्थ स्कोर, पूर्वानुमान और लेन-देन का डाइजेस्ट) का असली SHA-256 डाइजेस्ट है। कोई भी आँकड़ा बदलने पर हैश बदल जाता है। इसे दर्ज करने से साबित होता है कि ये आँकड़े किसी समय इसी रूप में थे। यह टेस्टनेट है, कानूनी निर्णय नहीं।",
+    "हा विवरणावर छापलेल्या आकड्यांचा (शिल्लक, उत्पन्न, खर्च, हेल्थ स्कोअर, अंदाज आणि व्यवहारांचा डायजेस्ट) खरा SHA-256 डायजेस्ट आहे. कोणताही आकडा बदलला की हॅश बदलतो. तो नोंदवल्याने हे आकडे एका वेळी याच स्वरूपात होते हे सिद्ध होते. हे टेस्टनेट आहे, कायदेशीर निर्णय नाही.",
+  ],
+  "stmt.anchor.how": ["How to check it yourself", "खुद कैसे जाँचें", "स्वतः कशी तपासावी"],
+  "stmt.anchor.how.body": [
+    "SHA-256 of exactly this text (UTF-8, no trailing newline) gives the hash above, e.g. `printf '%s' '<text>' | sha256sum`:",
+    "ठीक इसी पाठ (UTF-8, अंत में नई पंक्ति नहीं) का SHA-256 ऊपर वाला हैश देता है, जैसे `printf '%s' '<text>' | sha256sum`:",
+    "अगदी याच मजकुराचा (UTF-8, शेवटी नवीन ओळ नाही) SHA-256 वरील हॅश देतो, उदा. `printf '%s' '<text>' | sha256sum`:",
+  ],
+  "stmt.anchor.open": ["Anchor this statement on Base Sepolia", "इस विवरण को Base Sepolia पर दर्ज करें", "हे विवरण Base Sepolia वर नोंदवा"],
+  "stmt.anchor.flowTitle": ["Anchor statement hash", "विवरण का हैश दर्ज करें", "विवरणाचा हॅश नोंदवा"],
+  "d.wg_open": ["Open Wallet Guard", "वॉलेट गार्ड खोलें", "वॉलेट गार्ड उघडा"],
+  "d.wg_copy": [
+    "Check a Bitcoin wallet before you pay. Graph-verified, with the evidence shown.",
+    "भुगतान से पहले बिटकॉइन वॉलेट जाँचें। ग्राफ़ से सत्यापित, सबूत के साथ।",
+    "पैसे देण्यापूर्वी बिटकॉइन वॉलेट तपासा. ग्राफद्वारे पडताळलेले, पुराव्यासह.",
+  ],
+  "d.wg_placeholder": ["Paste a Bitcoin address", "बिटकॉइन पता पेस्ट करें", "बिटकॉइन पत्ता पेस्ट करा"],
+  "d.wg_check": ["Check wallet", "वॉलेट जाँचें", "वॉलेट तपासा"],
+  "d.wg_secret": [
+    "That looks like a seed phrase or private key. Never type it anywhere: we cleared it and sent nothing.",
+    "यह सीड फ़्रेज़ या प्राइवेट की जैसा लगता है। इसे कहीं भी न लिखें: हमने इसे मिटा दिया और कुछ नहीं भेजा।",
+    "हे सीड फ्रेज किंवा प्रायव्हेट की सारखे दिसते. ते कुठेही टाइप करू नका: आम्ही ते पुसले आणि काहीही पाठवले नाही.",
+  ],
+  "d.wg_note": [
+    "A risk signal from a research dataset, not an accusation.",
+    "शोध डेटासेट से एक जोखिम संकेत, आरोप नहीं।",
+    "संशोधन डेटासेटमधील जोखमीचा संकेत, आरोप नव्हे.",
+  ],
 };
 
 /** Translate a key into the current language; falls back to English, then `fallback`, then the key. */

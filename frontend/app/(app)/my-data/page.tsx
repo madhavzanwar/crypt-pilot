@@ -49,6 +49,7 @@ export default function MyDataPage() {
 
   return (
     <div className="grid gap-4">
+      <h1 className="sr-only">My data</h1>
       <Card>
         <CardHeader className="gap-3 sm:flex-row sm:items-center">
           <div className="min-w-0">

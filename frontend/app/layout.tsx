@@ -1,9 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+// Base for absolute og/twitter URLs. Set NEXT_PUBLIC_SITE_URL in deployments; Vercel's production host is used when present.
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://finpilot.ai"),
-  title: "CryptPilot",
+  metadataBase: new URL(siteUrl),
+  title: { default: "CryptPilot", template: "%s | CryptPilot" },
   description:
     "AI x crypto: a personal-finance copilot with 90-day Monte Carlo cash-flow forecasts, plus graph-verified Bitcoin wallet risk checks with plain-language, multilingual explanations.",
   icons: {

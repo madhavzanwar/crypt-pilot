@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Button } from "@/components/ui/Button";
+import { ButtonLink } from "./_components/ButtonLink";
 import { Card } from "@/components/ui/Card";
 import { AnswerContractView } from "@/components/AnswerContractView";
 import { setUserId } from "@/lib/user";
@@ -19,6 +19,7 @@ import { LandingHeader } from "@/components/landing/LandingHeader";
 import { Reveal } from "@/components/landing/Reveal";
 import { ShieldCheck, TrendingUp, Sparkles, CheckCircle2, Network } from "lucide-react";
 import type { ReactNode } from "react";
+import { useServiceStatus, voiceProviderLabel } from "@/lib/useServiceStatus";
 
 const PREVIEW_ANSWER: AnswerContract = {
   query: "Can I afford to increase my SIP by ₹3,000/month?",
@@ -97,6 +98,7 @@ const PERSONAS = [
 ];
 
 export default function Home() {
+  const status = useServiceStatus();
   return (
     <div className="flex flex-1 flex-col overflow-x-clip">
       <LandingHeader />
@@ -134,19 +136,15 @@ export default function Home() {
           {/* CTA Group */}
           <Reveal delay={0.15} className="w-full">
             <div className="mt-10 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3.5 w-full">
-              <Link href="/login" className="w-full sm:w-auto">
-                <Button variant="lime" size="lg" className="w-full sm:w-auto px-8 py-3.5 text-base">
+              <ButtonLink href="/login" variant="lime" className="w-full sm:w-auto px-8 py-3.5 text-base">
                   Sign in to get started
                   <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
-                </Button>
-              </Link>
-              <Link href="/wallet-guard" className="w-full sm:w-auto">
-                <Button variant="secondary" size="lg" className="w-full sm:w-auto px-6 py-3.5 text-base">
+                </ButtonLink>
+              <ButtonLink href="/wallet-guard" variant="secondary" className="w-full sm:w-auto px-6 py-3.5 text-base">
                   Check a wallet
-                </Button>
-              </Link>
+                </ButtonLink>
             </div>
           </Reveal>
 
@@ -204,11 +202,9 @@ export default function Home() {
               ))}
             </ul>
             <div className="mt-8">
-              <Link href="/wallet-guard">
-                <Button variant="lime" size="lg" className="px-7 py-3 text-base">
+              <ButtonLink href="/wallet-guard" variant="lime" className="px-7 py-3 text-base">
                   Open Wallet Guard
-                </Button>
-              </Link>
+                </ButtonLink>
             </div>
           </div>
 
@@ -267,11 +263,10 @@ export default function Home() {
             <p className="text-center text-xs font-semibold uppercase tracking-wider text-pewter">Built with</p>
             <ul className="mt-5 flex flex-wrap items-center justify-center gap-2.5 text-xs font-medium text-graphite">
               {[
-                "TigerGraph · graph evidence",
+                status?.engine === "tigergraph" ? "TigerGraph · graph evidence" : "Graph evidence",
                 "Dodo Payments · test mode",
                 "Cake Wallet · testnet invoices",
-                "Sarvam · voice",
-                "Wispr Flow · voice",
+                voiceProviderLabel(status) === "voice" ? "Voice input" : `${voiceProviderLabel(status)} · voice`,
                 "EAS on Base Sepolia · attestations",
               ].map((item) => (
                 <li key={item} className="rounded-full border border-black/[0.06] bg-white/70 px-3.5 py-1.5 backdrop-blur">
@@ -497,16 +492,12 @@ export default function Home() {
                 </p>
 
                 <div className="mt-8 flex flex-col sm:flex-row gap-3.5 w-full sm:w-auto">
-                  <Link href="/dashboard" className="w-full sm:w-auto">
-                    <Button variant="primary" size="lg" className="w-full sm:w-auto px-7 py-3 text-base">
+                  <ButtonLink href="/dashboard" variant="primary" className="w-full sm:w-auto px-7 py-3 text-base">
                       Launch Dashboard
-                    </Button>
-                  </Link>
-                  <Link href="/copilot" className="w-full sm:w-auto">
-                    <Button variant="secondary" size="lg" className="w-full sm:w-auto bg-white/80 text-ink border-ink/15 hover:bg-white text-base shadow-xs">
+                    </ButtonLink>
+                  <ButtonLink href="/copilot" variant="secondary" className="w-full sm:w-auto bg-white/80 text-ink border-ink/15 hover:bg-white text-base shadow-xs">
                       Ask FinPilot Copilot
-                    </Button>
-                  </Link>
+                    </ButtonLink>
                 </div>
 
                 <div className="mt-6 flex flex-wrap items-center gap-4 text-xs font-semibold text-graphite">

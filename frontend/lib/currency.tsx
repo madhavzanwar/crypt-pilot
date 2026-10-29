@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import React, { createContext, useContext, useSyncExternalStore, type ReactNode } from "react";
 
 export type CurrencyCode = "INR" | "USD" | "EUR" | "GBP" | "AED" | "SGD";
 
@@ -86,34 +86,52 @@ const CurrencyContext = createContext<CurrencyContextType>({
 
 const STORAGE_KEY = "finpilot_currency";
 
-export function CurrencyProvider({ children }: { children: ReactNode }) {
-  const [currency, setCurrencyState] = useState<CurrencyCode>("INR");
+const CHANGE_EVENT = "finpilot:currency-change";
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(STORAGE_KEY) as CurrencyCode | null;
-      if (saved && CURRENCIES[saved]) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- read localStorage after mount to avoid a hydration mismatch
-        setCurrencyState(saved);
-      }
-    }
-  }, []);
+// localStorage can throw (blocked site data, private windows): every access is guarded and falls back to INR.
+let memoryCurrency: CurrencyCode | null = null; // used when storage is blocked, so switching still works until reload
+
+function readStoredCurrency(): CurrencyCode {
+  try {
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    if (saved && Object.prototype.hasOwnProperty.call(CURRENCIES, saved)) return saved as CurrencyCode;
+  } catch {
+    /* storage unavailable */
+  }
+  return memoryCurrency ?? "INR";
+}
+
+function subscribeCurrency(onChange: () => void): () => void {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(CHANGE_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(CHANGE_EVENT, onChange);
+  };
+}
+
+export function CurrencyProvider({ children }: { children: ReactNode }) {
+  // Server and first client render use "INR", then the stored choice is applied without a hydration mismatch.
+  const currency = useSyncExternalStore<CurrencyCode>(subscribeCurrency, readStoredCurrency, () => "INR");
 
   const setCurrency = (next: CurrencyCode) => {
-    setCurrencyState(next);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, next);
-      // Dispatch custom event for cross-component sync
-      window.dispatchEvent(new CustomEvent("finpilot:currency-change", { detail: next }));
+    memoryCurrency = next;
+    try {
+      window.localStorage.setItem(STORAGE_KEY, next);
+    } catch {
+      /* storage unavailable: the choice then lasts only until reload */
     }
+    window.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: next }));
   };
 
   const config = CURRENCIES[currency] || CURRENCIES.INR;
 
   const formatAmount = (amountInINR: number, options?: { showCents?: boolean }): string => {
-    const converted = amountInINR * config.rateFromINR;
     const isINR = config.code === "INR";
-    const maxDigits = options?.showCents ? 2 : isINR || Math.abs(converted) >= 100 ? 0 : 2;
+    const rawConverted = amountInINR * config.rateFromINR;
+    const maxDigits = options?.showCents ? 2 : isINR || Math.abs(rawConverted) >= 100 ? 0 : 2;
+    // a value that rounds to zero must not print as "-0" / "-₹0"
+    const converted = Math.round(rawConverted * 10 ** maxDigits) / 10 ** maxDigits === 0 ? 0 : rawConverted;
 
     try {
       return new Intl.NumberFormat(config.locale, {

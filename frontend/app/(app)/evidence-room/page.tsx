@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
@@ -243,22 +243,33 @@ export default function EvidenceRoomPage() {
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  const load = useCallback(async () => {
-    try {
-      const r = await api.securityReport(userId);
-      setReport(r);
-      setState(r ? Object.fromEntries(r.agents.map((a) => [a.agent, { status: "done" as Status, info: a }])) : {});
-    } catch {
-      setReport(null);
-    }
-  }, [userId]);
+  // Persona switch: the report on screen belongs to the previous persona, so drop it during render.
+  const [reportUser, setReportUser] = useState(userId);
+  if (reportUser !== userId) {
+    setReportUser(userId);
+    setReport(null);
+    setState({});
+  }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount; state is set after the await
-    load();
+    // `live` goes false on unmount or persona change, so a slow response for the previous persona is ignored.
+    let live = true;
+    (async () => {
+      try {
+        const r = await api.securityReport(userId);
+        if (!live) return;
+        setReport(r);
+        setState(r ? Object.fromEntries(r.agents.map((a) => [a.agent, { status: "done" as Status, info: a }])) : {});
+      } catch {
+        if (live) setReport(null);
+      }
+    })();
     const pending = timers.current;
-    return () => pending.forEach(clearTimeout);
-  }, [load]);
+    return () => {
+      live = false;
+      pending.forEach(clearTimeout);
+    };
+  }, [userId]);
 
   async function run() {
     timers.current.forEach(clearTimeout);
@@ -317,6 +328,7 @@ export default function EvidenceRoomPage() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="grid gap-5">
+      <h1 className="sr-only">Evidence Council</h1>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 font-display text-lg">

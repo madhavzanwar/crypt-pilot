@@ -148,8 +148,8 @@ export default function PhotosPage() {
           <CardTitle>Add by photo</CardTitle>
         </CardHeader>
         <div className="flex flex-col gap-3 p-5 pt-0">
-          <input ref={snapInput} type="file" accept="image/*" className="hidden" onChange={(e) => snap(e.target.files?.[0])} />
-          <input ref={camInput} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => snap(e.target.files?.[0])} />
+          <input ref={snapInput} type="file" accept="image/*" aria-label="Choose a photo of the item" tabIndex={-1} className="hidden" onChange={(e) => snap(e.target.files?.[0])} />
+          <input ref={camInput} type="file" accept="image/*" capture="environment" aria-label="Take a photo of the item" tabIndex={-1} className="hidden" onChange={(e) => snap(e.target.files?.[0])} />
           {live ? (
             <div className="flex flex-col gap-2">
               <video ref={videoRef} autoPlay playsInline muted className="w-full rounded-xl bg-black" />
@@ -194,9 +194,9 @@ export default function PhotosPage() {
           <CardTitle>Teach a photo</CardTitle>
         </CardHeader>
         <form onSubmit={teach} className="flex flex-col gap-3 p-5 pt-0">
-          <input type="file" accept="image/*" capture="environment" required={!teachFile} onChange={(e) => setTeachFile(e.target.files?.[0] ?? null)} className="text-sm" />
-          <input className={field} value={teachName} onChange={(e) => setTeachName(e.target.value)} placeholder="Name, e.g. tea" required />
-          <input className={field} value={teachPrice} onChange={(e) => setTeachPrice(e.target.value)} placeholder="Price (₹), e.g. 15" inputMode="decimal" required />
+          <input type="file" accept="image/*" capture="environment" aria-label="Photo to remember" required={!teachFile} onChange={(e) => setTeachFile(e.target.files?.[0] ?? null)} className="text-sm text-graphite file:mr-3 file:min-h-10 file:cursor-pointer file:rounded-chip file:border file:border-mist file:bg-white file:px-4 file:py-2 file:text-sm file:font-medium file:text-ink hover:file:bg-fog" />
+          <input aria-label="Item name" className={field} value={teachName} onChange={(e) => setTeachName(e.target.value)} placeholder="Name, e.g. tea" required />
+          <input aria-label="Item price in rupees" className={field} value={teachPrice} onChange={(e) => setTeachPrice(e.target.value)} placeholder="Price (₹), e.g. 15" inputMode="decimal" required />
           <Button type="submit" variant="primary" disabled={busy || !teachFile}>
             Remember this
           </Button>

@@ -9,7 +9,6 @@ import {
   ArrowUp,
   ArrowDown,
   Car,
-  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -45,7 +44,6 @@ import { api } from "@/lib/api";
 import { useAsync, useDebouncedValue, useUserId } from "@/lib/hooks";
 import type {
   CategorizationRule,
-  CategorizationRuleCreate,
   ReviewAction,
   ReviewStatus,
   RuleMatchType,
@@ -352,6 +350,7 @@ export default function TransactionsPage() {
               {openPanel === "filters" && (
                 <>
                   <select
+                    aria-label="Filter by category"
                     value={category}
                     onChange={(e) => {
                       setCategory(e.target.value as TxnCategory | "");
@@ -368,6 +367,7 @@ export default function TransactionsPage() {
                     ))}
                   </select>
                   <select
+                    aria-label="Filter by review status"
                     value={reviewStatusFilter}
                     onChange={(e) => {
                       setReviewStatusFilter(e.target.value);
@@ -538,7 +538,7 @@ export default function TransactionsPage() {
             <div className="flex items-center gap-2">
               <label className="flex items-center gap-1.5 text-xs text-graphite">
                 Rows per page
-                <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); resetToFirstPage(); }} className="rounded-xl border border-mist bg-white px-2 py-1 text-xs text-ink">
+                <select aria-label="Rows per page" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); resetToFirstPage(); }} className="rounded-xl border border-mist bg-white px-2 py-1 text-xs text-ink">
                   {PAGE_SIZES.map((n) => (
                     <option key={n} value={n}>
                       {n}
@@ -591,61 +591,63 @@ export default function TransactionsPage() {
 // Review Queue Section (Interactive Card Stack matching Showcase TRACK scene)
 // ---------------------------------------------------------------------------
 
-function ReviewQueueSection({
-  userId,
-  queue,
-  pendingCount,
-  onCompleted,
-  onDismiss,
-}: {
+type ReviewQueueProps = {
   userId: string;
   queue: Transaction[];
   pendingCount: number;
   onCompleted: () => void;
   onDismiss: () => void;
-}) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedCategory, setSelectedCategory] = useState<TxnCategory | null>(null);
-  const [tags, setTags] = useState<string[]>([]);
-  const [notes, setNotes] = useState<string>("");
+};
+
+// The queue refetches after every review and drops the reviewed item, so the card to show is always
+// queue[0]. The keyed inner component gives each transaction a fresh draft (no reset effect needed).
+function ReviewQueueSection(props: ReviewQueueProps) {
+  const txn = props.queue[0];
+  if (!txn) return null;
+  return <ReviewCard key={txn.id} txn={txn} isLast={props.queue.length <= 1} {...props} />;
+}
+
+function ReviewCard({
+  userId,
+  txn: currentTxn,
+  isLast,
+  pendingCount,
+  onCompleted,
+  onDismiss,
+}: ReviewQueueProps & { txn: Transaction; isLast: boolean }) {
+  const [selectedCategory, setSelectedCategory] = useState<TxnCategory | null>(currentTxn.category);
+  const [tags, setTags] = useState<string[]>(currentTxn.tags || []);
+  const [notes] = useState<string>(currentTxn.notes || "");
   const [createRule, setCreateRule] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [tagInput, setTagInput] = useState("");
   const [showTagAdder, setShowTagAdder] = useState(false);
 
-  const currentTxn = queue[currentIndex] || queue[0];
-
+  // Always call the latest handler (it closes over the current draft) from one stable key listener.
+  const actionRef = useRef<(action: ReviewAction) => void>(() => {});
   useEffect(() => {
-    if (currentTxn) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the draft when the card changes
-      setSelectedCategory(currentTxn.category);
-      setTags(currentTxn.tags || []);
-      setNotes(currentTxn.notes || "");
-    }
-  }, [currentTxn]);
+    actionRef.current = (action) => {
+      if (!submitting) void handleReviewAction(action);
+    };
+  });
 
-  // Keyboard shortcut listener: Enter to Confirm, S to Skip
+  // Keyboard shortcuts: Enter to confirm, S to skip.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // Don't trigger shortcuts if focus is inside an input or textarea
-      if (["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement)?.tagName)) {
-        return;
-      }
-      if (e.key === "Enter" && !submitting && currentTxn) {
+      const el = e.target as HTMLElement | null;
+      // Ignore typing in fields and Enter/Space activation of a focused button or link.
+      if (el?.closest("input, textarea, select, button, a, [role='button'], [contenteditable='true']")) return;
+      if (e.key === "Enter") {
         e.preventDefault();
-        handleReviewAction("confirm");
-      } else if ((e.key === "s" || e.key === "S") && !submitting && currentTxn) {
+        actionRef.current("confirm");
+      } else if (e.key === "s" || e.key === "S") {
         e.preventDefault();
-        handleReviewAction("skip");
+        actionRef.current("skip");
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentTxn, selectedCategory, tags, notes, createRule, submitting]);
-
-  if (!currentTxn) {
-    return null;
-  }
+  }, []);
 
   const isInflow = currentTxn.amount > 0;
   const config = CATEGORY_CONFIG[selectedCategory || currentTxn.category] || CATEGORY_CONFIG.other;
@@ -663,14 +665,13 @@ function ReviewQueueSection({
         create_rule: createRule,
         rule_pattern: currentTxn.merchant.split("#")[0].trim(),
       });
-      if (currentIndex < queue.length - 1) {
-        setCurrentIndex((prev) => prev + 1);
-      } else {
-        triggerConfetti({ count: 75 });
-      }
+      if (isLast) triggerConfetti({ count: 75 });
+      // Stay disabled until the refetched queue swaps in the next card (the key remounts this component),
+      // so a double click or key repeat cannot review the same transaction twice.
       onCompleted();
-    } finally {
+    } catch (err) {
       setSubmitting(false);
+      throw err;
     }
   }
 
@@ -767,6 +768,7 @@ function ReviewQueueSection({
                     Category:
                   </span>
                   <select
+                    aria-label="Category for this transaction"
                     value={selectedCategory || currentTxn.category}
                     onChange={(e) => setSelectedCategory(e.target.value as TxnCategory)}
                     className="rounded-chip border border-mist bg-fog/60 px-3 py-1.5 text-xs font-semibold text-ink focus:border-ember focus:outline-none focus:ring-1 focus:ring-ember cursor-pointer"
