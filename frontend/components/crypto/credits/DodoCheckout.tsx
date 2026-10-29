@@ -5,7 +5,7 @@ import { CreditCard, Loader2 } from "lucide-react";
 import { api, messageFor } from "@/lib/crypto/api";
 import type { CreditPack } from "@/lib/crypto/api";
 import { toRequestLang } from "@/lib/crypto/lang";
-import { useT } from "@/lib/i18n";
+import { useCryptoT as useT } from "@/lib/crypto/i18n";
 import { Button } from "@/components/shadcn/button";
 import { formatUsd } from "./PackCard";
 

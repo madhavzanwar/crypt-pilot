@@ -1,5 +1,6 @@
 "use client";
 
+import { useCryptoT as useT } from "@/lib/crypto/i18n";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -28,6 +29,7 @@ function Frame({ children }: { children: React.ReactNode }) {
 
 /** /credits/cancelled: Dodo checkout was abandoned or failed. Public on purpose (no FinPilot login needed to land here). */
 export function CreditsCancelled({ failed = false }: { failed?: boolean }) {
+  const { t } = useT();
   return (
     <Frame>
       <div className="flex items-start gap-3">
@@ -35,13 +37,13 @@ export function CreditsCancelled({ failed = false }: { failed?: boolean }) {
           <CircleX className="size-5" aria-hidden />
         </span>
         <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">{failed ? "Payment did not go through" : "Checkout cancelled"}</h1>
-          <p className="mt-1 text-sm text-graphite">No payment was made and nothing was charged. Your balance is unchanged.</p>
+          <h1 className="font-display text-2xl font-semibold text-ink">{failed ? t("cr.ret.failed", "Payment did not go through") : t("cr.ret.cancelled", "Checkout cancelled")}</h1>
+          <p className="mt-1 text-sm text-graphite">{t("cr.ret.nocharge", "No payment was made and nothing was charged. Your balance is unchanged.")}</p>
         </div>
       </div>
       <TestModeBanner />
       <Button asChild variant="lime" size="lg" className="w-full">
-        <Link href="/credits">Back to credits</Link>
+        <Link href="/credits">{t("cr.ret.back", "Back to credits")}</Link>
       </Button>
     </Frame>
   );
@@ -49,6 +51,7 @@ export function CreditsCancelled({ failed = false }: { failed?: boolean }) {
 
 /** /credits/success: calm confirmation. The Dodo webhook can land a moment after the redirect, so refetch for ~30 s. */
 export function CreditsSuccess() {
+  const { t } = useT();
   const status = (useSearchParams().get("status") ?? "").toLowerCase();
   const failed = status === "failed" || status === "cancelled" || status === "canceled";
   const confirmed = ["succeeded", "success", "paid", "completed"].includes(status);
@@ -76,35 +79,35 @@ export function CreditsSuccess() {
           <CircleCheck className="size-5" aria-hidden />
         </span>
         <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">{confirmed ? "Thank you" : "Checking your payment"}</h1>
+          <h1 className="font-display text-2xl font-semibold text-ink">{confirmed ? t("cr.ret.thanks", "Thank you") : t("cr.ret.checking", "Checking your payment")}</h1>
           <p className="mt-1 text-sm text-graphite">
             {confirmed
-              ? "Your test-mode payment came back from Dodo. Credits are added when Dodo confirms it, which can take a few seconds. No real charge was made."
-              : "We have not had a confirmed payment status from Dodo yet. Credits are added only once it confirms, which can take a few seconds. No real charge was made."}
+              ? t("cr.ret.came", "Your test-mode payment came back from Dodo. Credits are added when Dodo confirms it, which can take a few seconds. No real charge was made.")
+              : t("cr.ret.notyet", "We have not had a confirmed payment status from Dodo yet. Credits are added only once it confirms, which can take a few seconds. No real charge was made.")}
           </p>
         </div>
       </div>
       <div aria-live="polite">
-        <p className="text-sm text-graphite">Balance</p>
+        <p className="text-sm text-graphite">{t("cr.ret.balance", "Balance")}</p>
         {balance === null && !unavailable ? (
           <Skeleton className="mt-1.5 h-10 w-28" />
         ) : (
           <p className="mt-1 flex items-baseline gap-2">
             <span className="font-display text-5xl leading-none font-semibold text-ink tabular-nums">{balance ?? "-"}</span>
-            <span className="text-sm text-graphite">credits</span>
+            <span className="text-sm text-graphite">{t("cr.credits", "credits")}</span>
           </p>
         )}
         <p className="mt-2 text-xs text-pewter">
-          {unavailable ? "The credits service is not reachable right now. Try refresh in a moment." : waiting ? "Checking for confirmation..." : "If the balance has not changed, refresh in a minute."}
+          {unavailable ? t("cr.ret.unreach", "The credits service is not reachable right now. Try refresh in a moment.") : waiting ? t("cr.ret.waiting", "Checking for confirmation...") : t("cr.ret.refreshLater", "If the balance has not changed, refresh in a minute.")}
         </p>
       </div>
       <TestModeBanner />
       <div className="flex flex-wrap gap-2">
         <Button asChild variant="lime" size="lg" className="flex-1">
-          <Link href="/dashboard">Continue to FinPilot</Link>
+          <Link href="/dashboard">{t("cr.ret.continue", "Continue to FinPilot")}</Link>
         </Button>
         <Button variant="outline" size="lg" onClick={() => void refetch()}>
-          Refresh balance
+          {t("cr.ret.refresh", "Refresh balance")}
         </Button>
       </div>
     </Frame>

@@ -1,8 +1,12 @@
+"use client";
+
 import { FlaskConical } from "lucide-react";
+import { useCryptoT as useT } from "@/lib/crypto/i18n";
 import { cn } from "@/lib/utils";
 
 /** Always shown next to anything that takes payment. Mainnet is never used anywhere in CryptPilot. */
 export function TestModeBanner({ className }: { className?: string }) {
+  const { t } = useT();
   return (
     <div
       role="note"
@@ -10,8 +14,8 @@ export function TestModeBanner({ className }: { className?: string }) {
     >
       <FlaskConical className="mt-0.5 size-4 shrink-0 text-ember-dark" aria-hidden />
       <p>
-        <b className="font-semibold">Test mode / testnet only. No real money.</b>{" "}
-        <span className="text-graphite">Dodo test checkout, Bitcoin testnet, Monero demo. Never send real funds to these addresses.</span>
+        <b className="font-semibold">{t("cr.test.title", "Test mode / testnet only. No real money.")}</b>{" "}
+        <span className="text-graphite">{t("cr.test.body", "Dodo test checkout, Bitcoin testnet, Monero demo. Never send real funds to these addresses.")}</span>
       </p>
     </div>
   );

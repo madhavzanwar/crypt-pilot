@@ -1,6 +1,6 @@
 "use client";
 
-import { useT } from "@/lib/i18n";
+import { useCryptoT as useT } from "@/lib/crypto/i18n";
 import type { AttestSubject } from "@/lib/crypto/eas/subject";
 import { useEffect, useState } from "react";
 import { HashLine } from "./Bits";

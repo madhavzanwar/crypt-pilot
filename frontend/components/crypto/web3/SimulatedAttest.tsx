@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/Button";
-import { useT } from "@/lib/i18n";
+import { useCryptoT as useT } from "@/lib/crypto/i18n";
 import type { AttestSubject } from "@/lib/crypto/eas/subject";
 import { useEffect, useRef, useState } from "react";
 import { AttestStepper } from "./AttestStepper";

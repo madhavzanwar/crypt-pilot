@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CreditCard, Wallet } from "lucide-react";
 import { useCredits } from "@/lib/crypto/useCredits";
-import { useT } from "@/lib/i18n";
+import { useCryptoT as useT } from "@/lib/crypto/i18n";
 import { Skeleton } from "@/components/shadcn/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn/tabs";
 import { Button } from "@/components/shadcn/button";
@@ -38,9 +38,9 @@ export function CreditsPanel({ compact = false }: { compact?: boolean }) {
 
       {unavailable && (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-surface bg-rose-badge/10 px-3 py-2 text-sm text-rose-badge">
-          <span>The credits service is not reachable right now.</span>
+          <span>{t("cr.unreachable", "The credits service is not reachable right now.")}</span>
           <Button type="button" variant="outline" size="xs" onClick={() => void refetch()}>
-            Retry
+            {t("cr.retry", "Retry")}
           </Button>
         </div>
       )}
@@ -68,10 +68,10 @@ export function CreditsPanel({ compact = false }: { compact?: boolean }) {
           <Tabs defaultValue="card" className="gap-3">
             <TabsList className="h-auto w-full rounded-full bg-fog p-1">
               <TabsTrigger value="card" className="min-w-0 flex-1 gap-1.5 rounded-full px-3 py-1.5 whitespace-normal data-[state=active]:bg-lime data-[state=active]:text-ink data-[state=active]:shadow-none">
-                <CreditCard /> Card (Dodo, test mode)
+                <CreditCard /> {t("cr.tab.card", "Card (Dodo, test mode)")}
               </TabsTrigger>
               <TabsTrigger value="wallet" className="min-w-0 flex-1 gap-1.5 rounded-full px-3 py-1.5 whitespace-normal data-[state=active]:bg-lime data-[state=active]:text-ink data-[state=active]:shadow-none">
-                <Wallet /> Cake Wallet (BTC testnet / XMR demo)
+                <Wallet /> {t("cr.tab.wallet", "Cake Wallet (BTC testnet / XMR demo)")}
               </TabsTrigger>
             </TabsList>
             <TabsContent value="card">

@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import type { AttestSubject } from "@/lib/crypto/eas/subject";
-import { useT } from "@/lib/i18n";
+import { useCryptoT as useT } from "@/lib/crypto/i18n";
 import { Link2 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useState } from "react";

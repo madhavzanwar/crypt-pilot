@@ -6,7 +6,7 @@ import { ATTEST_ERROR_TEXT, classifyAttestError, HashMismatchError, isBytes32, t
 import type { AttestSubject } from "@/lib/crypto/eas/subject";
 import { checkSubjectHash, type LocalHashCheck } from "@/lib/crypto/eas/verify";
 import { CHAIN, HAS_WALLETCONNECT } from "@/lib/crypto/web3Config";
-import { useT } from "@/lib/i18n";
+import { useCryptoT as useT } from "@/lib/crypto/i18n";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useEffect, useState } from "react";
 import { useAccount, useDisconnect, useSwitchChain, useWalletClient } from "wagmi";

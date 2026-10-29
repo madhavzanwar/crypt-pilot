@@ -1,6 +1,6 @@
 "use client";
 
-import { useT } from "@/lib/i18n";
+import { useCryptoT as useT } from "@/lib/crypto/i18n";
 import { attestationUrl, txUrl } from "@/lib/crypto/eas/rules";
 import { CircleCheck, ExternalLink } from "lucide-react";
 import { ExtLink, HashLine } from "./Bits";

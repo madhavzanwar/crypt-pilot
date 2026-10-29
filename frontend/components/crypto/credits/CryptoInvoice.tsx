@@ -7,7 +7,7 @@ import { api, messageFor } from "@/lib/crypto/api";
 import type { CreditPack, CryptoCoin, CryptoInvoice as Invoice, InvoiceState } from "@/lib/crypto/api";
 import { notifyCreditsChanged } from "@/lib/crypto/creditsEvents";
 import { toRequestLang } from "@/lib/crypto/lang";
-import { useT } from "@/lib/i18n";
+import { useCryptoT as useT } from "@/lib/crypto/i18n";
 import { Button } from "@/components/shadcn/button";
 import { cn } from "@/lib/utils";
 import { InvoiceCard } from "./InvoiceCard";
