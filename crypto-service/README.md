@@ -167,6 +167,34 @@ them only when the graph engine fails. Replays are always labelled `engine: "rep
 curl -X POST https://<backend>/api/admin/crypto-invoice/<invoiceId>/mark-paid -H "x-admin-token: $ADMIN_TOKEN"
 ```
 
+### Payment reconciliation and webhooks
+
+- A `payment.succeeded` that cannot be credited (unknown pack/session, product id not in the pack's cart, USD amount below
+  the pack price) is stored in `payment_issues` (`kind=unmatched_payment`), is NOT marked processed, and the webhook answers
+  **500 `unmatched_payment`** so Dodo retries; it is credited automatically on a later retry once it can be matched.
+  Credits are never minted for unknown sessions. Product/amount are checked only when Dodo sent `product_cart` / `total_amount`+`currency`.
+- `refund.succeeded` / `payment.refunded` and `dispute.*` events are recorded in `payment_issues` (`kind=refund|dispute`,
+  `reason=needs_manual_review`) and logged. Credits are **not** revoked automatically (partial refunds, disputes won, and
+  already-spent credits make an automatic clawback unsafe): review the table and use the ledger by hand.
+- Webhook ids longer than 128 chars are rejected (400); non-object bodies are 400.
+
+## Security notes and known limits
+
+- **Client IP / rate limits (BUG-037/038).** Limits key on the peer address. Run uvicorn with `--no-proxy-headers` (the image and
+  Makefile do). Behind the FinPilot bridge set `CRYPTO_TRUST_PROXY=true` so visitors get separate buckets; the rightmost
+  `X-Forwarded-For` entry (`TRUSTED_PROXY_HOPS`) is used, never the first. Only enable it when the service is reachable solely
+  through that proxy: any other caller could choose its own bucket by sending the header. Server-side callers without the
+  header (the FinPilot council client) share the loopback bucket. Limiter state is per process and in memory (slowapi evicts
+  expired windows); it is not shared across instances. The bridge adds a global ceiling (`CRYPTO_GLOBAL_LIMIT`, 600/min).
+- **Free credits (BUG-049, accepted risk).** See DECISIONS.md: a new cookie is a new session; the per-IP daily grant cap and the
+  check limiter are the only brakes.
+- **Sessions (BUG-086).** The cookie signature has no timestamp, so sessions expire server-side after `SESSION_TTL_DAYS`
+  (30) idle days (`sessions.last_seen_at`), after which the visitor starts a fresh session.
+- **Secret guard (BUG-046).** Catches seed phrases split by invisible characters, list numbering, common separators and
+  Cyrillic/Greek homoglyphs, spaced hex byte pairs and WIF keys with spaces. Not covered: non-English BIP-39 lists. A bare
+  64-hex string is rejected because it cannot be told apart from a private key.
+- **Voice (BUG-091).** At most 2 concurrent ffmpeg conversions (503 `voice_busy`), CPU/memory rlimits on posix.
+
 ## Benchmark
 
 ```bash
