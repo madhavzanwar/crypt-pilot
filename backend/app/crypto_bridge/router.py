@@ -28,7 +28,22 @@ STATUS_TTL_SECONDS = 10.0
 STATUS_TIMEOUT_SECONDS = 3.0
 
 # 30 wallet checks per minute per visitor IP (in-memory, same limiter FinPilot uses elsewhere).
+# Limits (BUG-037): this is per PROCESS (not shared across serverless instances) and idle keys are evicted by
+# RateLimiter once it holds >5000 keys. Behind a trusted proxy (CRYPTO_TRUST_PROXY) a client that can rotate
+# X-Forwarded-For could mint a fresh key per request, so a second, global ceiling (CRYPTO_GLOBAL_LIMIT per minute
+# across all visitors, default 600) bounds the total regardless of the header. Keep CRYPTO_TRUST_PROXY off
+# except where the platform proxy (Vercel) overwrites the header.
 crypto_check_limiter = RateLimiter(max_calls=30, window_seconds=60)
+
+
+def _global_limit() -> int:
+    try:
+        return max(1, int(os.environ.get("CRYPTO_GLOBAL_LIMIT", "600")))
+    except ValueError:
+        return 600
+
+
+crypto_global_limiter = RateLimiter(max_calls=_global_limit(), window_seconds=60)
 
 _ID = r"[A-Za-z0-9_-]{1,64}"
 
@@ -131,12 +146,18 @@ def _is_plain_http(request: Request) -> bool:
     return (proto or request.url.scheme) == "http"
 
 
+# A real session cookie is `<token_urlsafe>.<hex>`; anything else (non-ASCII, spaces, quotes, absurd length) is
+# dropped instead of forwarded, so the service simply starts a new session (BUG-015: a raw "é" used to blow up
+# httpx's ASCII header encoding and surface as a 500).
+_COOKIE_VALUE = re.compile(r"[A-Za-z0-9_.\-]{1,200}")
+
+
 def _session_cookie_header(request: Request) -> str | None:
     """Only the crypto session cookie is forwarded; the browser's other cookies are none of the service's business."""
     for part in request.headers.get("cookie", "").split(";"):
         name, _, value = part.strip().partition("=")
         if name == SESSION_COOKIE and value:
-            return f"{SESSION_COOKIE}={value}"
+            return f"{SESSION_COOKIE}={value}" if _COOKIE_VALUE.fullmatch(value) else None
     return None
 
 
@@ -215,6 +236,7 @@ async def _proxy(request: Request, path: str) -> Response:
     if route.limited:
         try:
             crypto_check_limiter.check(_client_ip(request))
+            crypto_global_limiter.check("*")
         except Exception as exc:  # HTTPException(429) from the shared limiter -> the {"error": ...} shape the frontend parses
             return _rate_limited(exc)
 
@@ -233,11 +255,11 @@ async def _proxy(request: Request, path: str) -> Response:
 
     headers = {"accept-encoding": "identity", "x-forwarded-for": _forwarded_for(request)}
     for name in _FORWARD_REQUEST_HEADERS:
-        if name in request.headers:
+        if name in request.headers and request.headers[name].isascii():  # httpx encodes headers as ASCII
             headers[name] = request.headers[name]
     if route.webhook:
         for name in _WEBHOOK_HEADERS:
-            if name in request.headers:
+            if name in request.headers and request.headers[name].isascii():
                 headers[name] = request.headers[name]
     if route.cookies:
         cookie = _session_cookie_header(request)
@@ -250,7 +272,19 @@ async def _proxy(request: Request, path: str) -> Response:
     )
     started = time.perf_counter()
     try:
-        resp = await client.send(upstream_req, stream=True)
+        try:
+            resp = await client.send(upstream_req, stream=True)
+        except RuntimeError as exc:
+            # BUG-036: a pooled connection bound to a previous (closed) event loop, e.g. serverless invocations that
+            # each run in a fresh loop. Drop the shared client and retry once on a new one.
+            if "closed" not in str(exc).lower():
+                raise
+            log.info("crypto shared client bound to a closed event loop; rebuilding")
+            upstream.reset_shared_client()
+            client = upstream.shared_client()
+            upstream_req = client.build_request(method, f"/api/{path}", headers=headers, content=body,
+                                                timeout=upstream.timeout_for(_route_timeout(route)))
+            resp = await client.send(upstream_req, stream=True)
     except httpx.ConnectTimeout:
         return _unreachable(path, "connect timeout")
     except httpx.TimeoutException as exc:
