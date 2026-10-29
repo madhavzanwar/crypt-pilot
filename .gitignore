@@ -1,3 +1,7 @@
+# Binaries / local tooling
+bin/
+*.exe
+
 # secrets
 .env
 .env.*
