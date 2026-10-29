@@ -213,6 +213,27 @@ def _prefetch(user_id: str, message: str, history: Optional[list[ChatMessage]]):
     return chunks, plan, list(sources)
 
 
+def failure_reason(exc: BaseException | None) -> tuple[str, str]:
+    """(plain-words reason, short technical detail) for a failed AI call. Never includes a key or a response body."""
+    import re
+
+    text = str(exc or "")
+    m = re.search(r"NVIDIA (\d{3})", text)
+    code = int(m.group(1)) if m else None
+    kind = type(exc).__name__ if exc is not None else "none"
+    if code == 429:
+        return "it is busy right now", "NVIDIA HTTP 429, rate limited"
+    if code in (401, 403):
+        return "the AI service rejected the server's key", f"NVIDIA HTTP {code}, key rejected or no access to this model"
+    if code == 404:
+        return "the AI model is not available", "NVIDIA HTTP 404, model not found"
+    if code is not None:
+        return "the AI service returned an error", f"NVIDIA HTTP {code}"
+    if "timed out" in text.lower() or kind in ("ReadTimeout", "ConnectTimeout", "TimeoutException"):
+        return "it did not respond in time", f"timeout ({kind})"
+    return "the AI service could not be used", f"{kind}"
+
+
 LANGUAGES = {"en": "English", "hi": "Hindi", "mr": "Marathi", "bn": "Bengali", "ur": "Urdu", "kn": "Kannada", "ml": "Malayalam"}
 
 
@@ -279,11 +300,11 @@ def answer(
             last = exc
             logger.warning("Copilot engine step failed: %s", exc)
     if result is None:
-        why = "it is busy right now" if "429" in str(last) else "it did not respond in time"
+        why, detail = failure_reason(last)
         result = AnswerContract(
             query=message,
             narrative=f"I couldn't answer right now because {why}. Please try again in a minute.",
-            data_gaps=[DataGap(text="The AI engine was unavailable.", what_would_help="Retry shortly, or turn on 'Keep my data on this device' for basic rule-based answers.")],
+            data_gaps=[DataGap(text=f"The AI engine was unavailable ({detail}).", what_would_help="Retry shortly, or turn on 'Keep my data on this device' for basic rule-based answers.")],
         )
     result.query = message
     if sources:
