@@ -87,7 +87,7 @@ function Scanner({ onFound, onBack }: { onFound: (t: UpiTarget) => void; onBack:
         <p role="status" className="text-center text-sm text-white/80">{msg}</p>
         <label className="flex cursor-pointer items-center justify-center gap-2 rounded-full border border-white/40 py-3 text-sm font-medium active:bg-white/15">
           <ImageUp className="size-5" /> Upload from gallery
-          <input type="file" accept="image/*" className="hidden" onChange={(e) => fromPhoto(e.target.files?.[0])} />
+          <input type="file" accept="image/*" aria-label="Choose a QR photo" className="hidden" onChange={(e) => fromPhoto(e.target.files?.[0])} />
         </label>
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); accept(manual); }}>
           <input value={manual} onChange={(e) => setManual(e.target.value)} placeholder="or type a UPI ID, e.g. chai@demo" autoCapitalize="none" autoCorrect="off" className="min-w-0 flex-1 rounded-full bg-white/15 px-4 py-3 text-sm outline-none placeholder:text-white/50" />
