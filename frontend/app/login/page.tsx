@@ -117,7 +117,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="grid min-h-screen lg:grid-cols-2">
+    <main className="grid min-h-screen grid-cols-[minmax(0,1fr)] lg:grid-cols-2">
       {/* Brand panel */}
       <div className="relative hidden overflow-hidden bg-sage p-10 text-ink lg:flex lg:flex-col lg:justify-start lg:gap-8">
         <Link
