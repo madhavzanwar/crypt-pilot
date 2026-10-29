@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 
 const CATEGORIES = [
   ["groceries", "Groceries"],

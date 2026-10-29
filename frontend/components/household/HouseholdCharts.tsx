@@ -15,15 +15,14 @@ import {
 } from "recharts";
 import type { HouseholdInsights, HouseholdNetWorthSummary } from "@/lib/types";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
-import { formatCurrency } from "@/lib/format";
+import { formatCompact, formatCurrency } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 
 /** Stable per-member colours so a person looks the same in every chart. */
 export const MEMBER_COLORS = ["#ff6b1a", "#0fb67a", "#3b6bff", "#ffb81f", "#a855f7", "#f0455a", "#14b8a6", "#64748b"];
 export const colorFor = (idx: number) => MEMBER_COLORS[idx % MEMBER_COLORS.length];
 
-const compact = (n: number) =>
-  Math.abs(n) >= 1e7 ? `${(n / 1e7).toFixed(1)}Cr` : Math.abs(n) >= 1e5 ? `${(n / 1e5).toFixed(1)}L` : Math.abs(n) >= 1e3 ? `${(n / 1e3).toFixed(0)}k` : `${Math.round(n)}`;
+const compact = formatCompact;
 
 const monthLabel = (m: string) =>
   new Date(`${m}-01T00:00:00`).toLocaleDateString("en-IN", { month: "short" });
