@@ -131,3 +131,23 @@ def test_bug090_refund_and_lost_dispute_revoke_credits_once(settings: Any) -> No
     # refund for an unknown payment is a no-op
     assert signed_post(c, "r_none", {"type": "payment.refunded", "data": {"payment_id": "nope"}}).status_code == 200
     assert c.get("/api/credits").json()["balance"] == 3
+
+
+# ------------------------------------------------------------------------------------------------ BUG-013
+
+
+def test_bug013_image_defaults_to_prod_and_prod_refuses_placeholder_secrets() -> None:
+    import re
+    from pathlib import Path
+
+    import pytest
+
+    from app.config import Settings
+    from app.main import check_production_settings
+
+    dockerfile = (Path(__file__).resolve().parents[1] / "Dockerfile").read_text()
+    assert re.search(r"^ENV\s+APP_ENV=prod\b", dockerfile, re.M), "image must default to APP_ENV=prod"
+    # what the image does when started with no other env: default secrets are the public placeholders
+    placeholder = Settings(_env_file=None, app_env="prod", cors_origins="https://x.test")  # type: ignore[call-arg]
+    with pytest.raises(RuntimeError, match="SESSION_SECRET"):
+        check_production_settings(placeholder)
