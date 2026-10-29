@@ -10,7 +10,9 @@ from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 
-_FILE = Path(__file__).resolve().parent.parent / ".telemetry.jsonl"
+from app.core.paths import writable_file
+
+_FILE = writable_file(Path(__file__).resolve().parent.parent / ".telemetry.jsonl")  # /tmp when the code directory is read-only
 _MAX = 600
 _lock = threading.Lock()
 _events: deque[dict] = deque(maxlen=_MAX)

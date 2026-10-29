@@ -17,6 +17,12 @@ load_dotenv(_REPO_ROOT / ".env.local", override=False)
 load_dotenv(_REPO_ROOT / "backend" / ".env", override=False)
 
 
+def is_production() -> bool:
+    """True when the deployment says it is production (APP_ENV / FINPILOT_ENV / VERCEL_ENV = prod | production)."""
+    env = (os.getenv("APP_ENV") or os.getenv("FINPILOT_ENV") or os.getenv("VERCEL_ENV") or "").strip().lower()
+    return env in ("prod", "production")
+
+
 class Settings:
     # NVIDIA NIM hosted chat (the copilot's AI)
     nvidia_api_key: str = os.getenv("NVIDIA_API_KEY", "")

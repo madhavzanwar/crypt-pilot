@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import os
 import re
 import time
 import uuid
@@ -270,11 +271,21 @@ def save_report(user_id: str, run: str, rows: list, findings: list[dict], score:
     return report
 
 
-def investigate(user_id: str, pace: float = 0.35, wallets: list[str] | None = None, lang: str = "en"):
+def _pace() -> float:
+    """Seconds between the Evidence Room's stages. This IS deliberate pacing (the checks themselves take milliseconds): the
+    streamed running/done events drive the UI's step-by-step animation. FINPILOT_EVIDENCE_PACE overrides it (0 = no delay)."""
+    try:
+        return max(0.0, float(os.getenv("FINPILOT_EVIDENCE_PACE", "0.35")))
+    except ValueError:
+        return 0.35
+
+
+def investigate(user_id: str, pace: float | None = None, wallets: list[str] | None = None, lang: str = "en"):
     """Generator of progress events; the last one is the saved report.
 
     With `wallets` (cleaned by chain_analyst.clean_wallets) the Chain Analyst joins as a tenth stage, just before the Risk
     Scorer. Without wallets it does not run and the nine agents behave exactly as before."""
+    pace = _pace() if pace is None else pace
     rows, accounts = store.query(TransactionRow, user_id=user_id), store.query(AccountRow, user_id=user_id)
     all_findings, summaries = [], {}
     run, score, unverified = uuid.uuid4().hex[:8], 0, 0

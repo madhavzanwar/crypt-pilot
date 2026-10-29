@@ -9,9 +9,10 @@ from pathlib import Path
 import numpy as np
 
 from app import telemetry
+from app.core.paths import writable_dir
 from app.rag import corpus, embed
 
-_CACHE = Path(__file__).resolve().parents[2] / ".cache" / "rag"
+_CACHE = writable_dir(Path(__file__).resolve().parents[2] / ".cache" / "rag")  # /tmp when the code directory is read-only
 _TTL = 30  # shortcut: store edits show up within 30 s; lower it if that hurts
 _idx: dict[str, dict] = {}
 _locks: dict[str, threading.Lock] = {}

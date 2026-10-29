@@ -5,11 +5,11 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, Field
 
 from app.core.auth import resolve_user_id
-from app.core.ratelimit import RateLimiter
+from app.core.ratelimit import RateLimiter, client_ip, voice_ip_limiter
 
 router = APIRouter(prefix="/api/voice", tags=["voice"])
 _limit = RateLimiter(60, 60)
@@ -112,7 +112,8 @@ def _user_data(user_id: str) -> str:
 
 
 @router.post("/act")
-def act(b: Act, user_id: str = Depends(_uid)) -> dict:
+def act(b: Act, user_id: str = Depends(_uid), request: Request = None) -> dict:  # type: ignore[assignment]
+    voice_ip_limiter.check(client_ip(request))  # per address: guest ids are self-minted, so a per-user key is bypassable
     _limit.check("voice")
     from app.copilot import nvidia
     system = _SYSTEM.replace("{today}", date.today().isoformat())

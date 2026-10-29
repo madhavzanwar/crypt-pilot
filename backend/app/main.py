@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from app.api.budgets_router import router as budgets_router
@@ -35,6 +36,7 @@ from app.api.webhooks_router import router as webhooks_router
 from app.api.tax_router import router as tax_router
 from app.api.transactions_router import router as transactions_router
 from app.core.audit import log_audit_event
+from app.core.config import is_production
 from app.crypto_bridge.router import router as crypto_router
 
 _MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -74,7 +76,10 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="FinPilot API", version="0.1.0", lifespan=lifespan)
+_PROD = is_production()
+# Interactive docs and the schema are for development: closed in production.
+app = FastAPI(title="FinPilot API", version="0.1.0", lifespan=lifespan,
+              docs_url=None if _PROD else "/docs", redoc_url=None if _PROD else "/redoc", openapi_url=None if _PROD else "/openapi.json")
 
 # SECURITY: in dev, allow any localhost/127.0.0.1 port (next dev picks a
 # different one whenever 3000 is busy). In production, ALLOWED_ORIGINS must
@@ -82,20 +87,56 @@ app = FastAPI(title="FinPilot API", version="0.1.0", lifespan=lifespan)
 # separated -- so the API can't be called cross-origin from an arbitrary
 # site with a signed-in user's cookies/token. Unset in prod = no prod
 # origins trusted (fails closed, not open).
-_prod_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+def cors_settings(env: dict | None = None) -> tuple[list[str], str | None]:
+    """(allowed origins, localhost regex). The localhost regex is dev-only: on by default only when no production origins
+    are configured, or when ALLOW_LOCALHOST_CORS=true is set explicitly; never in production unless explicitly asked."""
+    env = os.environ if env is None else env
+    origins = [o.strip() for o in env.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+    allow_localhost = env.get("ALLOW_LOCALHOST_CORS", "" if origins or is_production() else "true").lower() == "true"
+    return origins, r"^http://(localhost|127\.0\.0\.1):\d+$" if allow_localhost else None
 
-# The localhost regex is dev-only: on by default only when no production origins are configured, or when
-# ALLOW_LOCALHOST_CORS=true is set explicitly.
-_allow_localhost = os.getenv("ALLOW_LOCALHOST_CORS", "" if _prod_origins else "true").lower() == "true"
+
+_prod_origins, _localhost_regex = cors_settings()
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_prod_origins,
-    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1):\d+$" if _allow_localhost else None,
+    allow_origin_regex=_localhost_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _max_body_bytes() -> int:
+    """Request body cap: FINPILOT_MAX_BODY_BYTES, else 4 MB on Vercel (its platform limit is 4.5 MB), else no cap here."""
+    raw = os.getenv("FINPILOT_MAX_BODY_BYTES", "")
+    if raw.isdigit():
+        return int(raw)
+    return 4 * 1024 * 1024 if os.getenv("VERCEL") else 0
+
+
+@app.middleware("http")
+async def body_limit_middleware(request: Request, call_next):
+    limit = _max_body_bytes()
+    declared = request.headers.get("content-length", "")
+    if limit and declared.isdigit() and int(declared) > limit:
+        return JSONResponse({"detail": f"Request body too large (limit {limit // (1024 * 1024)} MB)"}, status_code=413)
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """nosniff, no framing, no referrer; HSTS only when the request came over https (or in production)."""
+    response = await call_next(request)
+    h = response.headers
+    h.setdefault("X-Content-Type-Options", "nosniff")
+    h.setdefault("X-Frame-Options", "DENY")
+    h.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    if _PROD or request.url.scheme == "https" or request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower() == "https":
+        h.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
+
 
 app.include_router(router, prefix="/api")
 app.include_router(transactions_router, prefix="/api")

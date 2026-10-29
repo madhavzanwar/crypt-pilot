@@ -8,7 +8,9 @@ from pathlib import Path
 
 import numpy as np
 
-_CACHE = os.getenv("FINPILOT_MODEL_CACHE") or str(Path(__file__).resolve().parents[2] / ".model_cache")
+from app.core.paths import writable_dir
+
+_CACHE = os.getenv("FINPILOT_MODEL_CACHE") or str(writable_dir(Path(__file__).resolve().parents[2] / ".model_cache"))
 VISION, TEXT = "Qdrant/clip-ViT-B-32-vision", "Qdrant/clip-ViT-B-32-text"
 
 

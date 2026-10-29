@@ -54,6 +54,11 @@ AGENT_TASKS = {
 }
 
 
+def _redact(event: dict) -> dict:
+    """The event without the text a user searched for (query / url)."""
+    return {k: v for k, v in event.items() if k not in ("query", "url", "urls")}
+
+
 def _mask(v: str) -> str:
     return f"{v[:5]}…{v[-4:]}" if len(v) > 12 else "set"
 
@@ -148,6 +153,7 @@ def overview(admin: bool = Depends(ops_access)) -> dict:
              "stats": by_key.get(env), "status": _status(env, by_key.get(env)), "testable": env in PROBES} for env, (prov, use) in KEYS.items()]
     agents = [{"agent": a, "task": task, "model": ai_agents.MODELS.get(a), "backup": ai_agents.BACKUPS.get(a), "stats": by_agent.get(a)} for a, task in AGENT_TASKS.items()]
     ev = telemetry.events(300)
+    ev = [_redact(e) for e in ev]  # what people searched for is theirs: queries and urls never leave the process
     return {
         "keys": keys, "agents": agents, "models": stats["by_model"],
         "totals": {"tokens": stats["tokens"], "fallbacks": stats["fallbacks"], "cache_hits": stats["cache_hits"]},

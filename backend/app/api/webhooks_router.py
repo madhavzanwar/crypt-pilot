@@ -33,5 +33,6 @@ async def setu_status(request: Request) -> dict:
             raise HTTPException(400, "Signature missing")
         if not _signature_ok(raw, sig, secret):
             raise HTTPException(401, "Invalid signature")
-    log.warning("setu status notice: %s", raw[:4000].decode("utf-8", "replace"))
+    # Never log the body: without a configured secret anyone can post here, so it would be attacker-controlled log content.
+    log.warning("setu status notice received (%d bytes, signature %s)", len(raw), "verified" if secret else "not checked: secret unset")
     return {"ok": True}

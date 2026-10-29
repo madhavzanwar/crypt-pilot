@@ -21,7 +21,7 @@ from app.copilot.engine import answer as copilot_answer
 from app.core.auth import DEMO_USER_IDS, is_public_user, resolve_user_id, verify_token
 from app.core.config import get_settings
 from app.core import store
-from app.core.ratelimit import RateLimiter, chat_limiter, scoped_key, upload_limiter
+from app.core.ratelimit import RateLimiter, chat_ip_limiter, chat_limiter, client_ip, scoped_key, upload_limiter
 from app.copilot.watcher import watch
 from app.forecast.alerts import maybe_send_gap_alert
 from app.ingest.categorize import categorize
@@ -108,6 +108,7 @@ async def _resolve_body_user_id(req: ChatRequest, authorization: str | None = He
 def chat(req: ChatRequest, request: Request, user_id: str = Depends(_resolve_body_user_id)) -> AnswerContract:
     if not req.message.strip():
         raise HTTPException(400, "message must not be empty")
+    chat_ip_limiter.check(client_ip(request))  # per address first: rotating guest ids must not bypass the limit
     chat_limiter.check(scoped_key(request, user_id))
     return copilot_answer(user_id, req.message, force_offline=req.force_offline, model=req.model, history=req.history[-10:], language=req.language, simple=req.simple)
 
