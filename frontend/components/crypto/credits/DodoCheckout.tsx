@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CreditCard, Loader2 } from "lucide-react";
 import { api, messageFor } from "@/lib/crypto/api";
 import type { CreditPack } from "@/lib/crypto/api";
+import { toRequestLang } from "@/lib/crypto/lang";
 import { useT } from "@/lib/i18n";
 import { Button } from "@/components/shadcn/button";
 import { formatUsd } from "./PackCard";
@@ -24,6 +25,15 @@ export function DodoCheckout({ pack }: { pack: CreditPack }) {
   const [state, setState] = useState<"idle" | "busy" | "redirecting">("idle");
   const [error, setError] = useState<string | null>(null);
 
+  // Back from Dodo restores this page from the bfcache with state "redirecting": reset so the button works again (BUG-030).
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted) setState("idle");
+    };
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, []);
+
   async function go() {
     setState("busy");
     setError(null);
@@ -34,7 +44,7 @@ export function DodoCheckout({ pack }: { pack: CreditPack }) {
       window.location.href = url;
     } catch (e) {
       setState("idle");
-      setError(e instanceof Error && e.message === "bad_checkout_url" ? "Checkout returned an unexpected link, so we stopped." : messageFor(e, lang === "hi" ? "hi" : "en").message);
+      setError(e instanceof Error && e.message === "bad_checkout_url" ? "Checkout returned an unexpected link, so we stopped." : messageFor(e, toRequestLang(lang)).message);
     }
   }
 

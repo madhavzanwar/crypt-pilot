@@ -25,7 +25,7 @@ export default function DemoChips({ onPick, selected, disabled }: { onPick: (add
               const on = selected === w.address;
               const meta = VERDICT_META[w.expected];
               const Icon = meta.icon;
-              const label = w.note.length <= 28 ? w.note : verdictWord(uiLang, w.expected);
+              const label = verdictWord(uiLang, w.expected); // always the verdict word ("Warn"), never the free-text note (BUG-106)
               return (
                 <button
                   key={w.address}
