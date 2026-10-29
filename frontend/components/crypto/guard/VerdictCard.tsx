@@ -53,9 +53,9 @@ function Fact({ icon, title, value, tone = "neutral" }: { icon: ReactNode; title
     >
       <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-pewter">
         <span className="shrink-0">{icon}</span>
-        <span className="min-w-0 break-words">{title}</span>
+        <span className="min-w-0 [overflow-wrap:anywhere]">{title}</span>
       </div>
-      <p className="text-sm font-semibold text-ink">{value}</p>
+      <p className="text-sm font-semibold text-ink [overflow-wrap:anywhere]">{value}</p>
     </div>
   );
 }

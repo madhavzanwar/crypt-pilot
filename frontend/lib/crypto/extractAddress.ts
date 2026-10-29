@@ -72,6 +72,29 @@ export function scanAddress(text: string, opts: { allowDemo?: boolean } = {}): A
   return malformed;
 }
 
+export const MAX_CARDS = 3;
+
+/**
+ * Every distinct valid-checksum address in the text (BUG-103), in order, at most `max`; `ignored` counts the extra ones that
+ * were dropped so the UI can say so. Falls back to the single-address scan (squashed / dictated forms) when the tokens
+ * hold none.
+ */
+export function scanAddresses(text: string, opts: { allowDemo?: boolean; max?: number } = {}): { addresses: string[]; ignored: number } {
+  const max = opts.max ?? MAX_CARDS;
+  const found: string[] = [];
+  for (const raw of text.split(/[^A-Za-z0-9-]+/)) {
+    const token = raw.replace(/^-+|-+$/g, "");
+    if (token === "") continue;
+    const v = validateAddress(token, opts);
+    if (v.ok && !found.includes(v.address)) found.push(v.address);
+  }
+  if (found.length === 0) {
+    const one = scanAddress(text, opts);
+    if (one?.checksumValid) found.push(one.address);
+  }
+  return { addresses: found.slice(0, max), ignored: Math.max(0, found.length - max) };
+}
+
 /** The first address with a valid checksum, or null. */
 export function extractAddress(text: string, opts: { allowDemo?: boolean } = {}): string | null {
   const scan = scanAddress(text, opts);
