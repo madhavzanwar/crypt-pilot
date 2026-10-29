@@ -52,7 +52,7 @@ export function ScenariosTab({ r }: { r: ForecastRiskReport }) {
               <tr className="text-left text-[11px] uppercase tracking-wider text-pewter">
                 <th className="px-2 py-2 font-semibold" />
                 {sc.outcomes.map((o) => (
-                  <th key={o.id} className={cn("min-w-32 px-2 py-2 font-semibold", rec?.scenario_id === o.id && "text-lime-dark")}>
+                  <th key={o.id} className={cn("min-w-32 px-2 py-2 font-semibold", rec?.scenario_id === o.id && "text-lime-text")}>
                     {o.label}{rec?.scenario_id === o.id ? " (recommended)" : ""}
                   </th>
                 ))}

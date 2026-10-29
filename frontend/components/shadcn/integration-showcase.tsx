@@ -35,7 +35,7 @@ const HighlightedTitle = ({ text }: { text: string }) => {
               aria-hidden="true"
               viewBox="0 0 260 18"
               fill="none"
-              className="absolute -bottom-2 left-0 w-full h-[10px] text-lime-dark pointer-events-none select-none"
+              className="absolute -bottom-2 left-0 w-full h-[10px] text-lime-text pointer-events-none select-none"
               preserveAspectRatio="none"
             >
               <path
