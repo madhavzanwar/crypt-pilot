@@ -121,7 +121,7 @@ def test_concurrent_double_spend(tmp_path: Path, trained: tuple[Path, Path], dem
     async def run() -> list[int]:
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
-            await c.get("/api/health")  # get a session cookie
+            await c.get("/api/credits")  # get a session cookie
             reqs = [c.post("/api/check", json={"address": a, "lang": "en"}) for a in (demo["ALLOW"], demo["BLOCK"])]
             return sorted(r.status_code for r in await asyncio.gather(*reqs))
 

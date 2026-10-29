@@ -44,7 +44,7 @@ Firebase Console → Project settings → **Your apps** → web app config. Put 
 ## 4. Production URL and CORS
 
 - `ALLOWED_ORIGINS` (backend, Vercel): set it to your Vercel URL, for example `https://your-app.vercel.app`. Use a comma-separated list for more than one.
-- `NEXT_PUBLIC_API_URL`: **do not set on Vercel**. The frontend and backend share one domain there. Locally it defaults to `http://127.0.0.1:8000`.
+- `NEXT_PUBLIC_API_URL`: **do not set on Vercel**. The frontend and backend share one domain there. Locally set it to `http://127.0.0.1:8000` (see `.env.example`); it is not defaulted for the browser.
 
 ## 5. Account Aggregator (optional)
 
@@ -65,7 +65,7 @@ The mock flow needs nothing. These switch on the real Setu sandbox. All four mus
 |---|---|---|
 | `INNGEST_DEV=1` | `frontend/.env.local` **only** | Local development. Do not set on Vercel. |
 | `INNGEST_SIGNING_KEY`, `INNGEST_EVENT_KEY` | Vercel | From the Inngest dashboard. |
-| `BACKEND_URL` | Vercel | The deployed backend's public URL. Defaults to `http://127.0.0.1:8000`. |
+| `BACKEND_URL` | Vercel | The deployed backend's public URL. No default: when unset, `frontend/next.config.ts` adds no rewrites. |
 | `INNGEST_JOB_TOKEN` | backend **and** frontend (Vercel) | Any long random string. The Inngest function sends it as `X-Job-Token`; the backend's `/api/jobs/*` stages refuse every call without it (503 when unset). |
 | `INNGEST_EVENT_KEY` | backend | Lets `POST /api/security/{user}/investigate-job` send the start event. Not needed locally with `INNGEST_DEV=1`. |
 
@@ -73,12 +73,17 @@ The mock flow needs nothing. These switch on the real Setu sandbox. All four mus
 
 - `FINPILOT_DEMO_MODE` (default `true`): demo personas and seeded data.
 - `FINPILOT_NO_CACHE`: set to any value to turn off the backend read cache.
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`: Google Sheets connector.
 - `FIRESTORE_EMULATOR_HOST`: only for local and test runs against the Firestore emulator.
 
 ## Quick start for a teammate
 
 1. Copy `.env.example` to `backend/.env` and `frontend/.env.local`, then ask the owner for the values.
-2. Backend: `cd backend && pip install -r requirements.txt && uvicorn app.main:app --port 8000`.
+2. Backend: `cd backend && pip install -r requirements-local.txt && uvicorn app.main:app --port 8000`.
 3. Frontend: `cd frontend && npm install && npm run dev`.
 4. Tests (need the Firestore emulator): `firebase emulators:exec --only firestore --project demo-hackmatrix "python -m pytest backend"`.
+
+## Ports (standard local setup)
+
+- Crypto service: `8132`, FinPilot API: `8000`, web: `3100` when using `scripts/run_cryptpilot_demo.sh` / `.ps1`. Plain `run.bat` and `npm run dev` use web `3000`.
+- Set `CRYPTO_SERVICE_URL=http://127.0.0.1:8132` for the API in every manual run. The code default in `backend/app/crypto_bridge/upstream.py` is `8200`, and the crypto service itself defaults to `8000` (which collides with the API), so start it with `--port 8132`.
+- If the web port is 3100, also set `FRONTEND_URL` and `CORS_ORIGINS` in `crypto-service/.env` to `http://localhost:3100`.

@@ -16,19 +16,19 @@ def test_health(client: TestClient) -> None:
 
 
 def test_session_cookie_flags(client: TestClient) -> None:
-    r = client.get("/api/health")
+    r = client.get("/api/credits")
     cookie = r.headers["set-cookie"]
     assert cookie.startswith(COOKIE_NAME + "=")
     assert "HttpOnly" in cookie
     assert "SameSite=lax" in cookie
     # a valid cookie is kept, not re-issued
-    r2 = client.get("/api/health")
+    r2 = client.get("/api/credits")
     assert "set-cookie" not in r2.headers
 
 
 def test_tampered_cookie_is_replaced(client: TestClient) -> None:
     client.cookies.set(COOKIE_NAME, "abc.deadbeef")
-    r = client.get("/api/health")
+    r = client.get("/api/credits")
     assert "set-cookie" in r.headers
 
 

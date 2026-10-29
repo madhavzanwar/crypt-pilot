@@ -16,7 +16,7 @@ router = APIRouter()
 @router.get("/api/credits", response_model=CreditsResponse)
 async def credits(state: AppState = Depends(get_state), sid: str = Depends(get_session_id)) -> CreditsResponse:
     with state.db.session() as s:
-        ledger.ensure_session(s, sid, state.settings.starting_credits)
+        ledger.ensure_for_request(s, state.settings, sid)
         bal = ledger.balance(s, sid)
     packs = [PackOut(id=p.id, credits=p.credits, price_usd=p.price_usd, label=p.label) for p in state.settings.packs]
     return CreditsResponse(balance=bal, packs=packs)
@@ -33,7 +33,7 @@ async def checkout(body: CheckoutRequest, state: AppState = Depends(get_state),
     if not dodo.configured:
         raise ApiError(503, "payments_unavailable")
     with state.db.session() as s:
-        ledger.ensure_session(s, sid, state.settings.starting_credits)
+        ledger.ensure_for_request(s, state.settings, sid)
     try:
         url = await dodo.create_checkout(pack, sid)
     except UpstreamError as exc:

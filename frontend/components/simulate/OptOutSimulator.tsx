@@ -180,7 +180,7 @@ export function OptOutSimulator() {
           name: o.merchant,
           group: "subscriptions",
           icon: Receipt,
-          cost: Math.round(Math.abs(o.amount) * FREQ_PER_MONTH[o.frequency]),
+          cost: Math.round(Math.abs(o.amount) * (FREQ_PER_MONTH[o.frequency] ?? 1)),
           replacement: 0,
           cancelled: false,
         }));

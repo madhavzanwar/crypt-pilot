@@ -1,5 +1,6 @@
 "use client";
 
+import { safeHref, isInternalHref } from "@/components/safeHref";
 import Link from "next/link";
 import { AlertCircle, ArrowRight, CheckCircle2, Database, ExternalLink, Search, TrendingUp, Zap } from "lucide-react";
 import type { AnswerContract, Recommendation } from "@/lib/types";
@@ -70,12 +71,12 @@ export function AnswerView({ answer }: { answer: AnswerContract }) {
                   </div>
                   {s.why && <p className="text-xs leading-relaxed text-graphite">{s.why}</p>}
                   {s.link &&
-                    (s.link.startsWith("/") ? (
+                    (isInternalHref(s.link) ? (
                       <Link href={s.link} className="mt-1.5 inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-ink hover:bg-lime/60">
                         Open <ArrowRight className="size-3" />
                       </Link>
                     ) : (
-                      <a href={s.link} target="_blank" rel="noreferrer" className="mt-1.5 inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-ink hover:bg-lime/60">
+                      <a href={safeHref(s.link)} target="_blank" rel="noreferrer" className="mt-1.5 inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-ink hover:bg-lime/60">
                         Open <ExternalLink className="size-3" />
                       </a>
                     ))}
@@ -254,7 +255,7 @@ export function AnswerView({ answer }: { answer: AnswerContract }) {
           <span className="text-[11px] font-semibold uppercase tracking-wide text-pewter">Sources</span>
           <span className="rounded-full bg-tint-lime px-1.5 py-0.5 text-[9px] font-semibold text-olive">Live web</span>
           {sources.map((s, i) => (
-            <a key={i} href={s.url} target="_blank" rel="noreferrer" title={s.title} className="rounded-full border border-black/[0.08] px-2.5 py-0.5 text-[11px] text-graphite hover:bg-fog hover:text-ink">
+            <a key={i} href={safeHref(s.url)} target="_blank" rel="noreferrer" title={s.title} className="rounded-full border border-black/[0.08] px-2.5 py-0.5 text-[11px] text-graphite hover:bg-fog hover:text-ink">
               {hostOf(s.url)}
             </a>
           ))}

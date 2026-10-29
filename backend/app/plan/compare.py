@@ -6,10 +6,9 @@ arithmetic comes from the planner's DebtBook / _build / _evaluate, which keeps o
 """
 from __future__ import annotations
 
-import numpy as np
 from pydantic import BaseModel
 
-from app.plan.planner import DebtIn, PlanInputs, _build, _evaluate, _p50, _status_quo_mins
+from app.plan.planner import PlanInputs, _build, _evaluate, _p50, _status_quo_mins
 from app.plan.schemas import Band, Goal
 
 Sched = list[tuple[float, float, float]]

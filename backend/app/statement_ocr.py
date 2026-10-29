@@ -5,7 +5,7 @@ Order matters: redact() runs first, so nothing downstream (preview, database) ev
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import date
 
 # Whole lines that only carry who/where the account is; dropped, not masked.
 _IDENTITY_LINE = re.compile(

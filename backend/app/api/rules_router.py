@@ -67,6 +67,15 @@ def create_rule(
     pattern = payload.pattern.strip()
     if not pattern:
         raise HTTPException(400, "Rule pattern cannot be empty")
+    if len(pattern) > 200:
+        raise HTTPException(400, "Rule pattern is too long (max 200 characters)")
+    if payload.match_type.value == "regex":
+        import re
+
+        try:
+            re.compile(pattern)
+        except re.error as exc:
+            raise HTTPException(400, f"Invalid regular expression: {exc}") from exc
 
     tags_json = json.dumps(payload.tags) if payload.tags else None
 

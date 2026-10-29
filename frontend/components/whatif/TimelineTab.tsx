@@ -21,7 +21,10 @@ export function TimelineTab() {
   const [merchant, setMerchant] = useState("");
   const [amount, setAmount] = useState(1000);
   const [frequency, setFrequency] = useState("monthly");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
 
   const [diff, setDiff] = useState<RecomputeDiff | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -29,6 +32,8 @@ export function TimelineTab() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (!Number.isFinite(amount) || amount < 1) return setError("Enter an amount of at least ₹1");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return setError("Pick a valid date");
     setSubmitting(true);
     setError(null);
     setDiff(null);
@@ -69,10 +74,10 @@ export function TimelineTab() {
 
           <div className="grid grid-cols-2 gap-4">
             <Field label="Amount (₹)">
-              <Input required type="number" min={0} value={amount} onChange={(e) => setAmount(Number(e.target.value))} className="tnum" />
+              <Input required type="number" min={1} value={amount} onChange={(e) => setAmount(Number(e.target.value))} className="tnum" />
             </Field>
             <Field label={kind === "transaction" ? "Date" : "First due date"}>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <Input required type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </Field>
           </div>
 

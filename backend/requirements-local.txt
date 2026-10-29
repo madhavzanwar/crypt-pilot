@@ -1,6 +1,5 @@
-# Local development: the deployed (Vercel) set plus the server, tests and OCR.
+# Local development: the deployed (Vercel) set (which now includes uvicorn) plus tests and OCR.
 -r requirements.txt
-uvicorn[standard]==0.34.0
 pytest==8.3.4
 pytest-asyncio==0.25.0
 rapidocr==3.10.0

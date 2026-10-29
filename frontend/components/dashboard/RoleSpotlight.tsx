@@ -1,5 +1,6 @@
 "use client";
 
+import { safeHref } from "@/components/safeHref";
 import { useT } from "@/lib/i18n";
 import { useCallback } from "react";
 import { ExternalLink } from "lucide-react";
@@ -90,7 +91,7 @@ export function RoleSpotlight({ userId, savedThisMonth }: { userId: string; save
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {track.links.map((l) => (
-          <a key={l.label} href={l.href} target="_blank" rel="noreferrer" className="rounded-2xl bg-white/60 p-3 transition hover:bg-white">
+          <a key={l.label} href={safeHref(l.href)} target="_blank" rel="noreferrer" className="rounded-2xl bg-white/60 p-3 transition hover:bg-white">
             <p className="flex items-center gap-1.5 text-sm font-semibold">
               {l.label} <ExternalLink className="size-3.5" />
             </p>

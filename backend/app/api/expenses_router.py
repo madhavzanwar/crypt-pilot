@@ -35,7 +35,7 @@ class Suggestion(BaseModel):
 async def _photo(file: UploadFile | None) -> bytes | None:
     if file is None:
         return None
-    data = await file.read()
+    data = await file.read(_MAX_PHOTO + 1)
     if len(data) > _MAX_PHOTO:
         raise HTTPException(413, "Photo is too large; please use one under 6 MB")
     return data or None

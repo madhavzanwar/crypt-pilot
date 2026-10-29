@@ -52,7 +52,7 @@ def _verify(token: str, typ: str) -> dict:
     return payload
 
 
-def create_consent(mobile: str, profile: str, months: int) -> dict:
+def create_consent(mobile: str, profile: str, months: int, uid: str = "") -> dict:
     """POST /Consent: ask for `months` of deposit-account data. Returns a handle in PENDING state."""
     if not _MOBILE.match(mobile or ""):
         raise AAError("Enter the 10-digit mobile number linked to your bank accounts.", 422)
@@ -60,7 +60,7 @@ def create_consent(mobile: str, profile: str, months: int) -> dict:
         raise AAError("Unknown sample profile.", 422)
     if not 1 <= months <= 24:
         raise AAError("Choose between 1 and 24 months of history.", 422)
-    handle = _sign({"typ": "handle", "mobile": mobile, "profile": profile, "months": months, "exp": time.time() + _HANDLE_TTL})
+    handle = _sign({"typ": "handle", "mobile": mobile, "profile": profile, "months": months, "uid": uid, "exp": time.time() + _HANDLE_TTL})
     return {"handle": handle, "status": "PENDING", "fi_types": ["DEPOSIT"], "months": months}
 
 
@@ -71,6 +71,11 @@ def approve(handle: str, otp: str) -> dict:
         raise AAError("That OTP is not correct. Try again.", 400)
     consent = _sign({**h, "typ": "consent", "exp": time.time() + _CONSENT_TTL})
     return {"consent_id": consent, "status": "ACTIVE"}
+
+
+def owner(token: str, typ: str) -> str:
+    """The user id a handle / consent was issued to ("" when issued without one)."""
+    return _verify(token, typ).get("uid", "")
 
 
 def _fi_deposit(acc, txns, mobile: str, name: str, start: date, end: date) -> dict:

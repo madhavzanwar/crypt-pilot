@@ -52,8 +52,8 @@ function Fact({ icon, title, value, tone = "neutral" }: { icon: ReactNode; title
       )}
     >
       <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-pewter">
-        {icon}
-        <span className="min-w-0">{title}</span>
+        <span className="shrink-0">{icon}</span>
+        <span className="min-w-0 break-words">{title}</span>
       </div>
       <p className="text-sm font-semibold text-ink">{value}</p>
     </div>
@@ -95,7 +95,7 @@ export default function VerdictCard({ result }: { result: CheckResponse }) {
         </div>
 
         {found && (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-3">
             <Fact
               icon={<Route className="size-3.5" aria-hidden />}
               title={g("wg.hops.title")}

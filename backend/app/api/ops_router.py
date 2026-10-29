@@ -1,13 +1,15 @@
 """Agent Ops: which keys exist (masked), how each key / model / agent is behaving, what the web agents searched,
-and the chain of retries and fallbacks. Secrets never leave the process: only the env-var name and the last 4 characters."""
+and the chain of retries and fallbacks. Secrets never leave the process: only the env-var name (and, for the admin token holder only, the last 4 characters)."""
 from __future__ import annotations
 
 import os
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app import telemetry
+from app.core.guard import ops_access, probe_limiter
+from app.core.ratelimit import client_ip
 from app.security import ai_agents
 
 router = APIRouter(prefix="/api/ops", tags=["ops"])
@@ -65,8 +67,10 @@ def _status(env: str, stats: dict | None) -> str:
 
 
 @router.post("/probe/{env}")
-def probe(env: str) -> dict:
+def probe(env: str, request: Request, admin: bool = Depends(ops_access)) -> dict:
     """Test one key right now with a free read-only request. The result is recorded like any other call."""
+    if not admin:
+        probe_limiter.check(client_ip(request))
     if env not in KEYS:
         raise HTTPException(404, "Unknown key")
     secret = os.getenv(env)
@@ -136,11 +140,11 @@ def _resilience(ev: list[dict]) -> dict:
 
 
 @router.get("/overview")
-def overview() -> dict:
+def overview(admin: bool = Depends(ops_access)) -> dict:
     stats = telemetry.summary()
     by_key = {b["name"]: b for b in stats["by_key"]}
     by_agent = {b["name"]: b for b in stats["by_agent"]}
-    keys = [{"env": env, "provider": prov, "use": use, "configured": bool(os.getenv(env)), "masked": _mask(os.getenv(env, "")) if os.getenv(env) else None,
+    keys = [{"env": env, "provider": prov, "use": use, "configured": bool(os.getenv(env)), "masked": (_mask(os.getenv(env, "")) if admin else "set") if os.getenv(env) else None,
              "stats": by_key.get(env), "status": _status(env, by_key.get(env)), "testable": env in PROBES} for env, (prov, use) in KEYS.items()]
     agents = [{"agent": a, "task": task, "model": ai_agents.MODELS.get(a), "backup": ai_agents.BACKUPS.get(a), "stats": by_agent.get(a)} for a, task in AGENT_TASKS.items()]
     ev = telemetry.events(300)

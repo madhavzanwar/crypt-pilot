@@ -149,10 +149,10 @@ class Goal(BaseModel):
 
     id: str
     user_id: str
-    name: str
-    target_amount: float
+    name: str = Field(min_length=1, max_length=120)
+    target_amount: float = Field(gt=0, allow_inf_nan=False, le=1e12)
     target_date: Optional[date] = None
-    current_amount: float = 0
+    current_amount: float = Field(default=0, ge=0, allow_inf_nan=False, le=1e12)
     cover_key: str = "general"
     funding_account_id: Optional[str] = None
     auto_track: bool = False
@@ -338,9 +338,9 @@ class DashboardSnapshot(BaseModel):
 class CreateAccountRequest(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     type: AccountType
-    balance: float = 0
-    credit_limit: Optional[float] = None
-    interest_rate_apr: Optional[float] = None
+    balance: float = Field(default=0, allow_inf_nan=False, ge=-1e12, le=1e12)
+    credit_limit: Optional[float] = Field(default=None, allow_inf_nan=False, ge=0, le=1e12)
+    interest_rate_apr: Optional[float] = Field(default=None, allow_inf_nan=False, ge=0, le=1000)
 
 
 class CopilotAction(BaseModel):
@@ -384,7 +384,7 @@ class HistoryTurn(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(max_length=4000)
     conversation_id: Optional[str] = None
     # Additive, backward-compatible: defaults to the demo persona so existing
     # callers that don't send it keep working unchanged.
@@ -491,15 +491,15 @@ class Budget(BaseModel):
 
 class BudgetCreateRequest(BaseModel):
     category: TxnCategory
-    monthly_limit: float
+    monthly_limit: float = Field(allow_inf_nan=False, ge=0, le=1e12)
     rollover_enabled: bool = False
-    rollover_cap: Optional[float] = None
+    rollover_cap: Optional[float] = Field(default=None, allow_inf_nan=False, ge=0, le=1e12)
 
 
 class BudgetUpdateRequest(BaseModel):
-    monthly_limit: Optional[float] = None
+    monthly_limit: Optional[float] = Field(default=None, allow_inf_nan=False, ge=0, le=1e12)
     rollover_enabled: Optional[bool] = None
-    rollover_cap: Optional[float] = None
+    rollover_cap: Optional[float] = Field(default=None, allow_inf_nan=False, ge=0, le=1e12)
 
 
 BudgetHealth = Literal["under", "near", "over"]
@@ -532,10 +532,10 @@ class SafeToSpend(BaseModel):
 
 
 class GoalCreateRequest(BaseModel):
-    name: str
-    target_amount: float
+    name: str = Field(min_length=1, max_length=120)
+    target_amount: float = Field(gt=0, allow_inf_nan=False, le=1e12)
     target_date: Optional[date] = None
-    current_amount: float = 0
+    current_amount: float = Field(default=0, ge=0, allow_inf_nan=False, le=1e12)
     cover_key: str = "general"
     funding_account_id: Optional[str] = None
     auto_track: bool = False
@@ -544,10 +544,10 @@ class GoalCreateRequest(BaseModel):
 class GoalUpdateRequest(BaseModel):
     """All fields optional -- PATCH semantics (only provided fields change)."""
 
-    current_amount: Optional[float] = None
-    target_amount: Optional[float] = None
+    current_amount: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False, le=1e12)
+    target_amount: Optional[float] = Field(default=None, gt=0, allow_inf_nan=False, le=1e12)
     target_date: Optional[date] = None
-    name: Optional[str] = None
+    name: Optional[str] = Field(default=None, min_length=1, max_length=120)
     cover_key: Optional[str] = None
     funding_account_id: Optional[str] = None
     auto_track: Optional[bool] = None
@@ -662,13 +662,13 @@ class TaxOptimizationAnalysis(BaseModel):
 
 
 class TaxCalculationRequest(BaseModel):
-    gross_annual_income: Optional[float] = None
-    section_80c: Optional[float] = None
-    section_80d: Optional[float] = None
-    section_80ccd_1b_nps: Optional[float] = None
-    section_24b_home_loan: Optional[float] = None
-    hra_exemption: Optional[float] = None
-    other_deductions: Optional[float] = None
+    gross_annual_income: Optional[float] = Field(default=None, ge=0, le=1e11, allow_inf_nan=False)
+    section_80c: Optional[float] = Field(default=None, ge=0, le=1e11, allow_inf_nan=False)
+    section_80d: Optional[float] = Field(default=None, ge=0, le=1e11, allow_inf_nan=False)
+    section_80ccd_1b_nps: Optional[float] = Field(default=None, ge=0, le=1e11, allow_inf_nan=False)
+    section_24b_home_loan: Optional[float] = Field(default=None, ge=0, le=1e11, allow_inf_nan=False)
+    hra_exemption: Optional[float] = Field(default=None, ge=0, le=1e11, allow_inf_nan=False)
+    other_deductions: Optional[float] = Field(default=None, ge=0, le=1e11, allow_inf_nan=False)
 
 
 # ---------------------------------------------------------------------------

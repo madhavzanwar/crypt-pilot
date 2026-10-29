@@ -42,7 +42,7 @@ def create_consent(body: ConsentBody, user_id: str = Depends(resolve_user_id)) -
             if not mock._MOBILE.match(body.mobile or "") or not 1 <= body.months <= 24 or not body.return_url.startswith(("http://", "https://")):
                 raise AAError("Enter the 10-digit mobile number linked to your bank accounts.", 422)
             return setu.create_consent(body.mobile, body.months, body.return_url)
-        return {**mock.create_consent(body.mobile, body.profile, body.months), "demo_otp": mock.DEMO_OTP}
+        return {**mock.create_consent(body.mobile, body.profile, body.months, user_id), "demo_otp": mock.DEMO_OTP}
     except AAError as e:
         _fail(e)
 
@@ -50,6 +50,8 @@ def create_consent(body: ConsentBody, user_id: str = Depends(resolve_user_id)) -
 @router.post("/{user_id}/consent/approve")
 def approve(body: ApproveBody, user_id: str = Depends(resolve_user_id)) -> dict:
     try:
+        if mock.owner(body.handle, "handle") != user_id:
+            raise AAError("This consent was issued to a different user. Start again.", 403)
         return mock.approve(body.handle, body.otp)
     except AAError as e:
         _fail(e)
@@ -62,6 +64,8 @@ def import_data(body: ImportBody, user_id: str = Depends(resolve_user_id)) -> di
         if setu.enabled():
             fi = setu.fetch(body.consent_id)
         else:
+            if mock.owner(body.consent_id, "consent") != user_id:
+                raise AAError("This consent was issued to a different user. Start again.", 403)
             priv, pub = mock.new_keypair()
             fi = mock.decrypt(priv, mock.fetch(body.consent_id, pub))
         accounts, txns = mapper.to_rows(user_id, fi)

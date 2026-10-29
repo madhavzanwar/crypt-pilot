@@ -18,6 +18,8 @@ DEFAULT_SERVICE_URL = "http://127.0.0.1:8200"
 CONNECT_TIMEOUT = 5.0
 DEFAULT_TIMEOUT = 15.0
 CHECK_TIMEOUT = 60.0
+# /transcribe: ffmpeg + up to two STT providers at the service's 15 s each; must outlast the service (CRYPTO_TRANSCRIBE_TIMEOUT).
+TRANSCRIBE_TIMEOUT = 45.0
 
 # Tests inject an httpx.MockTransport here; None means real network.
 _transport: httpx.AsyncBaseTransport | None = None

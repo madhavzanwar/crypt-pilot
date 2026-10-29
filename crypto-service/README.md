@@ -42,6 +42,8 @@ cd backend
 make setup                 # uv sync
 cp .env.example .env       # then fill values
 make run                   # http://localhost:8000/api/health , docs at /api/docs
+# Alongside the FinPilot API (which uses 8000), run it on 8132 instead and set CRYPTO_SERVICE_URL=http://127.0.0.1:8132 on the API,
+# e.g. `uv run uvicorn app.main:app --port 8132` (this is what scripts/run_cryptpilot_demo.* does).
 make test lint
 ```
 

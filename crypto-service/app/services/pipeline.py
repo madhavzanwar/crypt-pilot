@@ -135,7 +135,7 @@ class CheckPipeline:
         except InvalidAddressError as exc:
             raise ApiError(400, "invalid_address") from exc
         with self.db.session() as s:
-            ledger.ensure_session(s, session_id, self.s.starting_credits)
+            ledger.ensure_for_request(s, self.s, session_id)
             if ledger.balance(s, session_id) <= 0:
                 raise ApiError(402, "no_credits")
         return Prepared(info.address, lang, session_id)

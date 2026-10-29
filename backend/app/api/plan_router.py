@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.api.routes import _starting_balance_for_user
 from app.core import store
@@ -35,11 +35,11 @@ _MIN_MONTHS = 4
 
 
 class PlanParams(BaseModel):
-    reserve: float | None = None
-    goal_amount: float | None = None
-    goal_month: int | None = None
-    tolerance: float = 0.10
-    cut: float = 0.20
+    reserve: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    goal_amount: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    goal_month: int | None = Field(default=None, ge=1)
+    tolerance: float = Field(default=0.10, ge=0, le=1, allow_inf_nan=False)
+    cut: float = Field(default=0.20, allow_inf_nan=False)
     horizon: int = 6
 
 
@@ -87,11 +87,11 @@ def _inputs(user_id: str, p: PlanParams) -> PlanInputs:
 
 @router.get("/plan/{user_id}", response_model=PlanResult)
 def get_plan(
-    reserve: float | None = Query(None, ge=0),
-    goal_amount: float | None = Query(None, gt=0),
+    reserve: float | None = Query(None, ge=0, allow_inf_nan=False),
+    goal_amount: float | None = Query(None, gt=0, allow_inf_nan=False),
     goal_month: int | None = Query(None, ge=1),
-    tolerance: float = Query(0.10, ge=0, le=1),
-    cut: float = Query(0.20),
+    tolerance: float = Query(0.10, ge=0, le=1, allow_inf_nan=False),
+    cut: float = Query(0.20, ge=0, le=0.30, allow_inf_nan=False),
     horizon: int = Query(6),
     user_id: str = Depends(resolve_user_id),
 ) -> PlanResult:

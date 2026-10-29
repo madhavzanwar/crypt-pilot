@@ -152,7 +152,7 @@ do_start() {
   PY="python3"
   if [ -x "$ROOT/backend/.venv/bin/python" ]; then PY="$ROOT/backend/.venv/bin/python"; fi
   if ! "$PY" -c "import fastapi, uvicorn" >/dev/null 2>&1; then
-    warn "$PY cannot import fastapi/uvicorn. Install the backend first: cd backend && python -m venv .venv && .venv/bin/pip install -r requirements.txt"
+    warn "$PY cannot import fastapi/uvicorn. Install the backend first: cd backend && python -m venv .venv && .venv/bin/pip install -r requirements-local.txt"
   fi
   export CRYPTO_SERVICE_URL="http://127.0.0.1:$CRYPTO_PORT"
   export FINPILOT_DEMO_MODE=true

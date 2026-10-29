@@ -240,6 +240,8 @@ export default function EvidenceRoomPage() {
   const [busy, setBusy] = useState(false);
   const [wallets, setWallets] = useWalletList(userId);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const load = useCallback(async () => {
     try {
@@ -252,6 +254,7 @@ export default function EvidenceRoomPage() {
   }, [userId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount; state is set after the await
     load();
     const pending = timers.current;
     return () => pending.forEach(clearTimeout);
@@ -269,8 +272,9 @@ export default function EvidenceRoomPage() {
       };
       // With no wallets this is the original request; with wallets the Chain Analyst joins as a tenth stage.
       if (wallets.length === 0) await api.investigate(userId, onEvent);
-      else await postNdjson<SecurityEvent>(`/api/security/${userId}/investigate`, { wallets, lang: "en" }, onEvent, "Investigation failed");
+      else await postNdjson<SecurityEvent>(`/api/security/${userId}/investigate`, { wallets, lang: "en" }, onEvent, "Investigation failed", (abortRef.current = new AbortController()).signal);
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       toast.error(err instanceof Error ? err.message : "The investigation could not run");
     } finally {
       setRunning(false);

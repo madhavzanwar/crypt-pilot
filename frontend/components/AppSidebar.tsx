@@ -143,7 +143,7 @@ export function AppSidebar({ footer }: { footer?: ReactNode }) {
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="[@media(max-height:860px)]:gap-0 [@media(max-height:860px)]:[&_[data-sidebar=group]]:py-1 [@media(max-height:860px)]:[&_[data-sidebar=group-label]]:h-6 [@media(max-height:860px)]:[&_[data-sidebar=group-label]]:mb-0 [@media(max-height:860px)]:[&_[data-sidebar=menu]]:gap-0 [@media(max-height:860px)]:[&_[data-sidebar=menu-button]]:h-7">
         {NAV_GROUPS.filter((g) => g.links.some((l) => !l.more)).map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel>{t(`nav.${group.label}`, group.label)}</SidebarGroupLabel>

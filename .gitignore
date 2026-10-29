@@ -35,6 +35,11 @@ AGENTS.md
 !/README.md
 !brand/*.md
 !audit/*.md
+!docs/*.md
+!crypto-service/*.md
+!crypto-service/**/*.md
+!/ENVIRONMENT.md
+!/MIGRATION_REPORT.md
 
 # logs
 *.log
@@ -66,3 +71,11 @@ backend/.translation_cache.json
 
 finpilot-config.json
 scripts/.phone-ip
+
+# local artefacts / secrets
+.vercel/
+*.pem
+*.key
+*.pid
+.demo-logs/
+__MACOSX/

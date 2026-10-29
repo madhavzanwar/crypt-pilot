@@ -33,6 +33,8 @@ LIMIT_80D = 75_000.0  # ₹25k self/family + ₹50k senior citizen parents
 LIMIT_80CCD_1B = 50_000.0  # NPS additional voluntary contribution
 LIMIT_24B = 200_000.0  # Self-occupied home loan interest
 
+NEW_REGIME_REBATE_LIMIT = 1_200_000.0  # Section 87A, FY 2025-26 (taxable income)
+
 CESS_RATE = 0.04  # 4% Health & Education Cess
 
 _INSURANCE_RE = re.compile(
@@ -80,42 +82,38 @@ def _compute_slabs_tax(
 
 def compute_new_regime_tax(gross_income: float) -> TaxRegimeCalculation:
     """Calculate income tax under the New Tax Regime (Section 115BAC).
-    Includes ₹75,000 standard deduction, revised slabs, Section 87A rebate
-    (full rebate up to ₹7,00,000 taxable), and marginal relief.
+    Includes ₹75,000 standard deduction, FY 2025-26 slabs, Section 87A rebate
+    (full rebate up to ₹12,00,000 taxable) and marginal relief just above it.
     """
+    gross_income = max(0.0, gross_income)
     total_deductions = min(gross_income, NEW_REGIME_STD_DEDUCTION)
     taxable_income = max(0.0, gross_income - total_deductions)
 
-    # Revised Slabs for New Regime:
-    # 0 - 3,00,000 : 0%
-    # 3,00,001 - 7,00,000 : 5%
-    # 7,00,001 - 10,00,000 : 10%
-    # 10,00,001 - 12,00,000 : 15%
-    # 12,00,001 - 15,00,000 : 20%
-    # Above 15,00,000 : 30%
+    # FY 2025-26 slabs for the New Regime (Budget 2025):
+    # 0-4L nil, 4-8L 5%, 8-12L 10%, 12-16L 15%, 16-20L 20%, 20-24L 25%, above 24L 30%
     slabs_def = [
-        (0.0, 300_000.0, 0.0, "₹0 – ₹3,00,000 (0%)"),
-        (300_000.0, 700_000.0, 5.0, "₹3,00,001 – ₹7,00,000 (5%)"),
-        (700_000.0, 1_000_000.0, 10.0, "₹7,00,001 – ₹10,00,000 (10%)"),
-        (1_000_000.0, 1_200_000.0, 15.0, "₹10,00,001 – ₹12,00,000 (15%)"),
-        (1_200_000.0, 1_500_000.0, 20.0, "₹12,00,001 – ₹15,00,000 (20%)"),
-        (1_500_000.0, float("inf"), 30.0, "Above ₹15,00,000 (30%)"),
+        (0.0, 400_000.0, 0.0, "₹0 – ₹4,00,000 (0%)"),
+        (400_000.0, 800_000.0, 5.0, "₹4,00,001 – ₹8,00,000 (5%)"),
+        (800_000.0, 1_200_000.0, 10.0, "₹8,00,001 – ₹12,00,000 (10%)"),
+        (1_200_000.0, 1_600_000.0, 15.0, "₹12,00,001 – ₹16,00,000 (15%)"),
+        (1_600_000.0, 2_000_000.0, 20.0, "₹16,00,001 – ₹20,00,000 (20%)"),
+        (2_000_000.0, 2_400_000.0, 25.0, "₹20,00,001 – ₹24,00,000 (25%)"),
+        (2_400_000.0, float("inf"), 30.0, "Above ₹24,00,000 (30%)"),
     ]
 
     slabs, tax_before_rebate = _compute_slabs_tax(taxable_income, slabs_def)
 
-    # Section 87A Rebate: if taxable income <= 7,00,000, 100% tax rebate (up to ₹25k)
+    # Section 87A rebate: nil tax when taxable income <= 12,00,000 (rebate capped at ₹60,000)
     rebate = 0.0
-    if taxable_income <= 700_000.0:
+    if taxable_income <= NEW_REGIME_REBATE_LIMIT:
         rebate = tax_before_rebate
         tax_after_rebate = 0.0
     else:
-        # Marginal relief: Tax payable cannot exceed (Taxable Income - ₹7,00,000)
-        excess_over_7l = taxable_income - 700_000.0
-        if tax_before_rebate > excess_over_7l:
-            marginal_discount = tax_before_rebate - excess_over_7l
-            rebate = round(marginal_discount, 2)
-            tax_after_rebate = round(excess_over_7l, 2)
+        # Marginal relief: tax payable cannot exceed the income above ₹12,00,000
+        excess = taxable_income - NEW_REGIME_REBATE_LIMIT
+        if tax_before_rebate > excess:
+            rebate = round(tax_before_rebate - excess, 2)
+            tax_after_rebate = round(excess, 2)
         else:
             tax_after_rebate = tax_before_rebate
 
@@ -160,14 +158,20 @@ def compute_old_regime_tax(
     Applies ₹50,000 standard deduction, user deductions (80C, 80D, 80CCD, 24b, HRA),
     Old Regime slabs, and Section 87A rebate up to ₹5,00,000.
     """
+    gross_income = max(0.0, gross_income)
     std_ded = min(gross_income, OLD_REGIME_STD_DEDUCTION)
 
-    sec_80c = min(LIMIT_80C, deductions.section_80c if deductions else 0.0)
-    sec_80d = min(LIMIT_80D, deductions.section_80d if deductions else 0.0)
-    sec_nps = min(LIMIT_80CCD_1B, deductions.section_80ccd_1b_nps if deductions else 0.0)
-    sec_24b = min(LIMIT_24B, deductions.section_24b_home_loan_interest if deductions else 0.0)
-    hra = deductions.hra_exemption if deductions else 0.0
-    other = deductions.other_deductions if deductions else 0.0
+    def _pos(v: float | None) -> float:
+        return max(0.0, v or 0.0)
+
+    sec_80c = min(LIMIT_80C, _pos(deductions.section_80c if deductions else 0.0))
+    sec_80d = min(LIMIT_80D, _pos(deductions.section_80d if deductions else 0.0))
+    sec_nps = min(LIMIT_80CCD_1B, _pos(deductions.section_80ccd_1b_nps if deductions else 0.0))
+    sec_24b = min(LIMIT_24B, _pos(deductions.section_24b_home_loan_interest if deductions else 0.0))
+    # HRA and "other" have no fixed statutory cap here; they can never exceed what is left of the income
+    room = max(0.0, gross_income - std_ded - sec_80c - sec_80d - sec_nps - sec_24b)
+    hra = min(_pos(deductions.hra_exemption if deductions else 0.0), room)
+    other = min(_pos(deductions.other_deductions if deductions else 0.0), room - hra)
 
     total_deductions = round(std_ded + sec_80c + sec_80d + sec_nps + sec_24b + hra + other, 2)
     taxable_income = max(0.0, gross_income - total_deductions)

@@ -74,6 +74,8 @@ export function CommandPalette() {
   // Auto focus input when opened
   useEffect(() => {
     if (open) {
+      // Reset the palette each time it opens (open is toggled from several places).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setQuery("");
       setSelectedIndex(0);
       setTimeout(() => inputRef.current?.focus(), 60);

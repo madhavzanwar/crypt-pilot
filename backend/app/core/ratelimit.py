@@ -13,7 +13,7 @@ from __future__ import annotations
 import time
 from collections import defaultdict, deque
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 
 
 class RateLimiter:
@@ -24,6 +24,9 @@ class RateLimiter:
 
     def check(self, key: str) -> None:
         now = time.monotonic()
+        if len(self._calls) > 5000:  # evict idle keys so unique client ids cannot grow memory without bound
+            for k in [k for k, v in self._calls.items() if not v or now - v[-1] > self.window_seconds]:
+                del self._calls[k]
         q = self._calls[key]
         while q and now - q[0] > self.window_seconds:
             q.popleft()
@@ -41,3 +44,21 @@ class RateLimiter:
 # (falls back to a constant key only if user_id somehow isn't available yet).
 chat_limiter = RateLimiter(max_calls=30, window_seconds=3600)  # 30 copilot msgs/hour
 upload_limiter = RateLimiter(max_calls=10, window_seconds=3600)  # 10 CSV uploads/hour
+
+
+def client_ip(request: Request | None) -> str:
+    """Best-effort caller address (first X-Forwarded-For hop behind a proxy, else the socket peer)."""
+    if request is None:
+        return "unknown"
+    fwd = request.headers.get("x-forwarded-for", "")
+    if fwd:
+        return fwd.split(",")[0].strip() or "unknown"
+    return request.client.host if request.client else "unknown"
+
+
+def scoped_key(request: Request | None, user_id: str) -> str:
+    """Rate-limit key. Demo/guest ids are shared by every visitor, so they are keyed per (client, id);
+    real accounts stay keyed by user id alone."""
+    from app.core.auth import is_public_user
+
+    return f"{client_ip(request)}:{user_id}" if is_public_user(user_id) else user_id

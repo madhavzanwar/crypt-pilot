@@ -1,6 +1,4 @@
-> **Free route first:** this file describes Fly.io, which I believe needs a payment card (pricing could not be
-> checked from the development sandbox). For a $0 deployment (Hugging Face Spaces + Vercel Hobby) read
-> `docs/DEPLOY_NOTES.md`. The Dockerfile is shared by both routes.
+> **Free route:** a $0 deployment (Hugging Face Spaces + Vercel Hobby) uses `deploy/hf-space/`. The Dockerfile is shared by both routes. This file describes Fly.io, which may need a payment card (pricing was not checked).
 
 # Deploying the Cryptiq backend (Fly.io)
 

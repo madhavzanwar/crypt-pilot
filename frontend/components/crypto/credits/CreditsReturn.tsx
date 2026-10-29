@@ -51,6 +51,7 @@ export function CreditsCancelled({ failed = false }: { failed?: boolean }) {
 export function CreditsSuccess() {
   const status = (useSearchParams().get("status") ?? "").toLowerCase();
   const failed = status === "failed" || status === "cancelled" || status === "canceled";
+  const confirmed = ["succeeded", "success", "paid", "completed"].includes(status);
   const { balance, unavailable, refetch } = useCredits();
   const [tries, setTries] = useState(0);
 
@@ -75,9 +76,11 @@ export function CreditsSuccess() {
           <CircleCheck className="size-5" aria-hidden />
         </span>
         <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">Thank you</h1>
+          <h1 className="font-display text-2xl font-semibold text-ink">{confirmed ? "Thank you" : "Checking your payment"}</h1>
           <p className="mt-1 text-sm text-graphite">
-            Your test-mode payment came back from Dodo. Credits are added when Dodo confirms it, which can take a few seconds. No real charge was made.
+            {confirmed
+              ? "Your test-mode payment came back from Dodo. Credits are added when Dodo confirms it, which can take a few seconds. No real charge was made."
+              : "We have not had a confirmed payment status from Dodo yet. Credits are added only once it confirms, which can take a few seconds. No real charge was made."}
           </p>
         </div>
       </div>

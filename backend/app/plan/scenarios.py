@@ -4,7 +4,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from functools import lru_cache
 
-import numpy as np
 
 from app.plan.forecast import (
     N_PATHS,
@@ -18,7 +17,7 @@ from app.plan.forecast import (
     timeline,
 )
 from app.plan.planner import MAX_HORIZON, DebtIn, PlanInputs, _plan, shock_paths
-from app.plan.schemas import Constraints, Goal, OutcomeRow, ReplanResult, Scenario, Shock
+from app.plan.schemas import Constraints, Goal, OutcomeRow, Scenario, Shock
 from app.plan.synthetic import TOTAL, TRAIN_END, VAL_END, generate_monthly_history
 
 SPLIT = Split(TRAIN_END, VAL_END, TOTAL)

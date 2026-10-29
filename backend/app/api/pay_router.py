@@ -6,6 +6,7 @@ insights update from it. /live is a cheap change counter the open dashboard poll
 from __future__ import annotations
 
 import secrets
+import threading
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -22,6 +23,15 @@ from app.models import AccountRow, TransactionRow
 from app.schemas import AccountType
 
 router = APIRouter()
+
+_locks_guard = threading.Lock()
+_user_locks: dict[str, threading.Lock] = {}
+
+
+def user_lock(user_id: str) -> threading.Lock:
+    """One lock per user so balance check + deduct is atomic within this process (the handlers are sync, run in threads)."""
+    with _locks_guard:
+        return _user_locks.setdefault(user_id, threading.Lock())
 
 
 class PayBody(BaseModel):
@@ -86,6 +96,11 @@ def history(limit: int = 15, user_id: str = Depends(payer)) -> list[dict]:
 
 @router.post("/pay/{user_id}")
 def pay(body: PayBody, user_id: str = Depends(payer)) -> dict:
+    with user_lock(user_id):
+        return _pay_locked(body, user_id)
+
+
+def _pay_locked(body: PayBody, user_id: str) -> dict:
     acc = _account(user_id)
     merchant = body.payee_name.strip()
     category = categorize(merchant, body.amount).value

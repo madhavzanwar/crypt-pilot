@@ -23,4 +23,4 @@ def test_probe_rejects_unknown_key():
     import pytest
     from fastapi import HTTPException
     with pytest.raises(HTTPException):
-        ops_router.probe("NOT_A_KEY")
+        ops_router.probe("NOT_A_KEY", None, True)

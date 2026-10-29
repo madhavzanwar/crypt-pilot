@@ -93,6 +93,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(STORAGE_KEY) as CurrencyCode | null;
       if (saved && CURRENCIES[saved]) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- read localStorage after mount to avoid a hydration mismatch
         setCurrencyState(saved);
       }
     }

@@ -23,7 +23,8 @@ def read_session_id(request: Request, settings: Settings) -> str | None:
     if not raw or "." not in raw:
         return None
     sid, sig = raw.rsplit(".", 1)
-    if not hmac.compare_digest(sig, _sign(sid, settings.session_secret.get_secret_value())):
+    if not hmac.compare_digest(sig.encode("utf-8", "replace"),
+                              _sign(sid, settings.session_secret.get_secret_value()).encode()):
         return None
     return sid
 

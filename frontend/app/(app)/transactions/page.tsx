@@ -617,6 +617,7 @@ function ReviewQueueSection({
 
   useEffect(() => {
     if (currentTxn) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the draft when the card changes
       setSelectedCategory(currentTxn.category);
       setTags(currentTxn.tags || []);
       setNotes(currentTxn.notes || "");

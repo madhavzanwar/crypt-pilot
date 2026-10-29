@@ -96,24 +96,24 @@ export function NavShell({ children }: { children: ReactNode }) {
       <SidebarProvider>
         <AppSidebar
           footer={
-            <div className="xl:hidden">
+            <div className="2xl:hidden">
               <PersonaSwitcher />
             </div>
           }
         />
         <SidebarInset className="min-w-0 overflow-x-hidden bg-transparent">
-          <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 bg-background/70 px-4 backdrop-blur-md">
+          <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 bg-background/70 px-3 backdrop-blur-md sm:px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
-            <Breadcrumb className="min-w-0">
+            <Breadcrumb className="min-w-0 shrink-0">
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbPage className={cn("truncate font-display font-semibold text-ink", isDashboard ? "text-3xl sm:text-4xl" : "text-2xl")}>{current?.label ?? "FinPilot"}</BreadcrumbPage>
+                  <BreadcrumbPage className={cn("truncate font-display font-semibold text-ink", isDashboard ? "text-3xl sm:text-4xl" : "text-xl sm:text-2xl")}>{current?.label ?? "FinPilot"}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
 
-            <div className="ml-auto flex shrink-0 items-center gap-2">
+            <div className="ml-auto flex min-w-0 shrink items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
                 onClick={() => window.dispatchEvent(new CustomEvent("finpilot:open-command-palette"))}
@@ -141,7 +141,7 @@ export function NavShell({ children }: { children: ReactNode }) {
                 <LanguageSwitcher />
                 <CurrencySelector />
               </div>
-              <div className="hidden xl:block">
+              <div className="hidden 2xl:block">
                 <PersonaSwitcher />
               </div>
               <CreditsPill />

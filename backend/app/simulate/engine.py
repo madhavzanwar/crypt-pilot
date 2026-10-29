@@ -202,8 +202,6 @@ def _do_reduce_category_spend(inputs: ForecastInputs, params: dict, health_befor
     forecast_after = _forecast_from(inputs, transactions_override=adjusted)
 
     monthly_reduction = abs(avg_before - avg_after) * 30
-    fcf_before = _free_cash_flow(inputs.recurring)
-    fcf_after = fcf_before + monthly_reduction
     health_after = _approx_health_delta(monthly_reduction, health_before)
 
     impact = ImpactEstimate(

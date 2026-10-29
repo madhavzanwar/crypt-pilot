@@ -8,14 +8,20 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Header, HTTPException, UploadFile
+from typing import Optional
+from datetime import date as date_type
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, UploadFile
+
+from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from app.analytics.recurring import normalize_merchant
 from app.copilot.engine import answer as copilot_answer
-from app.core.auth import DEMO_USER_IDS, resolve_user_id
+from app.core.auth import DEMO_USER_IDS, is_public_user, resolve_user_id, verify_token
 from app.core.config import get_settings
 from app.core import store
-from app.core.ratelimit import chat_limiter, upload_limiter
+from app.core.ratelimit import RateLimiter, chat_limiter, scoped_key, upload_limiter
 from app.copilot.watcher import watch
 from app.forecast.alerts import maybe_send_gap_alert
 from app.ingest.categorize import categorize
@@ -26,6 +32,7 @@ from app.schemas import (
     AnswerContract,
     ChatRequest,
     DashboardSnapshot,
+    TxnCategory,
     RecomputeDiff,
     SimulationRequest,
     SimulationResult,
@@ -33,6 +40,7 @@ from app.schemas import (
 from app.simulate.engine import ForecastInputs, simulate
 
 router = APIRouter()
+_alert_limiter = RateLimiter(3, 3600)  # gap-alert emails per account per hour
 
 _LIQUID_ACCOUNT_TYPES = {"checking", "savings"}
 
@@ -97,10 +105,10 @@ async def _resolve_body_user_id(req: ChatRequest, authorization: str | None = He
 
 
 @router.post("/chat", response_model=AnswerContract)
-def chat(req: ChatRequest, user_id: str = Depends(_resolve_body_user_id)) -> AnswerContract:
+def chat(req: ChatRequest, request: Request, user_id: str = Depends(_resolve_body_user_id)) -> AnswerContract:
     if not req.message.strip():
         raise HTTPException(400, "message must not be empty")
-    chat_limiter.check(user_id)
+    chat_limiter.check(scoped_key(request, user_id))
     return copilot_answer(user_id, req.message, force_offline=req.force_offline, model=req.model, history=req.history[-10:], language=req.language, simple=req.simple)
 
 
@@ -128,7 +136,7 @@ def run_simulation(req: SimulationRequest, user_id: str = Depends(resolve_user_i
 
 
 @router.post("/upload/{user_id}", response_model=RecomputeDiff)
-async def upload_transactions(file: UploadFile, user_id: str = Depends(resolve_user_id)) -> RecomputeDiff:
+async def upload_transactions(file: UploadFile, request: Request, user_id: str = Depends(resolve_user_id)) -> RecomputeDiff:
     """Accepts a multipart bank-statement CSV, parses + categorizes it, and
     persists the resulting transactions for `user_id`. account_id defaults to
     a synthetic per-user "uploaded" account since bank CSV exports rarely
@@ -138,8 +146,8 @@ async def upload_transactions(file: UploadFile, user_id: str = Depends(resolve_u
     was last cached for this user (or a freshly computed one if none was
     cached yet), "after" is recomputed post-ingest.
     """
-    upload_limiter.check(user_id)
-    raw = await file.read()
+    upload_limiter.check(scoped_key(request, user_id))
+    raw = await file.read(_MAX_UPLOAD_BYTES + 1)
     if not raw:
         raise HTTPException(400, "uploaded file is empty")
     if len(raw) > _MAX_UPLOAD_BYTES:
@@ -219,6 +227,37 @@ def _build_recompute_diff(*, trigger: str, before: DashboardSnapshot, after: Das
     )
 
 
+class EventPayload(BaseModel):
+    """Typed /events body. Extra keys are tolerated (and stored), but every field the handler uses is validated."""
+
+    model_config = ConfigDict(extra="allow")
+    kind: str = "transaction"
+    amount: Optional[float] = Field(default=None, allow_inf_nan=False)
+    merchant: str = Field(default="Manual entry", min_length=1, max_length=200)
+    category: Optional[TxnCategory] = None
+    date: Optional[date_type] = None
+    next_expected_date: Optional[date_type] = None
+    frequency: str = "monthly"
+    account_id: Optional[str] = Field(default=None, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=500)
+    is_recurring: bool = False
+    recurring_group_id: Optional[str] = Field(default=None, max_length=200)
+
+    @field_validator("merchant", mode="before")
+    @classmethod
+    def _merchant_default(cls, v):
+        return "Manual entry" if v is None else v
+
+
+def _check_account(user_id: str, account_id: str | None) -> None:
+    """An event may only be booked to one of the caller's own accounts (or their synthetic per-user ones)."""
+    if not account_id or account_id in (f"acc-events-{user_id}", f"acc-uploaded-{user_id}"):
+        return
+    acc = store.get(AccountRow, account_id)
+    if acc is None or acc.user_id != user_id:
+        raise HTTPException(400, "account_id does not belong to this user")
+
+
 @router.post("/events/{user_id}", response_model=RecomputeDiff)
 def add_event(payload: dict, user_id: str = Depends(resolve_user_id)) -> RecomputeDiff:
     """Persist a new event (transaction, income, or debt) for `user_id`, then
@@ -232,7 +271,17 @@ def add_event(payload: dict, user_id: str = Depends(resolve_user_id)) -> Recompu
        "account_id": "..." (optional -- defaults to the user's first
        checking account, or a synthetic "acc-events-{user_id}")}
     """
+    raw_payload = payload
     kind = payload.get("kind", "transaction")
+    if kind not in ("transaction", "recurring"):
+        raise HTTPException(400, f"Unsupported event kind: {kind!r}")
+    if payload.get("amount") is None:
+        raise HTTPException(400, f"{kind} event requires 'amount'")
+    try:
+        ev = EventPayload.model_validate(payload)
+    except ValidationError as exc:
+        raise HTTPException(422, "; ".join(f"{'.'.join(map(str, e['loc']))}: {e['msg']}" for e in exc.errors())) from exc
+    _check_account(user_id, ev.account_id)
     new_txns: list[TransactionRow] = []
 
     def _default_checking_account(account_id: str | None) -> str:
@@ -256,34 +305,23 @@ def add_event(payload: dict, user_id: str = Depends(resolve_user_id)) -> Recompu
     before = get_last_snapshot(user_id) or build_dashboard_snapshot(user_id)
 
     if kind == "transaction":
-        amount = payload.get("amount")
-        if amount is None:
-            raise HTTPException(400, "transaction event requires 'amount'")
-        merchant = payload.get("merchant", "Manual entry")
-        category = payload.get("category")
-        if category:
-            category_value = category
-        else:
-            category_value = categorize(merchant, float(amount)).value
-        txn_date_str = payload.get("date")
-        txn_date = (
-            datetime.strptime(txn_date_str, "%Y-%m-%d").date()
-            if txn_date_str
-            else datetime.now(timezone.utc).date()
-        )
-        account_id = _default_checking_account(payload.get("account_id"))
+        amount = ev.amount
+        merchant = ev.merchant
+        category_value = ev.category.value if ev.category else categorize(merchant, amount).value
+        txn_date = ev.date or datetime.now(timezone.utc).date()
+        account_id = _default_checking_account(ev.account_id)
 
         new_txns.append(
             TransactionRow(
                 user_id=user_id,
                 account_id=account_id,
                 date=txn_date,
-                amount=float(amount),
+                amount=amount,
                 merchant=merchant,
                 category=category_value,
-                description=payload.get("description"),
-                is_recurring=bool(payload.get("is_recurring", False)),
-                recurring_group_id=payload.get("recurring_group_id"),
+                description=ev.description,
+                is_recurring=ev.is_recurring,
+                recurring_group_id=ev.recurring_group_id,
             )
         )
         store.put(*new_txns)
@@ -297,25 +335,16 @@ def add_event(payload: dict, user_id: str = Depends(resolve_user_id)) -> Recompu
         # occurrences at the chosen cadence instead, which makes the new
         # obligation show up on the very next dashboard fetch exactly
         # like every other recurring obligation.
-        amount = payload.get("amount")
-        if amount is None:
-            raise HTTPException(400, "recurring event requires 'amount'")
-        merchant = payload.get("merchant", "Manual entry")
-        frequency = payload.get("frequency", "monthly")
+        merchant = ev.merchant
+        frequency = ev.frequency
         interval_days = _FREQUENCY_INTERVAL_DAYS.get(frequency, 30)
-        anchor_str = payload.get("next_expected_date")
-        anchor = (
-            datetime.strptime(anchor_str, "%Y-%m-%d").date()
-            if anchor_str
-            else datetime.now(timezone.utc).date()
-        )
+        anchor = ev.next_expected_date or datetime.now(timezone.utc).date()
         # A recurring "obligation" is a commitment (rent, EMI,
         # subscription, ...) -- always an outflow, regardless of the sign
         # the caller passed in.
-        signed_amount = -abs(float(amount))
-        category = payload.get("category")
-        category_value = category if category else categorize(merchant, signed_amount).value
-        account_id = _default_checking_account(payload.get("account_id"))
+        signed_amount = -abs(ev.amount)
+        category_value = ev.category.value if ev.category else categorize(merchant, signed_amount).value
+        account_id = _default_checking_account(ev.account_id)
 
         # Use the same normalization detect_recurring() applies so a
         # group id assigned here matches what recurring-detection would
@@ -333,15 +362,13 @@ def add_event(payload: dict, user_id: str = Depends(resolve_user_id)) -> Recompu
                     amount=signed_amount,
                     merchant=merchant,
                     category=category_value,
-                    description=payload.get("description"),
+                    description=ev.description,
                     is_recurring=True,
                     recurring_group_id=group_id,
                 )
             )
-    else:
-        raise HTTPException(400, f"Unsupported event kind: {kind!r}")
 
-    store.put(EventRow(user_id=user_id, kind=kind, payload_json=json.dumps(payload, default=str)))
+    store.put(EventRow(user_id=user_id, kind=kind, payload_json=json.dumps(raw_payload, default=str)))
 
     after = build_dashboard_snapshot(user_id)
 
@@ -351,18 +378,27 @@ def add_event(payload: dict, user_id: str = Depends(resolve_user_id)) -> Recompu
 
 
 @router.post("/alerts/gap/{user_id}")
-def send_gap_alert(payload: dict, user_id: str = Depends(resolve_user_id)) -> dict:
+async def send_gap_alert(payload: dict, user_id: str = Depends(resolve_user_id), authorization: str | None = Header(default=None)) -> dict:
     """Explicit, user-triggered cash-flow gap alert email. Not called
     automatically by any other route -- must be invoked by a frontend
-    button so we never spam users on every dashboard load."""
+    button so we never spam users on every dashboard load.
+
+    The mail goes ONLY to the verified e-mail of the signed-in account: demo/guest sandboxes have none, and an
+    address in the payload that differs from the account's is refused (this was an open mail relay)."""
     settings = get_settings()
     if not settings.has_resend:
         raise HTTPException(503, "Email alerts are not configured (no RESEND_API_KEY).")
-
-    user_email = payload.get("email")
-    if not user_email:
-        raise HTTPException(400, "payload must include 'email'")
-
+    if is_public_user(user_id) or not authorization:
+        raise HTTPException(403, "Gap alerts can only be emailed to a signed-in account's own address")
+    _, _, token = authorization.partition(" ")
+    claims = await run_in_threadpool(verify_token, token)
+    own_email = (claims.get("email") or "").strip().lower()
+    if not own_email or not claims.get("email_verified", True):
+        raise HTTPException(403, "Your account has no verified email address")
+    asked = (payload.get("email") or own_email).strip().lower()
+    if asked != own_email:
+        raise HTTPException(403, "Alerts can only be sent to your own account email")
+    _alert_limiter.check(user_id)
     snap = build_dashboard_snapshot(user_id)
-    sent = maybe_send_gap_alert(user_email, snap.forecast)
+    sent = maybe_send_gap_alert(own_email, snap.forecast)
     return {"sent": sent}

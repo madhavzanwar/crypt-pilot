@@ -427,7 +427,6 @@ def _stub_simulation(snap, action_enum: ActionType, action_params: dict) -> dict
 
     if action_enum == ActionType.affordability_check:
         amount = float(action_params.get("amount", 0.0))
-        months_of_buffer = (free_cash_flow / amount) if amount else None
         affordable = bool(amount and amount <= max(free_cash_flow, 0) * 2)
         return {
             "note": "STUB estimate -- app.simulate.engine not available in this branch.",

@@ -61,9 +61,10 @@ export function TxnSummary() {
 
   const topIncome = useMemo(() => {
     const m = new Map<string, number>();
-    for (const t of txns) if (t.category === "income" && t.amount > 0 && latest && t.date.startsWith(latest.month)) m.set(t.merchant, (m.get(t.merchant) ?? 0) + t.amount);
+    const latestMonth = spend.months.at(-1)?.month;
+    for (const t of txns) if (t.category === "income" && t.amount > 0 && latestMonth && t.date.startsWith(latestMonth)) m.set(t.merchant, (m.get(t.merchant) ?? 0) + t.amount);
     return [...m].sort((a, b) => b[1] - a[1])[0];
-  }, [txns, latest]);
+  }, [txns, spend.months]);
   const topCat = [...spend.categories].filter((c) => c.total > 0).sort((a, b) => b.total - a.total)[0];
 
   const inPct = topIncome && income > 0 ? (topIncome[1] / income) * 100 : 0;

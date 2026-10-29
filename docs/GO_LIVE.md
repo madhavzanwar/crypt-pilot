@@ -12,7 +12,7 @@ Prerequisites (Windows: `winget install ...`): Git, Node 20+, Python 3.11+, `uv`
 (`Cloudflare.cloudflared`). The Elliptic++ data and model are fetched from your **private** Hugging Face dataset repo.
 
 1. `git clone https://github.com/madhavzanwar/crypt-pilot` and `cd crypt-pilot`.
-2. Backend deps once: `cd backend && python -m venv .venv && .venv\Scripts\pip install -r requirements.txt && cd ..`
+2. Backend deps once: `cd backend && python -m venv .venv && .venv\Scripts\pip install -r requirements-local.txt && cd ..`
    (Linux/macOS: `.venv/bin/pip`).
 3. Start the tunnel in its own terminal and keep it open: `cloudflared tunnel --url http://localhost:3100`.
    It prints `https://<random-words>.trycloudflare.com`. That is your **public URL**; it changes every time you restart

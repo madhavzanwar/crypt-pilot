@@ -84,10 +84,14 @@ app = FastAPI(title="FinPilot API", version="0.1.0", lifespan=lifespan)
 # origins trusted (fails closed, not open).
 _prod_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 
+# The localhost regex is dev-only: on by default only when no production origins are configured, or when
+# ALLOW_LOCALHOST_CORS=true is set explicitly.
+_allow_localhost = os.getenv("ALLOW_LOCALHOST_CORS", "" if _prod_origins else "true").lower() == "true"
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_prod_origins,
-    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1):\d+$",
+    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1):\d+$" if _allow_localhost else None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -149,13 +153,16 @@ async def audit_log_middleware(request: Request, call_next):
         # user_id is always the 3rd segment for these resources (even when
         # further sub-path segments follow, e.g. /api/budgets/{user_id}/status
         # or /api/transactions/{user_id}/{transaction_id}).
-        if parts[1] in {"transactions", "budgets", "goals", "tax", "rules", "household", "plan", "profile", "aa"}:
+        if parts[1] in {"transactions", "budgets", "goals", "tax", "rules", "household", "plan", "profile", "aa", "security", "connectors", "documents", "pay", "expenses", "plaid"}:
             return parts[2]
 
         # For these, user_id is the LAST segment (/api/dashboard/{user_id},
         # /api/alerts/gap/{user_id}, /api/accounts/{user_id}, etc.).
         if parts[1] in {"dashboard", "simulate", "upload", "events", "alerts", "accounts", "notifications"}:
             return parts[-1]
+        # /api/ocr/extract/{user_id}, /api/ocr/import/{user_id}
+        if parts[1] == "ocr" and len(parts) >= 4:
+            return parts[3]
         # /api/networth/{user_id}/history
         if parts[1] == "networth":
             return parts[2]
