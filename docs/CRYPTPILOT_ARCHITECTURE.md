@@ -118,15 +118,15 @@ flowchart TB
 
 Why the crypto service is a separate container, not part of the Vercel project:
 
-| Item | Measured (Cryptiq notes, 4 CPUs, 16 GB RAM, real Elliptic++ data) |
+| Item | Reported in the earlier Cryptiq notes (4 CPUs, 16 GB RAM, real Elliptic++ data); not re-measured in this repository |
 |---|---|
 | Scorer only (what a TigerGraph-backed deployment needs): load / peak RSS | 1.1 s / 1,006 MB; score median 14.4 ms, p95 20.3 ms |
 | Full API with the NetworkX engine (graph in memory): startup / RSS | 28 s / 2,605 MB |
 | Image size | 952 MB without ffmpeg, 1.58 GB with ffmpeg |
 
-So a serverless function is not a fit: the scorer needs about 1 GB and the NetworkX engine about 2.6 GB. A 2 GB machine is enough only for a TigerGraph-backed (or replay-only) deployment. TigerGraph query time over a network (p50 669.86 ms, p95 774.72 ms) and LLM time were measured separately; deployed latency is **not measured**.
+So a serverless function is not a fit: the scorer needs about 1 GB and the NetworkX engine about 2.6 GB. A 2 GB machine is enough only for a TigerGraph-backed (or replay-only) deployment. The earlier notes also report TigerGraph query time over a network (p50 669.86 ms, p95 774.72 ms); that workspace was suspended on 2026-10-29, so it was not reproduced. Deployed latency is **not measured**.
 
-Data never ships in the image or the repo (Elliptic++ has no stated licence). At start the container runs `python -m scripts.fetch_artifacts`, which downloads `data/` and `artifacts/` from a **private** Hugging Face dataset repo (`ARTIFACTS_REPO`, read token in `HF_TOKEN`), allowlisted paths only, with a size cap, and never logs the token. First live run: 27 files, 232,036,359 bytes, 7.5 s.
+Data never ships in the image or the repo (Elliptic++ has no stated licence). At start the container runs `python -m scripts.fetch_artifacts`, which downloads `data/` and `artifacts/` from a **private** Hugging Face dataset repo (`ARTIFACTS_REPO`, read token in `HF_TOKEN`), allowlisted paths only, with a size cap, and never logs the token. An earlier run reported 27 files, 232,036,359 bytes, 7.5 s (not re-run here).
 
 Hosting options:
 

@@ -4,6 +4,8 @@ These cannot be done from the development sandbox, which can only make outgoing 
 inbound traffic, no tunnels, no wallets, no accounts). Each step says what to do and **how to check it worked**.
 Everything is free and test-mode / testnet only. Never paste a key into chat or a commit; put them in `.env` files.
 
+**Status: none of these steps has been performed by the project. This file is a checklist, not a record of what works.** Each "Check" says what you should see; record what you actually saw in `docs/CRYPTPILOT.md`.
+
 Order: 0 -> 1 -> 2 (Dodo) -> 3 (Bitcoin testnet) -> 4 (attestation) -> 5 (Wispr, optional).
 
 ## 0. Run the stack on your laptop with a public URL (about 15 minutes)
@@ -20,9 +22,11 @@ Prerequisites (Windows: `winget install ...`): Git, Node 20+, Python 3.11+, `uv`
 4. Create ONE file named `.env` in the repo root (git ignores it; the start script reads it and passes every value to all three
    processes; names are in `crypto-service/.env.example`):
    `APP_ENV=prod`, `SESSION_SECRET`, `LOG_SALT`, `ADMIN_TOKEN` (each `openssl rand -hex 32`), `COOKIE_SECURE=true`,
-   `GRAPH_ENGINE=tigergraph`, `TG_HOST`, `TG_GRAPH=Cryptiq`, `TG_SECRET`, `LLM_PROVIDER=openai_compatible`,
+   `GRAPH_ENGINE` (`tigergraph`, with `TG_HOST`, `TG_GRAPH=Cryptiq`, `TG_SECRET`; or `networkx`, which needs about 2.6 GB of RAM and no TigerGraph), `LLM_PROVIDER=openai_compatible`,
    `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `LLM_JSON_MODE=true`, `SARVAM_API_KEY`, `SARVAM_STT_MODEL=saaras:v4`,
    `SARVAM_TTS_MODEL=bulbul:v4-flash`, `ARTIFACTS_REPO=<you>/cryptiq-artifacts`, `HF_TOKEN` (read-only token).
+   TigerGraph Savanna auto-suspends idle workspaces (it was suspended on 2026-10-29); resume it in the Savanna console first, or use `networkx`.
+   The launchers read `.env` as plain `KEY=value` lines (one pair of outer quotes is removed), so JSON values such as `PACKS_JSON` can be written as-is.
 5. Start everything with the public URL:
    - PowerShell: `$env:FRONTEND_URL="https://<your-tunnel>.trycloudflare.com"; $env:CRYPTPILOT_WEB_MODE="prod"; powershell -ExecutionPolicy Bypass -File scripts\run_cryptpilot_demo.ps1`
    - bash: `FRONTEND_URL=https://<tunnel> CRYPTPILOT_WEB_MODE=prod scripts/run_cryptpilot_demo.sh`
@@ -30,9 +34,9 @@ Prerequisites (Windows: `winget install ...`): Git, Node 20+, Python 3.11+, `uv`
    `prod` builds the frontend (about a minute); the dev server refuses tunnel hostnames.
 
 **Check:** open `https://<tunnel>/api/crypto/status` in a browser. You want
-`{"configured":true,"reachable":true,"engine":"tigergraph","dataSource":"elliptic++", ...}`.
+`{"configured":true,"reachable":true,"engine":"<tigergraph or networkx, whichever you set>","dataSource":"elliptic++", ...}`.
 Then open `https://<tunnel>`, press "Explore Demo App", open Wallet Guard, run the BLOCK example.
-(The PowerShell script has never been run on Windows. If it fails, the error is in `.demo-logs/*.err.log`.)
+(The PowerShell script has never been run on Windows. If it fails, the error is in `.demo-logs/*.err.log`. The bash script is the one that has been exercised, on Linux only.)
 
 ## 1. (included in step 0)
 
@@ -49,7 +53,7 @@ Then open `https://<tunnel>`, press "Explore Demo App", open Wallet Guard, run t
 
 **Check (all four):** you are returned to `/credits/success`; the credits pill goes up by 5 (and stays up after
 a reload); in Dodo -> Webhooks the delivery shows `200`; replaying the same delivery from Dodo's dashboard does **not**
-add credits a second time (the service de-duplicates by event id). A wrong signature must return `401`:
+add credits a second time (the service is meant to de-duplicate by event id; this is unit-tested only, so confirm it here). A wrong signature must return `401`:
 `curl -i -X POST https://<tunnel>/api/crypto/webhooks/dodo -d "{}"` -> `401 invalid_signature`.
 
 ## 3. Bitcoin testnet: one real invoice paid
