@@ -80,7 +80,7 @@ async def test_forged_unsigned_firebase_token_is_rejected(monkeypatch):
     """Regression: a token claiming a Firebase issuer used to be trusted
     without signature verification, letting anyone impersonate any user."""
     monkeypatch.setattr(auth_module.google_id_token, "_fetch_certs", lambda *a, **k: {})  # no network
-    forged = _fake_jwt({"iss": "https://securetoken.google.com/hackmatrix-3764f", "sub": "user-A", "exp": time.time() + 3600})
+    forged = _fake_jwt({"iss": "https://securetoken.google.com/cryptpilot-madhav-01", "sub": "user-A", "exp": time.time() + 3600})
     with pytest.raises(HTTPException) as exc_info:
         await resolve_user_id(user_id="user-A", authorization=f"Bearer {forged}")
     assert exc_info.value.status_code == 401
