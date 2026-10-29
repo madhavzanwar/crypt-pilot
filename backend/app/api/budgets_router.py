@@ -12,7 +12,8 @@ from datetime import date, datetime, timezone
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.analytics.recurring import detect_recurring
+from app.analytics.cashflow_basis import avg_income_expenses, committed_merchants, committed_monthly
+from app.analytics.recurring import detect_recurring, normalize_merchant
 from app.core import store
 from app.core.auth import resolve_user_id
 from app.models import BudgetRow, TransactionRow
@@ -233,40 +234,9 @@ def budget_status(user_id: str = Depends(resolve_user_id)) -> list[BudgetStatus]
 
 
 def _monthly_income(df: pd.DataFrame, recurring_all: list[RecurringObligation]) -> float:
-    """Monthly income used as the safe-to-spend basis. Prefer the detected
-    recurring income series (app.analytics.recurring.detect_recurring),
-    since it's the same salary-cadence signal the dashboard snapshot uses.
-    Falls back to a trailing-3-month average of positive (income-labeled)
-    transactions if no recurring income series was detected yet (e.g. fewer
-    than 3 salary credits on record)."""
-    income_recurring = [r for r in recurring_all if r.category == TxnCategory.income]
-    if income_recurring:
-        return float(income_recurring[0].amount)
-
-    if df.empty:
-        return 0.0
-    as_of = df["date"].max()
-    window_start = as_of - pd.DateOffset(months=3)
-    window = df[(df["date"] > window_start) & (df["date"] <= as_of)]
-    income_txns = window[(window["category"] == TxnCategory.income.value) & (window["amount"] > 0)]
-    if income_txns.empty:
-        return 0.0
-    return float(income_txns["amount"].sum()) / 3.0
-
-
-def _monthly_equivalent_obligation(r: RecurringObligation) -> float:
-    """Normalize a recurring obligation's magnitude to a monthly run-rate so
-    weekly/biweekly/quarterly/annual commitments are comparable on the same
-    monthly basis as `monthly_income`. E.g. a quarterly ₹3000 payment is
-    ₹1000/month of committed obligation."""
-    interval_days = {
-        "weekly": 7,
-        "biweekly": 14,
-        "monthly": 30,
-        "quarterly": 90,
-        "annual": 365,
-    }.get(r.frequency.value, 30)
-    return abs(r.amount) * (30.0 / interval_days)
+    """Monthly income used as the safe-to-spend basis: the same trailing-3-month average the dashboard and the statement
+    show (app.analytics.cashflow_basis.avg_income_expenses), so the three pages cannot disagree."""
+    return avg_income_expenses(df)[0]
 
 
 @router.get("/budgets/{user_id}/safe-to-spend", response_model=SafeToSpend)
@@ -286,19 +256,20 @@ def safe_to_spend(user_id: str = Depends(resolve_user_id)) -> SafeToSpend:
         )
 
     Where:
-      * `monthly_income` -- see `_monthly_income` (detected recurring salary
-        cadence, or a trailing-3-month average fallback).
-      * `committed_recurring_this_month` -- every detected recurring
-        obligation (app.analytics.recurring.detect_recurring; excludes the
-        income entry itself) normalized to a monthly-equivalent run-rate
-        (see `_monthly_equivalent_obligation`), summed. This represents cash
+      * `monthly_income` -- the trailing-3-month average inflow, the same
+        number the dashboard and the statement show (cashflow_basis).
+      * `committed_recurring_this_month` -- detected recurring obligations in
+        committed categories only (rent, EMIs, utilities, subscriptions,
+        education, SIPs; not habits like dining/shopping and not the card
+        bill) at a monthly-equivalent run-rate (app.analytics.cashflow_basis),
+        summed. This represents cash
         already earmarked for rent/EMI/subscriptions/etc. regardless of
         whether its exact due date has occurred yet this month -- it is a
         planning number, not a ledger of what's already left the account.
       * `discretionary_spend_so_far_this_month` -- actual outflow
         transactions dated in the current calendar month that are NOT
-        themselves part of a detected recurring series (is_recurring is
-        False) and are not transfers/CC-bill-payments (see
+        payments to a committed merchant (so nothing is counted twice) and
+        are not transfers/CC-bill-payments (see
         `_EXCLUDED_FROM_SPEND`) -- i.e. the spend that competes with
         "safe to spend today" money, as opposed to money already
         earmarked/committed.
@@ -314,9 +285,8 @@ def safe_to_spend(user_id: str = Depends(resolve_user_id)) -> SafeToSpend:
     recurring_all = detect_recurring(df)
 
     monthly_income = _monthly_income(df, recurring_all)
-    committed_recurring = sum(
-        _monthly_equivalent_obligation(r) for r in recurring_all if r.category != TxnCategory.income
-    )
+    committed_recurring = committed_monthly(recurring_all)  # rent, EMIs, utilities, subscriptions, education, SIPs only
+    committed_names = committed_merchants(recurring_all)
 
     if df.empty:
         discretionary_spent = 0.0
@@ -325,7 +295,7 @@ def safe_to_spend(user_id: str = Depends(resolve_user_id)) -> SafeToSpend:
             (df["amount"] < 0)
             & (df["date"].dt.year == today.year)
             & (df["date"].dt.month == today.month)
-            & (~df["is_recurring"].astype(bool))
+            & (~df["merchant"].map(normalize_merchant).isin(committed_names))  # committed payments are not spend twice
             & (~df["category"].isin(_EXCLUDED_FROM_SPEND))
         ]
         discretionary_spent = float(-discretionary["amount"].sum())
@@ -333,8 +303,16 @@ def safe_to_spend(user_id: str = Depends(resolve_user_id)) -> SafeToSpend:
     days_in_month = calendar.monthrange(today.year, today.month)[1]
     days_remaining = max(1, days_in_month - today.day + 1)
 
-    raw = (monthly_income - committed_recurring - discretionary_spent) / days_remaining
-    amount = max(0.0, raw)
+    left = monthly_income - committed_recurring - discretionary_spent
+    amount = max(0.0, left / days_remaining)
+    shortfall = max(0.0, -left)
+    # Never a "good" state at zero: nothing safe left (or committed payments above income) is a warning.
+    if amount <= 0:
+        status = "none"
+    elif amount < 0.5 * max(0.0, monthly_income - committed_recurring) / days_in_month:
+        status = "tight"
+    else:
+        status = "ok"
 
     basis = (
         f"(monthly income ₹{monthly_income:,.0f} - committed recurring "
@@ -343,4 +321,4 @@ def safe_to_spend(user_id: str = Depends(resolve_user_id)) -> SafeToSpend:
         f"{today.strftime('%B %Y')}, floored at 0."
     )
 
-    return SafeToSpend(amount=round(amount, 2), basis=basis, as_of_date=today)
+    return SafeToSpend(amount=round(amount, 2), basis=basis, as_of_date=today, status=status, shortfall=round(shortfall, 2))
