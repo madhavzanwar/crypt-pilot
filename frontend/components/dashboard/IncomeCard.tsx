@@ -2,7 +2,7 @@ import { useT } from "@/lib/i18n";
 import { TrendingDown, TrendingUp, Zap } from "lucide-react";
 import type { Transaction } from "@/lib/types";
 import type { MonthTotals } from "@/lib/spend";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { BigAmount } from "@/components/dashboard/BigAmount";
 
 const SOURCE_COLORS = ["border-[#3f7d5c]", "border-lime-dark", "border-[#4fe0b0]"];
@@ -27,19 +27,19 @@ export function IncomeCard({ months, txns }: { months: MonthTotals[]; txns: Tran
   const tone = delta >= 0 ? "text-leaf" : "text-rose-600";
 
   return (
-    <div className="flex h-full flex-col justify-between gap-4 rounded-card bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between text-sm font-medium text-ink">
+    <div className="flex h-full min-w-0 flex-col justify-between gap-4 overflow-hidden rounded-card bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-sm font-medium text-ink">
         <span>{tr("i.title")}</span>
         <span className="text-graphite">
           {latest ? new Date(`${latest.month}-01`).toLocaleDateString(lang, { month: "long", year: "numeric" }) : tr("i.nodata")}
         </span>
       </div>
-      <div className="flex items-end justify-between gap-3">
-        <div>
+      <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-3">
+        <div className="min-w-0">
           <p className="text-sm text-graphite">{tr("i.sub")}</p>
           <BigAmount value={total} className="mt-1 block text-3xl" />
         </div>
-        <div className="flex items-end gap-1" aria-hidden>
+        <div className="flex shrink-0 items-end gap-1" aria-hidden>
           {months.map((m) => {
             const filled = Math.max(1, Math.round((m.income / max) * ROWS));
             return (
@@ -53,7 +53,7 @@ export function IncomeCard({ months, txns }: { months: MonthTotals[]; txns: Tran
         </div>
       </div>
       <div className="flex flex-wrap gap-2 text-xs text-graphite">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-fog px-3 py-2">
+        <span className="inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-2xl bg-fog px-3 py-2">
           {delta >= 0 ? <TrendingUp className="size-4 text-ink" /> : <TrendingDown className="size-4 text-ink" />}
           {tr("i.last")} <span className="font-semibold tnum text-ink">{prev ? formatCurrency(prev.income) : "--"}</span>
           {tr("home.this_month")} <span className="font-semibold tnum text-ink">{formatCurrency(total)}</span>

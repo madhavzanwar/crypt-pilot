@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
 import type { AnswerContract, Debt, RecurringObligation, RecurrenceFrequency } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 
 const TONES = ["#5f7f0c", "#a6d11a", "#4fe0b0", "#3f7d5c", "#cddaa6"];
 const ASSET_TYPES = ["checking", "savings", "investment"];

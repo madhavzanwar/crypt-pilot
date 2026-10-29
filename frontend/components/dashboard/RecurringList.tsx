@@ -16,7 +16,9 @@ import { Badge } from "@/components/shadcn/badge";
 import { Button } from "@/components/shadcn/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/shadcn/table";
 import { ConfidenceChip } from "@/components/ui/ConfidenceChip";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
+import { categoryLabel } from "@/components/ui/labels";
 
 function SortHeader({
   label,
@@ -60,8 +62,8 @@ const columns: ColumnDef<RecurringObligation>[] = [
     accessorKey: "category",
     header: "Category",
     cell: ({ row }) => (
-      <Badge variant="secondary" className="hidden capitalize sm:inline-flex">
-        {row.original.category.replace(/_/g, " ")}
+      <Badge variant="secondary" className="hidden sm:inline-flex">
+        {categoryLabel(row.original.category)}
       </Badge>
     ),
   },

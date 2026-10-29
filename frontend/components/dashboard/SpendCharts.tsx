@@ -16,7 +16,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
 import { MerchantLogo } from "@/components/dashboard/MerchantLogo";
-import { formatCurrency } from "@/lib/format";
+import { formatAxisCurrency, formatCurrency } from "@/components/ui/money";
 import type { SpendSummary } from "@/lib/spend";
 
 const TOOLTIP_STYLE = {
@@ -27,8 +27,7 @@ const TOOLTIP_STYLE = {
   boxShadow: "0 8px 0 rgba(20,33,61,0.05)",
 };
 
-const compact = (v: number) =>
-  v >= 100000 ? `₹${(v / 100000).toFixed(1)}L` : v >= 1000 ? `₹${Math.round(v / 1000)}k` : `₹${v}`;
+const compact = formatAxisCurrency;
 
 function Empty({ children }: { children: string }) {
   return <p className="py-10 text-center text-sm text-pewter">{children}</p>;
@@ -49,7 +48,7 @@ export function CategoryDonut({ summary }: { summary: SpendSummary }) {
         ) : (
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-8">
             <div className="relative h-56 w-56 shrink-0">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                 <PieChart>
                   <Pie data={top} dataKey="total" nameKey="label" innerRadius={66} outerRadius={104} paddingAngle={3} cornerRadius={6} stroke="none" isAnimationActive={false}>
                     {top.map((c) => (
@@ -96,7 +95,7 @@ export function IncomeVsSpend({ summary }: { summary: SpendSummary }) {
           <Empty>{t("sc.history")}</Empty>
         ) : (
           <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
               <BarChart data={summary.months} barGap={4} margin={{ left: -8, right: 4, top: 8 }}>
                 <CartesianGrid vertical={false} stroke="var(--color-mist)" strokeDasharray="4 4" />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--color-pewter)" }} />

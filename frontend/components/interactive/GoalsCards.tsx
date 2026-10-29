@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { motion, useInView, useReducedMotion } from "framer-motion";
 import { ShieldCheck, Zap, Plane, Home, Sliders, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 
 export interface FinancialGoal {
   id: string;

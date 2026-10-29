@@ -54,7 +54,7 @@ export function NotificationBell({ userId, large = false }: { userId: string; la
         aria-label="Notifications"
         aria-expanded={open}
         className={cn(
-          large ? "h-11 w-11" : "h-9 w-9",
+          large ? "h-11 w-11" : "h-9 w-9 max-md:h-11 max-md:w-11",
           "relative inline-flex items-center justify-center rounded-chip border transition-all duration-150 cursor-pointer select-none",
           open
             ? "border-navy/40 bg-navy/5 text-navy shadow-xs"

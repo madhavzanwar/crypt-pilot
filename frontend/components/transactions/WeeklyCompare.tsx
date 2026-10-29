@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import type { Transaction } from "@/lib/types";
-import { formatCurrency } from "@/lib/format";
+import { formatAxisCurrency, formatCurrency } from "@/components/ui/money";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const NON_SPEND = new Set(["transfer", "credit_card_payment", "income"]);
@@ -61,7 +61,7 @@ export function WeeklyCompare({ txns }: { txns: Transaction[] }) {
         </div>
       </div>
       <div className="mt-4 h-56">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
           <AreaChart data={rows} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
             <defs>
               <linearGradient id="wkThis" x1="0" y1="0" x2="0" y2="1">
@@ -71,7 +71,7 @@ export function WeeklyCompare({ txns }: { txns: Transaction[] }) {
             </defs>
             <CartesianGrid vertical={false} stroke="#eceee4" />
             <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#7b8070" }} />
-            <YAxis tickLine={false} axisLine={false} width={48} tick={{ fontSize: 11, fill: "#7b8070" }} tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))} />
+            <YAxis tickLine={false} axisLine={false} width={48} tick={{ fontSize: 11, fill: "#7b8070" }} tickFormatter={(v: number) => formatAxisCurrency(v)} />
             <Tooltip formatter={(v, n) => [formatCurrency(Number(v)), n === "thisWeek" ? "This week" : "Last week"]} />
             <Area type="monotone" dataKey="lastWeek" stroke="#4fb0e0" strokeWidth={2.5} fill="none" dot={false} isAnimationActive={false} />
             <Area type="monotone" dataKey="thisWeek" stroke="#3f7d5c" strokeWidth={2.5} fill="url(#wkThis)" dot={false} connectNulls={false} isAnimationActive={false} />

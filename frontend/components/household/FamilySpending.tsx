@@ -4,12 +4,14 @@ import { useState } from "react";
 import { Eye, TrendingDown, TrendingUp } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { Skeleton } from "@/components/ui/Skeleton";
 import type { MemberSpending } from "@/lib/types";
+import { categoryLabel } from "@/components/ui/labels";
 
 const MEMBER_COLOURS = ["#0fb67a", "#3b6bff", "#ff6b1a", "#e0a000", "#12a5b8", "#a855f7"];
 const PERIODS = [
@@ -17,8 +19,7 @@ const PERIODS = [
   { days: 30, label: "30 days" },
   { days: 90, label: "90 days" },
 ];
-const label = (c: string) =>
-  c.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()).replace(/\bEmi\b/, "EMI").replace(/\bSip\b/, "SIP");
+const label = categoryLabel;
 
 function Avatar({ m, colour, size = 40 }: { m: MemberSpending; colour: string; size?: number }) {
   return (
@@ -56,7 +57,7 @@ export function FamilySpending() {
   const [selected, setSelected] = useState<string>("all");
   const { data, loading, error } = useAsync(() => api.householdSpending(userId, days), [userId, days]);
 
-  if (loading && !data) return <Skeleton className="h-72 w-full" />;
+  if (loading && !data) return <Skeleton className="col-span-full h-72 w-full" />;
   if (error || !data) return null; // no household yet: the page's own create/join cards cover that case
 
   const colours = new Map(data.members.map((m, i) => [m.user_id, MEMBER_COLOURS[i % MEMBER_COLOURS.length]]));
@@ -67,7 +68,7 @@ export function FamilySpending() {
   const topAmount = active ? Math.max(1, ...active.by_category.map((c) => c.amount)) : 1;
 
   return (
-    <Card className="p-6 border border-black/[0.08] shadow-xs flex flex-col gap-6">
+    <Card className="col-span-full min-w-0 p-6 border border-black/[0.08] shadow-xs flex flex-col gap-6">
       <CardHeader className="mb-0">
         <div className="flex w-full flex-wrap items-start justify-between gap-3">
           <div>

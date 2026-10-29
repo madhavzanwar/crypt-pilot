@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
 import { summarizeSpend } from "@/lib/spend";
 import type { Transaction } from "@/lib/types";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatSignedCurrency } from "@/components/ui/money";
 import { WeeklyCompare } from "@/components/transactions/WeeklyCompare";
 import { BigAmount } from "@/components/dashboard/BigAmount";
 
@@ -85,9 +85,7 @@ export function TxnSummary() {
             </span>
             <div>
               <p className="font-display text-2xl font-semibold tnum text-ink">
-                {c.value > 0 && i > 0 ? "+" : ""}
-                {c.value < 0 ? "-" : ""}
-                {formatCurrency(Math.abs(c.value))}
+                {i > 0 ? formatSignedCurrency(c.value) : formatCurrency(c.value)}
               </p>
               <p className="text-xs text-graphite">{c.label}</p>
             </div>

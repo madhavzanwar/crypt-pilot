@@ -3,17 +3,18 @@
 import { useT } from "@/lib/i18n";
 import { useCallback } from "react";
 import { PiggyBank, TrendingDown, TrendingUp } from "lucide-react";
-import { formatCurrency, formatPercent } from "@/lib/format";
+import { formatPercent } from "@/lib/format";
+import { formatCurrency, formatSignedCurrency } from "@/components/ui/money";
 import { BigAmount } from "@/components/dashboard/BigAmount";
 import { api } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
 
 function Chip({ icon: Icon, label, value, tone }: { icon: typeof PiggyBank; label: string; value: string; tone?: string }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full bg-fog px-3 py-2 text-xs text-graphite">
+    <span className="inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-0.5 rounded-2xl bg-fog px-3 py-2 text-xs text-graphite">
       <Icon className="size-4 text-ink" />
       {label}
-      <span className={`font-semibold tnum ${tone ?? "text-ink"}`}>{value}</span>
+      <span className={`whitespace-nowrap font-semibold tnum ${tone ?? "text-ink"}`}>{value}</span>
     </span>
   );
 }
@@ -47,8 +48,8 @@ export function CashSummaryCard({
         {owed > 0 && <p className="mt-1 text-xs text-graphite">{t("c.owe").replace("{n}", formatCurrency(owed))}</p>}
       </div>
       <div className="flex flex-wrap gap-2">
-        <Chip icon={TrendingUp} label={t("c.in")} value={`+${formatCurrency(income)}`} tone="text-leaf" />
-        <Chip icon={TrendingDown} label={t("c.out")} value={`-${formatCurrency(expenses)}`} />
+        <Chip icon={TrendingUp} label={t("c.in")} value={formatSignedCurrency(income)} tone="text-leaf" />
+        <Chip icon={TrendingDown} label={t("c.out")} value={formatSignedCurrency(-expenses)} />
         <Chip icon={PiggyBank} label={t("c.save")} value={formatPercent(savingsRate)} tone={savingsRate < 0 ? "text-rose-600" : "text-leaf"} />
       </div>
     </div>

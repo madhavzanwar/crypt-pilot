@@ -38,6 +38,7 @@ import { Button } from "@/components/shadcn/button";
 import { Switch } from "@/components/shadcn/switch";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { cn } from "@/lib/utils";
+import { formatAxisCurrency, formatCurrency } from "@/components/ui/money";
 
 type Group = "subscriptions" | "essentials" | "bills";
 
@@ -69,8 +70,7 @@ const DEFAULT_ITEMS: Item[] = [
   { id: "wifi", name: "Broadband", group: "bills", icon: Wifi, cost: 600, replacement: 0, cancelled: false },
 ];
 
-const inr = (n: number) =>
-  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Math.round(n));
+const inr = (n: number) => formatCurrency(Math.round(n));
 
 const pct = (n: number) => `${n.toFixed(n % 1 === 0 ? 0 : 1)}%`;
 
@@ -374,7 +374,7 @@ export function OptOutSimulator() {
             </Head>
             <CardContent>
               <div className="h-52 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
                   <AreaChart data={calc.chart} margin={{ top: 6, right: 6, bottom: 0, left: 0 }}>
                     <defs>
                       <linearGradient id="optout-after" x1="0" y1="0" x2="0" y2="1">
@@ -390,7 +390,7 @@ export function OptOutSimulator() {
                       axisLine={false}
                       fontSize={11}
                       stroke="#7487a3"
-                      tickFormatter={(v) => (Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
+                      tickFormatter={(v: number) => formatAxisCurrency(v)}
                     />
                     <Tooltip
                       formatter={(v, name) => [inr(Number(v)), name === "after" ? "After opt-out" : "Current plan"]}

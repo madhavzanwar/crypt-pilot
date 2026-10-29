@@ -5,10 +5,10 @@ import { useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Transaction } from "@/lib/types";
 import { weeklyCategorySpend, type WeeklyStack } from "@/lib/spend";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { formatAxisCurrency, formatCurrency } from "@/components/ui/money";
 
-const compact = (v: number) =>
-  v >= 100000 ? `₹${(v / 100000).toFixed(1)}L` : v >= 1000 ? `₹${Math.round(v / 1000)}k` : `₹${v}`;
+const compact = formatAxisCurrency;
 
 function StackTooltip({
   active,
@@ -51,7 +51,7 @@ export function SpendByCategoryBars({ txns }: { txns: Transaction[] }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="h-64 w-full sm:h-72">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
           <BarChart data={rows} margin={{ left: 8, right: 16, top: 12, bottom: 4 }} barCategoryGap="12%">
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(15, 23, 42, 0.05)" vertical={false} />
             <XAxis

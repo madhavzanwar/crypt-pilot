@@ -16,7 +16,8 @@ import {
   ReferenceLine,
 } from "recharts";
 import type { CashFlowForecast } from "@/lib/types";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { formatAxisCurrency, formatCurrency } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 
 interface TooltipPayloadItem {
@@ -167,7 +168,7 @@ export function ForecastChart({
 
       {/* Chart Canvas */}
       <div className="h-56 sm:h-64 w-full pt-2">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
           {bars ? (
             <BarChart data={weekly} margin={{ left: 8, right: 16, top: 12, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(15, 23, 42, 0.05)" vertical={false} />
@@ -180,7 +181,7 @@ export function ForecastChart({
                 minTickGap={30}
               />
               <YAxis
-                tickFormatter={(v: number) => formatCurrency(v)}
+                tickFormatter={(v: number) => formatAxisCurrency(v)}
                 tick={{ fontSize: 11, fill: "var(--color-pewter)" }}
                 axisLine={false}
                 tickLine={false}
@@ -214,7 +215,7 @@ export function ForecastChart({
             />
 
             <YAxis
-              tickFormatter={(v: number) => formatCurrency(v)}
+              tickFormatter={(v: number) => formatAxisCurrency(v)}
               tick={{ fontSize: 11, fill: "var(--color-pewter)" }}
               axisLine={false}
               tickLine={false}

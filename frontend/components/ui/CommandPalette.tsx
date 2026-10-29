@@ -179,7 +179,7 @@ export function CommandPalette() {
         id: "nav-security",
         group: "navigation",
         label: "Security & Audit Logs",
-        sublabel: "Tamper-proof mutation logs & RLS policies",
+        sublabel: "Activity logs & access policies",
         icon: ShieldCheck,
         shortcut: "G L",
         onSelect: () => router.push("/security"),

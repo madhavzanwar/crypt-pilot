@@ -5,6 +5,7 @@ import { Sparkles } from "lucide-react";
 import type { ForecastRiskReport } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AXIS, GRID, Section, money, pct } from "./shared";
+import { formatAxisCurrency, formatSignedCurrency } from "@/components/ui/money";
 
 const COLORS: Record<string, string> = { current: "#64748b", cut_discretionary: "#ff5900", increase_savings: "#0ea5e9", extra_debt: "#8b5cf6" };
 
@@ -17,7 +18,7 @@ export function ScenariosTab({ r }: { r: ForecastRiskReport }) {
     return row;
   });
   const rec = sc.recommendation;
-  const signed = (v: number) => `${v > 0 ? "+" : ""}${money(v)}`;
+  const signed = (v: number) => formatSignedCurrency(v);
   const rows: [string, (o: (typeof live)[number]) => string][] = [
     ["Median end balance", (o) => money(o.end_cash?.p50 ?? 0)],
     ["End balance range (P10-P90)", (o) => `${money(o.end_cash?.p10 ?? 0)} to ${money(o.end_cash?.p90 ?? 0)}`],
@@ -72,11 +73,11 @@ export function ScenariosTab({ r }: { r: ForecastRiskReport }) {
 
       <Section title="Median cash by scenario" sub="Solid lines are medians; the dashed line is your reserve">
         <div className="h-64 w-full sm:h-72">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
             <LineChart data={data} margin={{ left: 8, right: 16, top: 12, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
               <XAxis dataKey="month" tick={AXIS} tickLine={false} />
-              <YAxis tickFormatter={money} tick={AXIS} axisLine={false} tickLine={false} width={82} />
+              <YAxis tickFormatter={(v: number) => formatAxisCurrency(v)} tick={AXIS} axisLine={false} tickLine={false} width={82} />
               <Tooltip formatter={(v) => money(Number(v))} />
               {live.map((o) => <Line key={o.id} dataKey={o.id} name={o.label} stroke={COLORS[o.id]} strokeWidth={2.5} dot={false} isAnimationActive={false} />)}
               <ReferenceLine y={r.reserve} stroke="#e11d48" strokeDasharray="4 4" />

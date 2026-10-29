@@ -2,7 +2,8 @@
 
 import React, { useMemo } from "react";
 import type { DashboardSnapshot, Account, Transaction } from "@/lib/types";
-import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
+import { formatPercent, formatDate } from "@/lib/format";
+import { formatCurrency, formatSignedCurrency, formatSignedImpact } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 import { ShieldCheck, CheckCircle2, Activity } from "lucide-react";
 import { FinPilotLogo } from "@/components/FinPilotLogo";
@@ -10,7 +11,7 @@ import { CategoryDonut, IncomeVsSpend, TopMerchants } from "@/components/dashboa
 import { ForecastChart } from "@/components/dashboard/ForecastChart";
 import { NetWorthTrend } from "@/components/dashboard/NetWorthTrend";
 import { CATEGORY_META, summarizeSpend } from "@/lib/spend";
-import { statementDigest } from "@/components/statement/auditHash";
+import { periodRangeLabel, statementDigest, statementPeriod } from "@/components/statement/auditHash";
 
 interface ExecutiveStatementProps {
   dashboard: DashboardSnapshot;
@@ -102,6 +103,16 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
     [userId, dashboard, accounts, transactions],
   );
 
+  const period = statementPeriod(transactions, dashboard.generated_at);
+  const generated = new Date(dashboard.generated_at);
+  const stamp = Number.isNaN(generated.getTime()) ? null : generated;
+  const auditTimestamp = stamp
+    ? `${stamp.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })}, ${stamp.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" })} IST`
+    : "n/a";
+  const certifiedOn = stamp
+    ? stamp.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })
+    : "n/a";
+
   const spend = summarizeSpend(transactions);
   const recent = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
 
@@ -140,13 +151,13 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
 
           <div className="text-left sm:text-right text-xs text-neutral-600 space-y-0.5">
             <div className="font-mono text-[11px] font-bold text-black uppercase tracking-wider">
-              DOC REF: FP-AUDIT-2026-09-{userId.replace("demo-", "").toUpperCase()}
+              DOC REF: FP-AUDIT-{period}-{userId.replace("demo-", "").toUpperCase()}
             </div>
             <div>
-              <span className="text-neutral-400">Statement Period:</span> 01 Sep 2026 – 30 Sep 2026
+              <span className="text-neutral-400">Statement Period:</span> {periodRangeLabel(period)}
             </div>
             <div>
-              <span className="text-neutral-400">Audit Timestamp:</span> 29 Sep 2026, 17:14 IST
+              <span className="text-neutral-400">Audit Timestamp:</span> {auditTimestamp}
             </div>
             <div>
               <span className="text-neutral-400">Classification:</span> Privileged & Confidential
@@ -368,7 +379,7 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
                 isNetPositive ? "text-emerald-700 print:text-black" : "text-ember print:text-black"
               )}
             >
-              {isNetPositive ? `+${formatCurrency(netMonthlyDelta)}` : formatCurrency(netMonthlyDelta)}
+              {formatSignedCurrency(netMonthlyDelta)}
             </span>
             <span className="text-[10px] text-neutral-500 mt-0.5 block">
               Savings Rate: {formatPercent(dashboard.savings_rate)}
@@ -719,7 +730,7 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
                   <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
                     <span className="min-w-0 font-bold text-black text-sm">{rec.text}</span>
                     <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 print:border print:border-black print:text-black">
-                      +{formatCurrency(rec.impact.delta)} Net Gain
+                      {formatSignedImpact(rec.impact.metric, rec.impact.delta)} {rec.impact.delta < 0 ? "Net Loss" : "Net Gain"}
                     </span>
                   </div>
                   <p className="text-neutral-600 text-[11px]">{rec.rationale}</p>
@@ -760,7 +771,7 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
             <div className="text-[10px] text-neutral-500 mt-1 font-mono break-all">
               SHA-256 of the figures in this statement:
               <br />
-              <span className="text-black">{digest.hex}</span>
+              <span translate="no" lang="en" className="notranslate text-black" data-testid="statement-doc-hash">{digest.hex}</span>
             </div>
             <div className="text-[10px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
               <ShieldCheck className="h-3 w-3" />
@@ -777,7 +788,7 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
               Double-Entry Read-Only Open Banking Aggregation
             </div>
             <div className="text-[10px] text-neutral-400 mt-1">
-              Certified on {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+              Certified on {certifiedOn}
             </div>
           </div>
         </div>

@@ -38,7 +38,7 @@ export function AccuracyTab({ a }: { a: FrAccuracy }) {
           </div>
           {c.low_sample && <p className="mb-3 text-xs text-ember">Few forecasts in the test window: treat calibration as indicative only.</p>}
           <div className="h-60 w-full max-w-md">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
               <ScatterChart margin={{ left: 0, right: 16, top: 8, bottom: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
                 <XAxis type="number" dataKey="x" domain={[0, 100]} unit="%" tick={AXIS} name="Predicted" label={{ value: "Predicted probability", position: "insideBottom", offset: -8, fontSize: 11, fill: "var(--color-pewter)" }} />

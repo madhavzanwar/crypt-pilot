@@ -2,7 +2,7 @@
 
 import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import type { SequenceResult } from "@/lib/types";
-import { formatCurrency } from "@/lib/format";
+import { formatAxisCurrency, formatCurrency } from "@/components/ui/money";
 
 const SEQ_COLORS = ["#64748b", "#ff5900", "#0ea5e9", "#10b981", "#8b5cf6"];
 
@@ -22,11 +22,11 @@ export function CashBandChart({ sequences, reserve }: { sequences: SequenceResul
   return (
     <div className="flex flex-col gap-3">
       <div className="h-64 sm:h-72 w-full">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
           <ComposedChart data={data} margin={{ left: 8, right: 16, top: 12, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(15, 23, 42, 0.05)" vertical={false} />
             <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--color-pewter)" }} tickLine={false} axisLine={{ stroke: "rgba(15, 23, 42, 0.08)" }} />
-            <YAxis tickFormatter={(v: number) => formatCurrency(v)} tick={{ fontSize: 11, fill: "var(--color-pewter)" }} axisLine={false} tickLine={false} width={82} />
+            <YAxis tickFormatter={(v: number) => formatAxisCurrency(v)} tick={{ fontSize: 11, fill: "var(--color-pewter)" }} axisLine={false} tickLine={false} width={82} />
             <Tooltip formatter={(v) => (Array.isArray(v) ? `${formatCurrency(v[0])} - ${formatCurrency(v[1])}` : formatCurrency(Number(v)))} />
             {sequences.map((s, i) => (
               <Area key={`b${s.id}`} dataKey={`band_${s.id}`} name={`${s.label} P10-P90`} stroke="none" fill={SEQ_COLORS[i % SEQ_COLORS.length]} fillOpacity={0.08} isAnimationActive={false} />

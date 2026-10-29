@@ -9,7 +9,9 @@ import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
+import { categoryLabel } from "@/components/ui/labels";
 
 const CATEGORIES = [
   ["groceries", "Groceries"],
@@ -284,7 +286,7 @@ export function ManagedMembersPanel({
                         <tr key={t.id}>
                           <td className="py-2.5 font-semibold text-ink">{t.merchant}</td>
                           <td className="py-2.5">
-                            <Chip tone="neutral" className="text-[10px] capitalize">{String(t.category).replace(/_/g, " ")}</Chip>
+                            <Chip tone="neutral" className="text-[10px]">{categoryLabel(String(t.category))}</Chip>
                           </td>
                           <td className="py-2.5 text-pewter">{formatDate(t.date)}</td>
                           <td className={`py-2.5 text-right font-bold tnum ${t.amount < 0 ? "text-rose-700" : "text-emerald-700"}`}>

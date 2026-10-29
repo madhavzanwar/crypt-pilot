@@ -10,7 +10,7 @@ import {
 } from "framer-motion";
 import { ArrowUpRight, ArrowDownRight, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatSignedCurrency } from "@/components/ui/money";
 
 export interface CashFlowChipData {
   id: string;
@@ -227,8 +227,7 @@ function SingleDraggableChip({
           isInflow ? "text-emerald-700" : "text-ink"
         )}
       >
-        {isInflow ? "+" : ""}
-        {formatCurrency(chip.amount)}
+        {isInflow ? formatSignedCurrency(chip.amount) : formatCurrency(chip.amount)}
       </span>
     </motion.div>
   );

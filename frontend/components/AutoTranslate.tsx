@@ -3,12 +3,14 @@
 import { useEffect } from "react";
 import { api } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
+import { stripProtected, toAsciiDigits, toDevanagariDigits } from "@/components/translateGuard";
 
 const ATTRS = ["placeholder", "aria-label", "title"] as const;
-const SKIP = "script,style,code,pre,textarea,input,select,option,svg,[data-no-translate],[contenteditable='true']";
-const SKIP_DIGITS = "script,style,code,pre,textarea,input,select,option,[data-no-translate],[contenteditable='true']"; // svg chart labels get Indic digits too
-const toDev = (v: string) => v.replace(/[0-9]/g, (d) => String.fromCharCode(0x966 + +d)); // Hindi and Marathi share the Devanagari numerals
-const toAscii = (v: string) => v.replace(/[०-९]/g, (d) => String(d.charCodeAt(0) - 0x966));
+// translate="no" (the HTML standard) marks hashes, addresses and ids: never translated, never digit-converted.
+const SKIP = "script,style,code,pre,textarea,input,select,option,svg,[data-no-translate],[translate='no'],.notranslate,[contenteditable='true']";
+const SKIP_DIGITS = "script,style,code,pre,textarea,input,select,option,[data-no-translate],[translate='no'],.notranslate,[contenteditable='true']"; // svg chart labels get Indic digits too
+const toDev = toDevanagariDigits; // Hindi and Marathi share the Devanagari numerals; hex/0x/bc1/UUID/PAN-like tokens are left alone
+const toAscii = toAsciiDigits;
 const NEEDS_TRANSLATION = /[A-Za-z]{2}/;
 
 /**
@@ -51,7 +53,7 @@ export function AutoTranslate() {
       const en = ascii.trim();
       if (!en) return;
       const el = s.attr ? (s.el as Element) : (s.el as Text).parentElement;
-      const wantsWords = NEEDS_TRANSLATION.test(en) && !el?.closest(SKIP);
+      const wantsWords = NEEDS_TRANSLATION.test(stripProtected(en)) && !el?.closest(SKIP);
       const hit = wantsWords ? cache[en] : undefined;
       if (hit) {
         const lead = ascii.slice(0, ascii.indexOf(en)), trail = ascii.slice(ascii.indexOf(en) + en.length);
@@ -60,9 +62,10 @@ export function AutoTranslate() {
         write(s, out);
         return;
       }
-      if (/[0-9]/.test(raw)) {
-        remember(s, raw, toDev(raw));
-        write(s, toDev(raw));
+      const devRaw = toDev(raw);
+      if (devRaw !== raw) {
+        remember(s, raw, devRaw);
+        write(s, devRaw);
       }
       if (wantsWords) pending.set(en, [...(pending.get(en) ?? []), s]);
     }

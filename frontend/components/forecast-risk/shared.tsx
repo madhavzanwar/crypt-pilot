@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 
 export const AXIS = { fontSize: 11, fill: "var(--color-pewter)" } as const;
