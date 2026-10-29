@@ -317,6 +317,7 @@ export default function EvidenceRoomPage() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="grid gap-5">
+      <h1 className="sr-only">Evidence Room</h1>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 font-display text-lg">

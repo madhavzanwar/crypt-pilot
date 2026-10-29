@@ -107,6 +107,7 @@ export default function TwinSimulatorPage() {
 
   return (
     <div className="grid gap-4">
+      <h1 className="sr-only">Twin Simulator</h1>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Flagged merchants" value={String(flagged.length)} tone={flagged.length ? "text-rose-600" : undefined} />
         <Stat label="Money at risk" value={formatCurrency(flagged.reduce((s, m) => s + m.amount, 0))} tone={flagged.length ? "text-rose-600" : undefined} />

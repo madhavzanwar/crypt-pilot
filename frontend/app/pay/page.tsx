@@ -320,6 +320,7 @@ function PayApp() {
     <div className="min-h-dvh bg-white text-[#202124]">
       <div className="bg-gradient-to-b from-[#c6dafc] via-[#e8f0fe] to-white pb-6">
         <header className="flex items-center gap-3 p-4">
+          <h1 className="sr-only">FinPilot Pay</h1>
           <div className="flex min-w-0 flex-1 items-center gap-3 rounded-full bg-white px-5 py-4 text-base text-[#5f6368] shadow-md">
             <Search className="size-5" /> Pay by name or phone number
           </div>
