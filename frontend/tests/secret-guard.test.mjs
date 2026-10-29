@@ -60,3 +60,36 @@ test("BUG-103: every address in a message is found (cap 3, the rest counted)", a
   const typo = scanAddresses(`${OLD.slice(0, -1)}b`);
   assert.deepEqual(typo.scans.map((s) => s.checksumValid), [false]);
 });
+
+const { findSplitSecret, cleanHistory, REDACTED } = await import("@/lib/crypto/secretGuard");
+
+test("QA3-2: key split over two messages is blocked and flagged", () => {
+  assert.equal(findSplitSecret([], HEX), 0);
+  assert.equal(findSplitSecret([HEX.slice(0, 32)], HEX.slice(32)), 1);
+  assert.equal(findSplitSecret(["hello", HEX.slice(0, 20), HEX.slice(20, 40)], HEX.slice(40)), 2);
+  assert.equal(findSplitSecret([WIF.slice(0, 25)], WIF.slice(25)), 1);
+  assert.equal(findSplitSecret(["is it safe?", "what about taxes", "thanks"], "ok 1000"), -1);
+  assert.equal(findSplitSecret(["I paid 1000"], "2000 rupees"), -1);
+});
+
+test("QA3-2: the chat popup source runs the guard before any request (text, voice and history)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../components/copilot/ChatPopup.tsx", import.meta.url), "utf8");
+  const send = src.slice(src.indexOf("async function send("));
+  assert.ok(send.indexOf("findSplitSecret") > 0 && send.indexOf("findSplitSecret") < send.indexOf("api.voiceAct"));
+  assert.ok(send.indexOf("findSplitSecret") < send.indexOf("answer(message"));
+  assert.match(src, /cleanHistory\(/);
+  assert.match(src, /messageHasSecret\(text\)/); // voice transcript is never displayed
+});
+
+test("QA3-2: history never re-sends a blocked or split secret", () => {
+  const h = [
+    { role: "user", content: HEX.slice(0, 32) },
+    { role: "assistant", content: "ok" },
+    { role: "user", content: HEX.slice(32) },
+    { role: "user", content: "what is my balance" },
+    { role: "user", content: REDACTED },
+  ];
+  const out = cleanHistory(h);
+  assert.deepEqual(out.map((x) => x.content), ["ok", "what is my balance"]);
+});

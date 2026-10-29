@@ -13,6 +13,7 @@ import MicButton from "@/components/crypto/voice/MicButton";
 import { VoiceProviderChip } from "@/components/crypto/voice/VoiceProviderChip";
 import type { CheckResponse, Lang as CryptoLang, VoiceProvider } from "@/lib/crypto/api";
 import { messageHasSecret, scanAddresses } from "@/lib/crypto/extractAddress";
+import { cleanHistory, findSplitSecret, REDACTED } from "@/lib/crypto/secretGuard";
 import { toCryptoLang } from "@/lib/crypto/lang";
 import { engineLabel, useVoiceT, type VoiceStringKey } from "@/lib/crypto/voice/strings";
 import { useCryptoStatus } from "@/lib/crypto/voice/useCryptoStatus";
@@ -180,7 +181,15 @@ export default function CopilotPage() {
 
   async function send(message: string) {
     if (!message.trim() || loading) return;
-    if (messageHasSecret(message)) return rejectSecret();
+    const split = findSplitSecret(turns.filter((t) => t.role === "user").map((t) => t.message), message);
+    if (split >= 0) {
+      if (split > 0) {
+        // earlier halves were already sent once: hide them and never re-send them as history
+        const idx = turns.map((t, i) => (t.role === "user" ? i : -1)).filter((i) => i >= 0).slice(-split);
+        setTurns((all) => all.map((t, i) => (idx.includes(i) ? { ...t, message: REDACTED } : t)));
+      }
+      return rejectSecret();
+    }
     const id = chatId ?? newChatId();
     const found = scanAddresses(message).scans;
     if (found.length === 0 && WALLET_QUESTION.test(message) && /\b(safe|pay|send|scam|check|trust)/i.test(message)) {
@@ -197,7 +206,7 @@ export default function CopilotPage() {
     });
     setSecretWarn(false);
     setVoiceProvider(null);
-    const history = turns.slice(-8).map((t) => ({ role: t.role, content: t.role === "user" ? t.message : t.answer?.narrative ?? "" }));
+    const history = cleanHistory(turns.slice(-8).map((t) => ({ role: t.role, content: t.role === "user" ? t.message : t.answer?.narrative ?? "" })));
     const withUser: Turn[] = [...turns, { role: "user", message }];
     setChatId(id);
     setTurns(withUser);
