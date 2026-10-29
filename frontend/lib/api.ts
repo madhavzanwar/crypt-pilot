@@ -1,3 +1,4 @@
+import { formatApiError } from "@/lib/apiError";
 import { getLang, getSimpleNow } from "@/lib/i18n";
 
 import type {
@@ -109,28 +110,11 @@ function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return value;
 }
 
-/** Plain server message for a 4xx (e.g. "That OTP is not correct"); a generic message for 5xx (detail goes to the console); the status line otherwise. */
+/** Friendly message for a failed response (see lib/apiError.ts); technical detail goes to the console only. */
 async function errorMessage(path: string, res: Response): Promise<string> {
   const text = await res.text();
-  if (res.status < 500) {
-    try {
-      const detail = (JSON.parse(text) as { detail?: unknown }).detail;
-      if (typeof detail === "string" && detail) return detail;
-    } catch {
-      // not JSON: fall through
-    }
-  }
-  if (res.status >= 500) {
-    console.error(`API ${path} failed: ${res.status} ${text}`);
-    return "Something went wrong on our side. Please try again in a moment.";
-  }
-  // A non-JSON body (an HTML 404 page from the proxy, say) is noise for the user: keep it in the console only.
-  const trimmed = text.trim();
-  if (trimmed.startsWith("<") || trimmed.length > 200) {
-    console.error(`API ${path} failed: ${res.status} ${trimmed.slice(0, 500)}`);
-    return `API ${path} failed: ${res.status}`;
-  }
-  return `API ${path} failed: ${res.status} ${text}`;
+  if (res.status >= 500 || res.status === 422) console.error(`API ${path} failed: ${res.status} ${text.slice(0, 500)}`);
+  return formatApiError(res.status, text);
 }
 
 const pairHeader = (code?: string): Record<string, string> => (code ? { "X-Pair-Code": code } : {});
@@ -275,7 +259,7 @@ export const api = {
   /** Downloads a connected source's dataset as a CSV file. */
   exportConnector: async (userId: string, connector: string) => {
     const res = await fetch(`${API_URL}/api/connectors/${userId}/${connector}/export`, { headers: await authHeader() });
-    if (!res.ok) throw new Error(`Export failed: ${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(formatApiError(res.status, await res.text()));
     const url = URL.createObjectURL(await res.blob());
     const a = Object.assign(document.createElement("a"), { href: url, download: `${connector}.csv` });
     a.click();
@@ -354,7 +338,7 @@ export const api = {
       headers: await authHeader(),
       body,
     });
-    if (!res.ok) throw new Error(`API upload failed: ${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(formatApiError(res.status, await res.text()));
     notifyIfWrite("POST");
     return publishInsights((await res.json()) as RecomputeDiff);
   },
@@ -366,7 +350,7 @@ export const api = {
     body.append("file", file);
     const res = await fetch(`${API_URL}/api/documents/${userId}`, { method: "POST", headers: await authHeader(), body });
     clearApiCache();
-    if (!res.ok) throw new Error(`Upload failed: ${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(formatApiError(res.status, await res.text()));
     return res.json();
   },
   // Statement / passbook photo -> OCR -> personal data removed -> preview; nothing is saved until importOcr

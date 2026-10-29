@@ -17,6 +17,7 @@ import { ChainChips } from "@/components/crypto/council/ChainParts";
 import { postJson } from "@/components/crypto/council/stream";
 import type { ChainWallet } from "@/components/crypto/council/types";
 import { cn } from "@/lib/utils";
+import { validateAmount, validateText } from "@/lib/validate";
 
 interface Merchant { id: string; label: string; amount: number; flagged: boolean; findings: string[] }
 interface Category { id: string; label: string; amount: number; flagged: boolean; merchants: Merchant[] }
@@ -49,6 +50,7 @@ export default function TwinSimulatorPage() {
   const [fraud, setFraud] = useState({ merchant: "AMAZ0N PAY", amount: "4999", wallet: "" });
   const [sim, setSim] = useState<{ caught: boolean; findings: SecurityFinding[]; merchant: string; wallet?: ChainWallet } | null>(null);
   const [simError, setSimError] = useState<string | null>(null);
+  const [fieldErr, setFieldErr] = useState<{ merchant?: string | null; amount?: string | null }>({});
   const graph = useAsync(useCallback(() => api.securityGraph(userId, months), [userId, months]), [userId, months]);
 
   // Categories with the merchants that feed them (the old network, as an outline you can read).
@@ -79,7 +81,13 @@ export default function TwinSimulatorPage() {
 
   async function attempt() {
     setSimError(null);
-    const amount = Math.abs(Number(fraud.amount)) || 0;
+    const fe = { merchant: validateText(fraud.merchant, "Merchant name"), amount: validateAmount(fraud.amount, "Amount") };
+    setFieldErr(fe);
+    if (fe.merchant || fe.amount) {
+      setSim(null);
+      return;
+    }
+    const amount = Number(fraud.amount);
     const wallet = fraud.wallet.trim();
     if (wallet && looksLikeSecret(wallet)) {
       setFraud((f) => ({ ...f, wallet: "" }));
@@ -204,8 +212,10 @@ export default function TwinSimulatorPage() {
               <CardDescription>Nothing is saved. The agents check your ledger plus this one made-up payment.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-2">
-              <Input value={fraud.merchant} onChange={(e) => setFraud({ ...fraud, merchant: e.target.value })} aria-label="Merchant name" />
-              <Input value={fraud.amount} inputMode="numeric" onChange={(e) => setFraud({ ...fraud, amount: e.target.value })} aria-label="Amount in rupees" />
+              <Input value={fraud.merchant} maxLength={200} aria-invalid={!!fieldErr.merchant} onChange={(e) => setFraud({ ...fraud, merchant: e.target.value })} aria-label="Merchant name" />
+              {fieldErr.merchant && <p role="alert" className="text-xs text-rose-700">{fieldErr.merchant}</p>}
+              <Input value={fraud.amount} inputMode="decimal" aria-invalid={!!fieldErr.amount} onChange={(e) => setFraud({ ...fraud, amount: e.target.value })} aria-label="Amount in rupees" />
+              {fieldErr.amount && <p role="alert" className="text-xs text-rose-700">{fieldErr.amount}</p>}
               <Input value={fraud.wallet} onChange={(e) => setFraud({ ...fraud, wallet: e.target.value })} placeholder="Paying a crypto wallet? Paste its address (optional)" aria-label="Crypto wallet address (optional)" className="font-mono text-xs" autoComplete="off" spellCheck={false} />
               <Button size="sm" onClick={attempt}>Run the agents</Button>
               {simError && <p className="text-xs text-rose-700">{simError}</p>}

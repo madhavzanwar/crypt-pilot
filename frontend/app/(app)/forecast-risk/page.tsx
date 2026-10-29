@@ -16,6 +16,10 @@ import { ScenariosTab } from "@/components/forecast-risk/ScenariosTab";
 import { AccuracyTab } from "@/components/forecast-risk/AccuracyTab";
 import { money, pct } from "@/components/forecast-risk/shared";
 import { cn } from "@/lib/utils";
+import { validateForecast, type ForecastField } from "@/lib/validate";
+
+// The engine's own default seed: the first run uses it, so the form must show it.
+const DEFAULT_SEED = 20240601;
 
 const TABS = [
   { id: "forecast", label: "Forecast" },
@@ -43,11 +47,12 @@ function Pills<T extends string | number>({ value, options, onChange }: { value:
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
   return (
     <label className="flex flex-col gap-1.5 text-xs font-semibold text-graphite">
       {label}
       {children}
+      {error && <span role="alert" className="text-[11px] font-medium text-rose-600">{error}</span>}
     </label>
   );
 }
@@ -57,29 +62,34 @@ function Controls({ q, onApply }: { q: ForecastRiskQuery; onApply: (q: ForecastR
   const init = (v: number | undefined, scale = 1) => (v === undefined ? "" : String(Math.round(v * scale)));
   const [d, setD] = useState({
     reserve: init(q.reserve), savings: init(q.savings), extra_debt: init(q.extra_debt), goal_amount: init(q.goal_amount),
-    goal_month: init(q.goal_month), cut: init(q.cut ?? 0.2, 100), sims: String(q.sims ?? 2000), seed: String(q.seed ?? 42),
+    goal_month: init(q.goal_month), cut: init(q.cut ?? 0.2, 100), sims: String(q.sims ?? 2000), seed: String(q.seed ?? DEFAULT_SEED),
   });
   const set = (k: keyof typeof d) => (e: React.ChangeEvent<HTMLInputElement>) => setD((p) => ({ ...p, [k]: e.target.value }));
   const num = (s: string) => (s.trim() === "" || Number.isNaN(Number(s)) ? undefined : Number(s));
-  const apply = () =>
+  const [errs, setErrs] = useState<Partial<Record<ForecastField, string>>>({});
+  const apply = () => {
+    const found = validateForecast(d);
+    setErrs(found);
+    if (Object.keys(found).length) return;
     onApply({
       ...q,
       reserve: num(d.reserve), savings: num(d.savings), extra_debt: num(d.extra_debt),
       goal_amount: num(d.goal_amount), goal_month: num(d.goal_month),
       cut: Math.min(30, Math.max(0, num(d.cut) ?? 20)) / 100,
-      sims: Math.min(10000, Math.max(500, num(d.sims) ?? 2000)), seed: num(d.seed) ?? 42,
+      sims: Math.min(10000, Math.max(500, num(d.sims) ?? 2000)), seed: num(d.seed) ?? DEFAULT_SEED,
     });
+  };
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Field label="Cash reserve (INR)"><input className={INPUT} inputMode="numeric" placeholder="Auto" value={d.reserve} onChange={set("reserve")} /></Field>
-        <Field label="Discretionary cut (%, max 30)"><input className={INPUT} inputMode="numeric" value={d.cut} onChange={set("cut")} /></Field>
-        <Field label="Extra savings / month"><input className={INPUT} inputMode="numeric" placeholder="Auto" value={d.savings} onChange={set("savings")} /></Field>
-        <Field label="Extra debt repayment / month"><input className={INPUT} inputMode="numeric" placeholder="Auto" value={d.extra_debt} onChange={set("extra_debt")} /></Field>
-        <Field label="Savings goal (INR)"><input className={INPUT} inputMode="numeric" placeholder="None" value={d.goal_amount} onChange={set("goal_amount")} /></Field>
-        <Field label="Goal by month #"><input className={INPUT} inputMode="numeric" placeholder="None" value={d.goal_month} onChange={set("goal_month")} /></Field>
-        <Field label="Simulations (500-10,000)"><input className={INPUT} inputMode="numeric" value={d.sims} onChange={set("sims")} /></Field>
-        <Field label="Random seed"><input className={INPUT} inputMode="numeric" value={d.seed} onChange={set("seed")} /></Field>
+        <Field label="Cash reserve (INR)" error={errs.reserve}><input className={INPUT} inputMode="numeric" placeholder="Auto" value={d.reserve} onChange={set("reserve")} aria-invalid={!!errs.reserve} /></Field>
+        <Field label="Discretionary cut (%, max 30)" error={errs.cut}><input className={INPUT} inputMode="numeric" value={d.cut} onChange={set("cut")} aria-invalid={!!errs.cut} /></Field>
+        <Field label="Extra savings / month" error={errs.savings}><input className={INPUT} inputMode="numeric" placeholder="Auto" value={d.savings} onChange={set("savings")} aria-invalid={!!errs.savings} /></Field>
+        <Field label="Extra debt repayment / month" error={errs.extra_debt}><input className={INPUT} inputMode="numeric" placeholder="Auto" value={d.extra_debt} onChange={set("extra_debt")} aria-invalid={!!errs.extra_debt} /></Field>
+        <Field label="Savings goal (INR)" error={errs.goal_amount}><input className={INPUT} inputMode="numeric" placeholder="None" value={d.goal_amount} onChange={set("goal_amount")} aria-invalid={!!errs.goal_amount} /></Field>
+        <Field label="Goal by month #" error={errs.goal_month}><input className={INPUT} inputMode="numeric" placeholder="None" value={d.goal_month} onChange={set("goal_month")} aria-invalid={!!errs.goal_month} /></Field>
+        <Field label="Simulations (500-10,000)" error={errs.sims}><input className={INPUT} inputMode="numeric" value={d.sims} onChange={set("sims")} aria-invalid={!!errs.sims} /></Field>
+        <Field label="Random seed" error={errs.seed}><input className={INPUT} inputMode="numeric" value={d.seed} onChange={set("seed")} aria-invalid={!!errs.seed} /></Field>
       </div>
       <div><Button onClick={apply}>Apply and re-run</Button></div>
     </div>
