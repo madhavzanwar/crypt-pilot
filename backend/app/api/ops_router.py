@@ -148,6 +148,8 @@ def overview(admin: bool = Depends(ops_access)) -> dict:
              "stats": by_key.get(env), "status": _status(env, by_key.get(env)), "testable": env in PROBES} for env, (prov, use) in KEYS.items()]
     agents = [{"agent": a, "task": task, "model": ai_agents.MODELS.get(a), "backup": ai_agents.BACKUPS.get(a), "stats": by_agent.get(a)} for a, task in AGENT_TASKS.items()]
     ev = telemetry.events(300)
+    if not admin:  # what users typed into web search is not public telemetry
+        ev = [{k: v for k, v in e.items() if k != "query"} for e in ev]
     return {
         "keys": keys, "agents": agents, "models": stats["by_model"],
         "totals": {"tokens": stats["tokens"], "fallbacks": stats["fallbacks"], "cache_hits": stats["cache_hits"]},

@@ -31,11 +31,11 @@ DEMO_USER_IDS = {"demo-priya", "demo-arjun", "demo-meera"}
 # their browser. Only synthetic connector data (see api/connectors_router.py)
 # ever lands under one, so it is reachable without a token like the demo
 # personas -- but isolated per id, and never mixed with real accounts.
-_GUEST_ID = re.compile(r"^guest-[a-z0-9]{12,32}$")
+_GUEST_ID = re.compile(r"guest-[a-z0-9]{12,32}")
 
 
 def is_public_user(user_id: str) -> bool:
-    return user_id in DEMO_USER_IDS or bool(_GUEST_ID.match(user_id))
+    return user_id in DEMO_USER_IDS or bool(_GUEST_ID.fullmatch(user_id))
 
 
 def verify_firebase_token(token: str) -> dict:
