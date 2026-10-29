@@ -2,7 +2,7 @@
 
 CryptPilot is two projects in one repository. **FinPilot** is a personal-finance AI copilot (Next.js frontend, FastAPI backend, 90-day Monte Carlo cash-flow forecasts, an Evidence Council and a Risk Council of specialist agents). **Cryptiq** is a Bitcoin wallet risk checker: paste an address, get ALLOW / WARN / BLOCK / UNKNOWN, with graph evidence and a plain-language explanation in English and Hindi.
 
-This file says what the merge added, what it removed, what has actually been verified, and what is still open. The `cryptiq-merge` branch has been merged; this file describes the code now in the repository. For how the pieces connect, see [CRYPTPILOT_ARCHITECTURE.md](CRYPTPILOT_ARCHITECTURE.md). FinPilot's own docs (root `README.md`, `ENVIRONMENT.md`, `docs/FinPilot_Feature_Guide.*`) are unchanged and still describe the baseline product.
+This file says what the merge added, what it removed, what has actually been verified, and what is still open. The `cryptiq-merge` branch has been merged; this file describes the code now in the repository. For how the pieces connect, see [CRYPTPILOT_ARCHITECTURE.md](CRYPTPILOT_ARCHITECTURE.md). FinPilot's own docs (root `README.md`, `ENVIRONMENT.md`, `docs/FinPilot_Feature_Guide.*`) are unchanged and still describe the baseline product. In particular `docs/FinPilot_Feature_Guide.*` still documents the Google Pay link and the FinPilot Pay phone app (`/pay`), which this repository has removed from the UI; read it as history, not as the current feature list.
 
 ## Why merge them
 
