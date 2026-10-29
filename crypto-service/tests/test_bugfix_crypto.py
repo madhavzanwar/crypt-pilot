@@ -82,7 +82,8 @@ def test_webhook_non_object_body_is_400(settings: Settings) -> None:
         ts = int(time.time())
         r = c.post("/api/webhooks/dodo", content=raw, headers={
             "webhook-id": f"m{i}", "webhook-timestamp": str(ts), "webhook-signature": sign(SW_SECRET, f"m{i}", ts, raw)})
-        assert r.status_code == (200 if raw.startswith(b'{') else 400), (raw, r.status_code)
+        # an unmatchable paid event is retryable (BUG-005): 503, never 200
+        assert r.status_code == (503 if raw.startswith(b'{') else 400), (raw, r.status_code)
 
 
 def test_no_session_cookie_on_health_and_demo_wallets(client: TestClient) -> None:

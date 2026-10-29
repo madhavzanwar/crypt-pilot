@@ -67,11 +67,12 @@ def ensure_session(s: Session, session_id: str, starting_credits: int, *, client
 def add_credits(s: Session, session_id: str, delta: int, reason: str, ref: str) -> bool:
     """Idempotent grant: the (reason, ref) pair is unique, so a replayed event adds nothing.
 
-    Returns True if credits were added.
+    Never creates a session: crediting an unknown session id would mint a ghost session holding credits that no
+    customer owns. Returns True if credits were added.
     """
     if s.get(SessionRow, session_id) is None:
-        s.add(SessionRow(id=session_id))
-        s.flush()
+        log.warning("credit_refused_unknown_session", reason=reason)
+        return False
     exists = s.scalar(select(CreditLedger.id).where(CreditLedger.reason == reason, CreditLedger.ref == ref))
     if exists is not None:
         return False
@@ -81,6 +82,19 @@ def add_credits(s: Session, session_id: str, delta: int, reason: str, ref: str) 
     except IntegrityError:
         return False
     return True
+
+
+def revoke_payment(s: Session, payment_id: str) -> int:
+    """Take back the credits a Dodo payment granted (refund / lost dispute). Idempotent; returns credits revoked."""
+    grant = s.scalar(select(CreditLedger).where(CreditLedger.reason == "dodo", CreditLedger.ref == payment_id))
+    if grant is None or grant.delta <= 0:
+        return 0
+    try:
+        with s.begin_nested():
+            s.add(CreditLedger(session_id=grant.session_id, delta=-grant.delta, reason="refund", ref=payment_id))
+    except IntegrityError:
+        return 0
+    return int(grant.delta)
 
 
 def try_charge(s: Session, session_id: str, ref: str, amount: int = 1) -> int | None:
