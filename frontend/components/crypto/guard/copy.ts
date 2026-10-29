@@ -23,6 +23,10 @@ const COPY: Record<string, [string, string]> = {
     "Mixed upper and lower case: please check the address.",
     "बड़े और छोटे अक्षर मिले हुए हैं: कृपया पता जाँचें।",
   ],
+  "wg.input.err.checksum": [
+    "The checksum does not match: the address has a typo or is incomplete. Copy it again.",
+    "चेकसम मेल नहीं खाता: पते में गलती है या वह अधूरा है। इसे फिर से कॉपी करें।",
+  ],
   "wg.input.paste": ["Paste", "पेस्ट करें"],
   "wg.input.clear": ["Clear", "साफ़ करें"],
   "wg.examples": ["Try an example", "उदाहरण आज़माएँ"],

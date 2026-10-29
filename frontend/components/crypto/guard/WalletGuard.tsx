@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { looksLikeSecret } from "@/lib/crypto/address/seedGuard";
-import { validateAddress } from "@/lib/crypto/address/validate";
+import { validateAddressStrict as validateAddress } from "@/lib/crypto/address/validate";
 import { findRecent, useWalletCheck, type WalletCheckState } from "@/lib/crypto/useWalletCheck";
 import { cn } from "@/lib/utils";
 import { openCreditsDrawer } from "@/components/crypto/credits/openCredits";
@@ -78,7 +78,7 @@ export default function WalletGuard() {
   const trimmed = value.trim();
   const check = validateAddress(trimmed, { allowDemo: true });
   const busy = state.phase === "checking";
-  const fmtError = trimmed !== "" && !check.ok ? (check.reason === "mixed_case" ? g("wg.input.err.mixed") : g("wg.input.err.format")) : null;
+  const fmtError = trimmed !== "" && !check.ok ? (check.reason === "mixed_case" ? g("wg.input.err.mixed") : check.reason === "checksum" ? g("wg.input.err.checksum") : g("wg.input.err.format")) : null;
 
   /** Anything that looks like a seed phrase or private key is wiped and never sent. */
   const guardSecret = useCallback((text: string): boolean => {
