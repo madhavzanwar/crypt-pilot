@@ -92,7 +92,8 @@ def validate(text: str, evidence: dict[str, Any], lang: str) -> list[str]:
         if re.search(rf"\b{v}\b", t) and v != evidence.get("verdict"):
             problems.append(f"wrong verdict {v}")
     hits = evidence.get("labelHits", {})
-    if ("ofac" in low or "sanction" in low or "treasury" in low or re.search(r"\bsdn\b", low) or "प्रतिबंध" in t) and not hits.get("ofac"):
+    sanctions = any(w in low for w in ("ofac", "sanction", "treasury")) or re.search(r"\bsdn\b", low) or "प्रतिबंध" in t
+    if sanctions and not hits.get("ofac"):
         problems.append("mentions sanctions without an OFAC hit")
     if ("ransom" in low or "extort" in low or "रैनसमवेयर" in t) and not hits.get("ransomwhere"):
         problems.append("mentions ransomware without a list hit")

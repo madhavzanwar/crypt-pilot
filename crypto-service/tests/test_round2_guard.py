@@ -6,7 +6,8 @@ import pytest
 
 from app.services.address import looks_like_secret
 
-W = "abandon ability able about above absent absorb abstract absurd abuse access accident".split()
+W = ["abandon", "ability", "able", "about", "above", "absent", "absorb", "abstract", "absurd", "abuse", "access",
+     "accident"]
 HEX = "ab" * 32
 
 

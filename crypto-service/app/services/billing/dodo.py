@@ -89,7 +89,7 @@ def pack_mismatch(event: dict[str, Any], pack: Pack) -> str | None:
             return "product_mismatch"
     total = data.get("total_amount")
     cur = data.get("currency")
-    if isinstance(total, int) and not isinstance(total, bool) and isinstance(cur, str) and cur.upper() == "USD":
-        if total < round(pack.price_usd * 100):
-            return "amount_too_low"
+    usd = isinstance(cur, str) and cur.upper() == "USD"
+    if usd and isinstance(total, int) and not isinstance(total, bool) and total < round(pack.price_usd * 100):
+        return "amount_too_low"
     return None

@@ -70,9 +70,8 @@ def test_matching_product_and_amount_with_tax_credits(settings: Any) -> None:
 
 def test_add_credits_refuses_unknown_session(settings: Any) -> None:
     c = client_with(settings)
-    with c.app.state.cryptiq.db.session() as s:
-        with pytest.raises(ledger.UnknownSessionError):
-            ledger.add_credits(s, "nobody", 5, "admin", "r1")
+    with c.app.state.cryptiq.db.session() as s, pytest.raises(ledger.UnknownSessionError):
+        ledger.add_credits(s, "nobody", 5, "admin", "r1")
     with c.app.state.cryptiq.db.session() as s:
         assert s.get(SessionRow, "nobody") is None
         assert s.query(CreditLedger).count() == 0
