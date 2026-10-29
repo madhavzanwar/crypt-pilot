@@ -69,7 +69,9 @@ async def lifespan(_: FastAPI):
             logging.getLogger(__name__).warning("Model warm-up skipped: %s", exc)
 
     threading.Thread(target=_prepare_demo, daemon=True).start()
-    if not os.getenv("VERCEL"):  # serverless instances are short-lived: warm-up would only compete with the first request
+    # Skip the warm-up on serverless (short-lived instances) and wherever FINPILOT_SKIP_WARMUP=true: loading CLIP + OCR needs
+    # about 2 GB, so a small host (e.g. a 512 MB free instance) is killed right after boot. The models then load on first use.
+    if not os.getenv("VERCEL") and os.getenv("FINPILOT_SKIP_WARMUP", "").lower() not in ("1", "true", "yes"):
         threading.Thread(target=_warm_models, daemon=True).start()
     yield
 
