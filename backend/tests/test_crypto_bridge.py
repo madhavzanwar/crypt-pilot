@@ -513,8 +513,12 @@ def test_check_wallet_real_unreachable_port_returns_none(monkeypatch):
 def test_router_is_included_in_finpilot_app():
     from app.main import app
 
-    paths = {getattr(r, "path", "") for r in app.routes}
-    assert "/api/crypto/status" in paths and "/api/crypto/{path:path}" in paths
+    # app.routes is not a flat list of paths on FastAPI >= 0.160 (included routers are nested), so ask the schema and the app
+    assert "/api/crypto/status" in app.openapi()["paths"]
+    from fastapi.testclient import TestClient
+
+    r = TestClient(app).get("/api/crypto/status")
+    assert r.status_code != 404 and r.headers["content-type"].startswith("application/json")
 
 
 # ---- review fixes ----------------------------------------------------------------------------------------------------

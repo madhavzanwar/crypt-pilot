@@ -79,7 +79,15 @@ def _coefficient_of_variation(values: list[float]) -> float:
     return abs(stdev / mean)
 
 
-def detect_recurring(df: pd.DataFrame) -> list[RecurringObligation]:
+def roll_forward(next_date: date, interval_days: int, today: date) -> date:
+    """First expected date on the series' cadence that is not in the past (a "Next" date must never be before today)."""
+    if next_date >= today or interval_days <= 0:
+        return next_date
+    periods = -(-(today - next_date).days // interval_days)  # ceil
+    return next_date + timedelta(days=periods * interval_days)
+
+
+def detect_recurring(df: pd.DataFrame, today: date | None = None) -> list[RecurringObligation]:
     """Group transactions by normalized merchant and flag recurring series.
 
     Criteria:
@@ -146,7 +154,7 @@ def detect_recurring(df: pd.DataFrame) -> list[RecurringObligation]:
         confidence = max(0.05, min(1.0, confidence))
 
         last_date = dates[-1]
-        next_expected_date = last_date + timedelta(days=typical_interval)
+        next_expected_date = roll_forward(last_date + timedelta(days=typical_interval), typical_interval, today or date.today())
 
         # representative amount: median (robust to outlier one-off surcharges)
         rep_amount = statistics.median(amounts)

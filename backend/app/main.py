@@ -74,7 +74,15 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="FinPilot API", version="0.1.0", lifespan=lifespan)
+_prod_hint = bool(os.getenv("ALLOWED_ORIGINS", "").strip()) or bool(os.getenv("VERCEL"))
+# /docs, /redoc and /openapi.json describe every route: on by default for local/demo runs, off when production origins
+# are configured (or on Vercel) unless FINPILOT_ENABLE_DOCS=true.
+_docs_on = os.getenv("FINPILOT_ENABLE_DOCS", "false" if _prod_hint else "true").lower() == "true"
+
+app = FastAPI(
+    title="FinPilot API", version="0.1.0", lifespan=lifespan,
+    docs_url="/docs" if _docs_on else None, redoc_url="/redoc" if _docs_on else None, openapi_url="/openapi.json" if _docs_on else None,
+)
 
 # SECURITY: in dev, allow any localhost/127.0.0.1 port (next dev picks a
 # different one whenever 3000 is busy). In production, ALLOWED_ORIGINS must
@@ -128,6 +136,29 @@ app.include_router(security_router)
 app.include_router(expenses_router, prefix="/api")
 app.include_router(webhooks_router, prefix="/api")
 app.include_router(crypto_router)  # CryptPilot bridge: already carries its own /api/crypto prefix
+
+
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+}
+# Interactive docs load their UI from a CDN and inline scripts, so only they are exempt from the CSP.
+_DOC_PATHS = ("/docs", "/redoc", "/openapi.json")
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """JSON API: never framed, never sniffed, no referrer, HTTPS only. The CSP forbids everything because an API response
+    is data, not a page."""
+    response = await call_next(request)
+    for k, v in _SECURITY_HEADERS.items():
+        response.headers.setdefault(k, v)
+    if not request.url.path.startswith(_DOC_PATHS):
+        response.headers.setdefault("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+    return response
 
 
 @app.middleware("http")

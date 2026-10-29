@@ -179,15 +179,11 @@ def build_forecast(
         # the real empirical distribution's shape (skew, fat tails) rather
         # than assuming normality.
         samples = rng.choice(residual_hist, size=(_N_BOOTSTRAP, horizon_days), replace=True)
-        cum_samples = np.cumsum(samples, axis=1)
-        # de-mean so the bootstrap band is centered on 0 extra drift (the
-        # deterministic average residual is already baked into p50_path);
-        # this isolates the *noise around the mean*, not a second copy of
-        # the mean itself.
-        cum_samples -= cum_avg_residual  # broadcast subtract the expected mean path
-        balance_samples = starting_balance + cum_scheduled + cum_samples
-        p10_path = np.percentile(balance_samples, 10, axis=0)
-        p90_path = np.percentile(balance_samples, 90, axis=0)
+        balance_samples = starting_balance + cum_scheduled + np.cumsum(samples, axis=1)
+        # All three bands come from the SAME bootstrap distribution, so P10 <= P50 <= P90 holds by construction.
+        # (Earlier, P10/P90 were taken around a de-meaned sample while P50 was the mean path: with skewed daily spend the
+        # sample P10 landed above the mean path and the clamp below flattened P10 onto P50.)
+        p10_path, p50_path, p90_path = np.percentile(balance_samples, [10, 50, 90], axis=0)
     else:
         # APPROXIMATION (documented above): widening normal band, stddev
         # grows with sqrt(elapsed days) under a random-walk assumption.

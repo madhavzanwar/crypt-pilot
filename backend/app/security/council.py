@@ -27,6 +27,7 @@ from app.security import agents, chain_analyst
 URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 _SPREAD = 25  # an agent this many points from the median gets a second turn
 _TTL = 600.0
+_CACHE_MAX = 256
 _cache: dict[str, tuple[float, dict]] = {}
 
 
@@ -175,17 +176,18 @@ async def _chain_vote(wallets: list[str], lang: str) -> tuple[dict, int]:
         return chain_analyst.council_vote([chain_analyst._offline(w, 0) for w in wallets]), 0
 
 
-async def convene(user_id: str, wallets: list[str] | None = None, lang: str = "en") -> AsyncIterator[dict]:
+async def convene(user_id: str, wallets: list[str] | None = None, lang: str = "en", rejected: int = 0) -> AsyncIterator[dict]:
     """Progress events: facts, vote (as each agent finishes), debate, then the final verdict.
 
     With `wallets` (already cleaned by chain_analyst.clean_wallets) an eighth specialist, Chain Analyst, screens them on the
-    crypto service and votes. Without wallets it does not run and everything below is exactly the seven-agent council."""
+    crypto service and votes. `rejected` is how many entered wallets were dropped as invalid addresses (reported, never silent).
+    Without wallets it does not run and everything below is exactly the seven-agent council."""
     wallets = list(wallets or [])
     facts = await asyncio.to_thread(compact_facts, user_id)
     facts_s = facts_json(facts)
     s = get_settings()
     use_model = bool(s.nvidia_chat_api_key)
-    key = hashlib.sha1(f"{facts_s}|{s.nvidia_council_model}|{use_model}{'|w:' + ','.join(wallets) if wallets else ''}".encode()).hexdigest()
+    key = hashlib.sha1(f"{facts_s}|{s.nvidia_council_model}|{use_model}{'|w:' + ','.join(wallets) if wallets else ''}|lang:{lang}|rej:{rejected}".encode()).hexdigest()
     hit = _cache.get(key)
     if hit and time.monotonic() - hit[0] < _TTL:
         yield {"type": "verdict", "cached": True, **hit[1]}
@@ -236,7 +238,24 @@ async def convene(user_id: str, wallets: list[str] | None = None, lang: str = "e
             result["actions"] = [chain_vote["do"]] + [a for a in result["actions"] if a.lower() != chain_vote["do"].lower()][:2]
     offline = bool(chain_vote) and any(r["status"] == "offline" for r in chain_vote["chain"]["wallets"])
     if wallets:
-        result["chain"] = {"wallets": len(wallets), "voted": bool(chain_vote) and not chain_vote.get("abstain"), "offline": offline}
+        unverified = chain_analyst.unverified_count(chain_vote["chain"]["wallets"]) if chain_vote else len(wallets)
+        result["chain"] = {"wallets": len(wallets), "voted": bool(chain_vote) and not chain_vote.get("abstain"), "offline": offline,
+                           "unverified": unverified}
+        if unverified:  # UNKNOWN / unscreened is not safe: say so in the verdict itself, never leave a bare "low"
+            result["caveat"] = chain_analyst.unverified_caveat(unverified)
+            if chain_analyst.UNVERIFIED_ACTION.lower() not in (a.lower() for a in result["actions"]):
+                result["actions"] = [*result["actions"][:2], chain_analyst.UNVERIFIED_ACTION]
+    if rejected:
+        chain = result.setdefault("chain", {"wallets": 0, "voted": False, "offline": False, "unverified": 0})
+        chain["rejected"] = rejected
+        chain["unverified"] = chain.get("unverified", 0) + rejected
+        result["caveat"] = chain_analyst.unverified_caveat(chain["unverified"])
+        if chain_analyst.UNVERIFIED_ACTION.lower() not in (a.lower() for a in result["actions"]):
+            result["actions"] = [*result["actions"][:2], chain_analyst.UNVERIFIED_ACTION]
     if not offline:  # an unreachable crypto service must not be remembered for ten minutes
-        _cache[key] = (time.monotonic(), result)
+        now = time.monotonic()
+        if len(_cache) >= _CACHE_MAX:  # bounded: drop expired entries, then the oldest
+            for k in [k for k, (t, _) in _cache.items() if now - t >= _TTL] or [min(_cache, key=lambda k: _cache[k][0])]:
+                _cache.pop(k, None)
+        _cache[key] = (now, result)
     yield {"type": "verdict", "cached": False, **result}

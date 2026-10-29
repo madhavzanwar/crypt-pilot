@@ -183,10 +183,25 @@ def cross_check(findings: list[dict]) -> None:
 
 
 def risk_score(findings: list[dict]) -> int:
-    """Severity weights; corroborated findings count 1.25x, ones the reviewing AI doubts count half."""
-    total = 0.0
+    """Severity weights; corroborated findings count 1.25x, ones the reviewing AI doubts count half.
+
+    Findings from different agents that point at the same transactions are one problem seen twice
+    (e.g. a double-charged EMI flagged by both the duplicate detector and the fraud hunter), so they
+    count once, at the heaviest weight, with the corroboration uplift.
+    """
+    def weight(f: dict, corroborated: bool) -> float:
+        return _WEIGHT[f["severity"]] * (1.25 if corroborated else 1) * (0.5 if f.get("ai", {}).get("verdict") == "doubt" else 1)
+
+    total, groups = 0.0, defaultdict(list)
     for f in findings:
-        total += _WEIGHT[f["severity"]] * (1.25 if f.get("corroborated_by") else 1) * (0.5 if f.get("ai", {}).get("verdict") == "doubt" else 1)
+        ids = frozenset(f.get("txn_ids") or ())
+        if ids:
+            groups[ids].append(f)
+        else:
+            total += weight(f, bool(f.get("corroborated_by")))
+    for group in groups.values():
+        agents_here = {f["agent"] for f in group}
+        total += max(weight(f, bool(f.get("corroborated_by")) or len(agents_here) > 1) for f in group)
     return min(100, round(total))
 
 
@@ -238,9 +253,20 @@ def write_verdict(findings: list[dict], score: int, run: str | None = None) -> t
     return None, None, "; ".join(errors) + ". The findings above are real; only the written explanation is missing."
 
 
-def verdict_for(findings: list[dict], score: int, run: str | None = None) -> tuple[dict | None, str | None, str | None]:
+def verdict_for(findings: list[dict], score: int, run: str | None = None, unverified: int = 0) -> tuple[dict | None, str | None, str | None]:
+    """`unverified` = wallets the user asked about that came back UNKNOWN / not screened. They are never an all-clear:
+    with no other findings the verdict says what was NOT checked, and with findings the caveat is added to what_to_do."""
     if findings:
-        return write_verdict(findings, score, run)
+        verdict, source, error = write_verdict(findings, score, run)
+        if verdict and unverified:
+            verdict["what_to_do"] = [*verdict["what_to_do"], chain_analyst.UNVERIFIED_ACTION]
+            verdict["caveat"] = chain_analyst.unverified_caveat(unverified)
+        return verdict, source, error
+    if unverified:
+        return {"headline": "No problems found in your transactions, but some wallets are unverified.",
+                "what_is_wrong": chain_analyst.unverified_caveat(unverified),
+                "what_to_do": [chain_analyst.UNVERIFIED_ACTION, "Re-run after your next sync."],
+                "caveat": chain_analyst.unverified_caveat(unverified)}, "rules", None
     return {"headline": "No security problems found.", "what_is_wrong": "All checks came back clean on your current data.", "what_to_do": ["Re-run after your next sync."]}, "rules", None
 
 
@@ -262,7 +288,7 @@ def save_report(user_id: str, run: str, rows: list, findings: list[dict], score:
     return report
 
 
-def investigate(user_id: str, pace: float = 0.35, wallets: list[str] | None = None, lang: str = "en"):
+def investigate(user_id: str, pace: float = 0.35, wallets: list[str] | None = None, lang: str = "en", rejected: int = 0):
     """Generator of progress events; the last one is the saved report.
 
     With `wallets` (cleaned by chain_analyst.clean_wallets) the Chain Analyst joins as a tenth stage, just before the Risk
@@ -290,7 +316,8 @@ def investigate(user_id: str, pace: float = 0.35, wallets: list[str] | None = No
             res, extra = chain_analyst.evidence_step(wallets, lang)
             all_findings += res
         elif key == "verdict_writer":
-            verdict, source, error = verdict_for(scored(all_findings), score, run)
+            verdict, source, error = verdict_for(scored(all_findings), score, run,
+                                                 unverified=summaries.get(chain_analyst.AGENT_ID, {}).get("unverified", 0) + rejected)
             res, extra = [], {"source": source, "error": error}
         else:
             res, extra = CHECKS[key](rows, accounts), {}
@@ -302,7 +329,7 @@ def investigate(user_id: str, pace: float = 0.35, wallets: list[str] | None = No
         telemetry.record(kind="stage", run=run, agent=key, step="agent", ms=summaries[key]["ms"], findings=len(res))
         yield {"type": "agent", "agent": key, "status": "done", **summaries[key]}
     report = save_report(user_id, run, rows, all_findings, score, list(summaries.values()), verdict, source, error,
-                         {"wallets_screened": wallets} if wallets else None)
+                         {"wallets_screened": wallets, "wallets_rejected": rejected} if wallets or rejected else None)
     yield {"type": "report", "report": report}
 
 

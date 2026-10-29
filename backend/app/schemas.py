@@ -121,6 +121,7 @@ class Debt(BaseModel):
     interest_rate_apr: float
     minimum_payment: float
     due_day_of_month: int
+    account_name: Optional[str] = None  # human name of the account the debt sits on (never show account_id to users)
 
 
 class Income(BaseModel):

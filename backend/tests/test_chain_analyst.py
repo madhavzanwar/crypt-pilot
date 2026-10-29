@@ -201,7 +201,8 @@ def test_council_with_a_blocked_wallet_adds_an_eighth_vote_that_counts(risk_coun
     chain = [e["vote"] for e in events if e["type"] == "vote" and e["vote"]["agent"] == "chain_analyst"]
     assert len(chain) == 1 and chain[0]["level"] == "high" and len(verdict["votes"]) == 8
     assert sum(verdict["counts"].values()) == 8 and verdict["counts"]["high"] == base["counts"].get("high", 0) + 1
-    assert verdict["chain"] == {"wallets": 1, "voted": True, "offline": False}
+    assert verdict["chain"] == {"wallets": 1, "voted": True, "offline": False, "unverified": 0}
+    assert "caveat" not in verdict
     assert any(a.startswith("Do not send funds") for a in verdict["actions"]) or len(verdict["actions"]) == 3
     assert service == [BLOCK_ADDR]
 
@@ -276,7 +277,10 @@ def test_evidence_with_wallets_adds_one_finding_per_wallet_before_the_risk_score
 def test_evidence_clean_and_unknown_wallets_do_not_raise_the_score(ledger, service):
     report = investigate([ALLOW_ADDR, UNKNOWN_ADDR])[-1]["report"]
     assert report["risk_score"] == 0 and len([f for f in report["findings"] if f["agent"] == "chain_analyst"]) == 2
-    assert report["verdict"]["headline"] == "No security problems found."
+    # BUG-017: an UNKNOWN wallet is not an all-clear, the verdict must say it was not verified
+    assert report["verdict"]["headline"] != "No security problems found."
+    assert "unverified" in report["verdict"]["headline"].lower() and "1 wallet" in report["verdict"]["what_is_wrong"]
+    assert chain_analyst.UNVERIFIED_ACTION in report["verdict"]["what_to_do"]
 
 
 def test_evidence_offline_service_abstains(ledger, monkeypatch):
@@ -343,3 +347,96 @@ def test_a_malformed_service_reply_does_not_break_the_council_or_the_investigati
     assert verdict["type"] == "verdict" and verdict["chain"]["wallets"] == 1
     monkeypatch.setattr(chain_analyst, "_evidence_step", lambda w, lang="en": (_ for _ in ()).throw(RuntimeError("boom")))
     assert chain_analyst.evidence_step([BLOCK_ADDR]) == ([], {"error": chain_analyst.OFFLINE_NOTE, "findings": 0})
+
+
+# --- BUG-016: real checksums, and why a wallet got no answer ----------------------------------------------------
+
+
+@pytest.mark.parametrize("addr", [BLOCK_ADDR, WARN_ADDR, ALLOW_ADDR, UNKNOWN_ADDR,
+                                  "bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297",  # taproot, bech32m
+                                  "DEMO-w00380"])
+def test_valid_addresses_pass_checksum(addr):
+    assert chain_analyst.valid_address(addr) == addr
+
+
+@pytest.mark.parametrize("addr", [
+    "1Q8f6cESGGLkiExCwhnPCTzyLqmAUZg3Wv",  # the audit's bad-checksum address
+    "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNb",  # last char changed
+    "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdr",  # bech32 checksum broken
+    "bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3298",  # bech32m checksum broken
+])
+def test_bad_checksum_addresses_are_rejected_before_any_call(service, addr):
+    assert chain_analyst.valid_address(addr) is None
+    assert chain_analyst.clean_wallets([addr]) == ([], 1)
+    assert service == []
+
+
+@pytest.mark.parametrize("answer,failure,fragment", [
+    (None, "unreachable", "could not be reached"),
+    ({"status": "error", "error": "invalid_address", "http": 400}, "rejected", "rejected this address"),
+    ({"status": "error", "error": "rate_limited", "http": 429}, "rate_limited", "rate limiting"),
+    ({"status": "error", "error": "internal", "http": 503}, "unreachable", "could not be reached"),
+])
+def test_no_answer_reasons_are_distinguished(monkeypatch, answer, failure, fragment):
+    async def fake(address, lang="en"):
+        return answer
+
+    monkeypatch.setattr(chain_analyst, "check_wallet", fake)
+    r = screen(ALLOW_ADDR)[0]
+    assert r["status"] == "offline" and r["failure"] == failure and fragment in r["reason"]
+    assert chain_analyst.unverified_count([r]) == 1
+
+
+def test_rejected_wallets_are_reported_by_the_council(risk_council, service):
+    council._cache.clear()
+    bad = "1Q8f6cESGGLkiExCwhnPCTzyLqmAUZg3Wv"
+    wallets, rejected = chain_analyst.clean_wallets([bad])
+    verdict = convene_with_rejected(wallets, rejected)[-1]
+    assert verdict["chain"]["rejected"] == 1 and verdict["chain"]["unverified"] == 1
+    assert "could not be verified" in verdict["caveat"]
+    assert chain_analyst.UNVERIFIED_ACTION in verdict["actions"]
+
+
+def test_unknown_only_council_is_not_an_all_clear(risk_council, service):
+    council._cache.clear()
+    verdict = convene([UNKNOWN_ADDR])[-1]
+    assert verdict["chain"]["unverified"] == 1 and verdict["chain"]["voted"] is False
+    assert "not an all-clear" in verdict["caveat"] and chain_analyst.UNVERIFIED_ACTION in verdict["actions"]
+
+
+def test_council_cache_is_per_language_and_bounded(risk_council, service):
+    council._cache.clear()
+
+    def run(lang):
+        async def go():
+            return [e async for e in council.convene("u", wallets=[UNKNOWN_ADDR], lang=lang)]
+        return asyncio.run(go())[-1]
+
+    assert run("en")["cached"] is False
+    assert run("hi")["cached"] is False  # a Hindi request must not be answered from the English cache entry
+    assert run("hi")["cached"] is True
+    council._cache.clear()
+    for i in range(council._CACHE_MAX):
+        council._cache[f"k{i}"] = (council.time.monotonic(), {})
+    assert run("en")["cached"] is False
+    assert len(council._cache) <= council._CACHE_MAX
+
+
+def convene_with_rejected(wallets, rejected):
+    async def go():
+        return [e async for e in council.convene("u", wallets=wallets, rejected=rejected)]
+    return asyncio.run(go())
+
+
+# --- BUG-043: the screening body is bounded ---------------------------------------------------------------------
+
+
+def test_screening_body_is_bounded():
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    c = TestClient(app)
+    assert c.post("/api/security/demo-priya/council", json={"wallets": [ALLOW_ADDR] * 21}).status_code == 422
+    assert c.post("/api/security/demo-priya/council", json={"wallets": ["1" * 101]}).status_code == 422
+    assert c.post("/api/security/demo-priya/council", json={"wallets": ["x" * 50_000]}).status_code == 422

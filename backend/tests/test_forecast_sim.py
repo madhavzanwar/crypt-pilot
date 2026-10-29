@@ -379,3 +379,16 @@ def test_affordability_strategy_ranking_deterministic_across_calls():
     ]
     strategy_orders = [[s["strategy"] for s in r.affordability_strategies] for r in runs]
     assert strategy_orders[0] == strategy_orders[1] == strategy_orders[2]
+
+
+def test_p10_is_not_flattened_onto_p50_for_demo_personas():
+    """BUG-021: with skewed daily spend the bootstrap P10 used to land above the mean path and was clamped to P50."""
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    c = TestClient(app)
+    for uid in ("demo-priya", "demo-arjun", "demo-meera"):
+        pts = c.get(f"/api/dashboard/{uid}").json()["forecast"]["points"]
+        for p in pts[30:]:  # past the first weeks the band must have real width on both sides
+            assert p["p10"] < p["p50"] < p["p90"], (uid, p)

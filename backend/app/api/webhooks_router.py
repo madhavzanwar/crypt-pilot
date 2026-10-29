@@ -20,7 +20,8 @@ def _signature_ok(raw: bytes, signature: str, secret: str) -> bool:
         candidates.append(json.dumps(json.loads(raw), separators=(",", ":"), ensure_ascii=False).encode())
     except ValueError:
         pass
-    return any(hmac.compare_digest(hmac.new(secret.encode(), c, hashlib.sha256).hexdigest(), signature) for c in candidates)
+    given = signature.strip().encode("utf-8", "replace")  # compare bytes: compare_digest raises TypeError on non-ASCII str
+    return any(hmac.compare_digest(hmac.new(secret.encode(), c, hashlib.sha256).hexdigest().encode(), given) for c in candidates)
 
 
 @router.post("/webhooks/setu-status")
@@ -33,5 +34,8 @@ async def setu_status(request: Request) -> dict:
             raise HTTPException(400, "Signature missing")
         if not _signature_ok(raw, sig, secret):
             raise HTTPException(401, "Invalid signature")
-    log.warning("setu status notice: %s", raw[:4000].decode("utf-8", "replace"))
+    if secret:  # only a signed body is worth logging; an unsigned one is never echoed (log forging / log flooding)
+        log.warning("setu status notice: %s", raw[:4000].decode("utf-8", "replace"))
+    else:
+        log.warning("setu status notice ignored: no SETU_STATUS_WEBHOOK_SECRET configured (%d bytes, not logged)", len(raw))
     return {"ok": True}

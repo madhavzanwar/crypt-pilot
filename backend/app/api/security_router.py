@@ -7,7 +7,9 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from typing import Annotated
+
+from pydantic import BaseModel, Field, StringConstraints
 
 from app.api.connectors_router import CATALOG, DATASET_FILES, _dataset
 from app.api.jobs_router import enqueue_evidence
@@ -21,18 +23,19 @@ router = APIRouter(prefix="/api/security", tags=["security"])
 
 
 class Screening(BaseModel):
-    """Optional body for the councils: public crypto wallet addresses for the Chain Analyst to screen (never seed phrases or keys)."""
-    wallets: list[str] = []
+    """Optional body for the councils: public crypto wallet addresses for the Chain Analyst to screen (never seed phrases or keys).
+    Bounded so a huge body cannot be pushed through validation (the longest real address is 90 characters)."""
+    wallets: list[Annotated[str, StringConstraints(max_length=100)]] = Field(default_factory=list, max_length=20)
     lang: str = "en"
 
 
-def _wallets(body: Screening | None) -> tuple[list[str], str, str]:
-    """(valid wallets, language, audit note). Anything that is not an address is dropped without being stored or logged."""
+def _wallets(body: Screening | None) -> tuple[list[str], str, str, int]:
+    """(valid wallets, language, audit note, rejected count). Anything that is not an address is dropped without being stored or logged."""
     if body is None or not body.wallets:
-        return [], "en", ""
+        return [], "en", "", 0
     wallets, rejected = chain_analyst.clean_wallets(body.wallets)
     note = f" and sent {len(wallets)} public wallet address(es) to the crypto graph service for the Chain Analyst" if wallets else ""
-    return wallets, body.lang if body.lang in ("en", "hi") else "en", note + (f" ({rejected} ignored)" if rejected else "")
+    return wallets, body.lang if body.lang in ("en", "hi") else "en", note + (f" ({rejected} ignored)" if rejected else ""), rejected
 
 
 def _log(request: Request, user_id: str, what: str) -> None:
@@ -42,9 +45,9 @@ def _log(request: Request, user_id: str, what: str) -> None:
 
 @router.post("/{user_id}/investigate")
 def investigate(request: Request, body: Screening | None = None, user_id: str = Depends(resolve_user_id)) -> StreamingResponse:
-    wallets, lang, note = _wallets(body)
+    wallets, lang, note, rejected = _wallets(body)
     _log(request, user_id, "Evidence Room investigation read your transactions and accounts" + note)
-    return StreamingResponse((json.dumps(e, default=str) + "\n" for e in agents.investigate(user_id, wallets=wallets, lang=lang)), media_type="application/x-ndjson")
+    return StreamingResponse((json.dumps(e, default=str) + "\n" for e in agents.investigate(user_id, wallets=wallets, lang=lang, rejected=rejected)), media_type="application/x-ndjson")
 
 
 @router.post("/{user_id}/investigate-job")
@@ -56,11 +59,11 @@ def investigate_job(request: Request, user_id: str = Depends(resolve_user_id)) -
 
 @router.post("/{user_id}/council")
 async def convene_council(request: Request, body: Screening | None = None, user_id: str = Depends(resolve_user_id)) -> StreamingResponse:
-    wallets, lang, note = _wallets(body)
+    wallets, lang, note, rejected = _wallets(body)
     _log(request, user_id, "Risk Council read a summary of your finances (no raw transactions)" + note)
 
     async def events():
-        async for e in council.convene(user_id, wallets=wallets, lang=lang):
+        async for e in council.convene(user_id, wallets=wallets, lang=lang, rejected=rejected):
             yield json.dumps(e, default=str) + "\n"
 
     return StreamingResponse(events(), media_type="application/x-ndjson")
