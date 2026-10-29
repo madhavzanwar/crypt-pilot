@@ -28,10 +28,16 @@ fb login:list 2>&1 | grep -qi "@" || die "not logged in. Run: firebase login   (
 jfield() { node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s.slice(s.indexOf("{")));const r=eval("j"+process.argv[1]);console.log(r===undefined?"":(typeof r==="string"?r:JSON.stringify(r)))}catch(e){console.log("")}})' "$1"; }
 
 say "[1/7] project $PROJECT"
-if fb projects:list --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s.slice(s.indexOf("{")));process.exit((j.result||[]).some(p=>p.projectId===process.argv[1])?0:1)}catch(e){process.exit(1)}})' "$PROJECT"; then
+# Do not depend on the shape of the CLI's JSON: the id appearing in the project list (JSON or table) means we have it.
+if fb projects:list --json 2>&1 | grep -q -F "$PROJECT"; then
   say "  already exists, reusing it"
 else
-  fb projects:create "$PROJECT" --display-name "$NAME" || die "could not create the project (the id may be taken; pick another)."
+  OUT="$(fb projects:create "$PROJECT" --display-name "$NAME" 2>&1)"; say "$OUT"
+  if printf '%s' "$OUT" | grep -q "already a project with ID"; then
+    PROBE="$(fb apps:list --project "$PROJECT" 2>&1)"
+    if printf '%s' "$PROBE" | grep -Eqi "permission|not have|denied|403|not found|404"; then die "the project id '$PROJECT' is taken by another account. Pick a different id."; fi
+    say "  already yours, reusing it"
+  elif printf '%s' "$OUT" | grep -qi "error"; then die "could not create the project: see the message above."; fi
 fi
 
 say "[2/7] web app"
