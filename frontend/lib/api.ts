@@ -124,6 +124,12 @@ async function errorMessage(path: string, res: Response): Promise<string> {
     console.error(`API ${path} failed: ${res.status} ${text}`);
     return "Something went wrong on our side. Please try again in a moment.";
   }
+  // A non-JSON body (an HTML 404 page from the proxy, say) is noise for the user: keep it in the console only.
+  const trimmed = text.trim();
+  if (trimmed.startsWith("<") || trimmed.length > 200) {
+    console.error(`API ${path} failed: ${res.status} ${trimmed.slice(0, 500)}`);
+    return `API ${path} failed: ${res.status}`;
+  }
   return `API ${path} failed: ${res.status} ${text}`;
 }
 

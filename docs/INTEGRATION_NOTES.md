@@ -41,3 +41,21 @@ verification results are added by the lead after integration.
   one pair of outer quotes removed).
 - `import-config.ps1` writes only an allowlist of paths; `vercel-env-push.ps1` skips values that point at localhost.
 - PowerShell scripts could not be executed in the Linux sandbox (no `pwsh`); those edits are untested.
+
+## Verification results (measured on `main` 62e1047, plus the changes below)
+
+| Gate | Result |
+|---|---|
+| Backend `pytest tests` (`--noconftest`, no Firestore emulator) | 597 passed, 0 failed |
+| crypto-service `pytest` | 268 passed, 3 skipped on 62e1047; 269 passed, 3 skipped with the credit-cap guard below |
+| Frontend `next typegen` + `tsc --noEmit` | 0 errors |
+| Frontend `eslint .` | 0 errors, 24 warnings |
+| Frontend `next build` (Next 16.4.3, `BACKEND_URL` set) | passes, 37/37 static pages |
+
+Not run on this tree: the Playwright browser scripts, a live backend/crypto smoke, Docker builds, Vercel, anything against real Dodo, Wispr, TigerGraph, a wallet or a microphone. (An independent branch of the same fixes was verified live with Playwright and curl; see the PR description.)
+
+### Fixes added after integration
+
+- **Free-credit cap (BUG-049).** `FREE_SESSIONS_PER_IP_PER_DAY` (default 25) counted every visitor behind the bridge as one IP unless `CRYPTO_TRUST_PROXY=true`, so the 26th new visitor of the day would have received 0 credits. The cap now applies only when the IP identifies a visitor: `CRYPTO_TRUST_PROXY=true`, or a public peer address. Verified live: 30 cookie-less visitors from a loopback peer all received 3 credits. **Set `CRYPTO_TRUST_PROXY=true` on the crypto-service wherever the bridge fronts it** to enable the cap.
+- **API error text.** A non-JSON 4xx body (an HTML 404 page from a missing proxy rewrite) was shown verbatim in the UI; it now goes to the console and the user sees `API <path> failed: <status>`.
+- **Production build needs `BACKEND_URL` at build time.** The `/api/*` rewrite is baked in; without it the app proxies nothing (in dev the rewrite defaults to `http://127.0.0.1:8000`).
