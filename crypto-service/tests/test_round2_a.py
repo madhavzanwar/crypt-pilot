@@ -269,3 +269,62 @@ def test_bug089_lost_credit_race_is_not_cached(make_client: Any, demo: dict[str,
     assert p.cache.get(demo["BLOCK"]) is None, "the loser's result must not be served to others for free"
     ok = _chk(c, demo["BLOCK"])
     assert ok.status_code == 200 and ok.json()["cached"] is False and ok.json()["creditsRemaining"] == 0
+
+
+# ------------------------------------------------------------------------------------------------ BUG-046 / BUG-102
+
+
+def _words12() -> list[str]:
+    return ["abandon"] * 11 + ["about"]
+
+
+import pytest  # noqa: E402
+
+from app.services.address import looks_like_secret  # noqa: E402
+
+HEX64 = "e9873d79c6d87dc0fb6a5778633389f4453213303da61f20bd67fc233aa33262"
+WIF = "5" + "J" * 50  # synthetic WIF shape
+XPRV = "xprv" + "9" * 107  # synthetic extended-key shape (111 chars)
+
+
+@pytest.mark.parametrize("text", [
+    # BUG-102: space / hyphen / other separator split keys
+    " ".join(HEX64[i:i + 8] for i in range(0, 64, 8)),
+    "-".join(HEX64[i:i + 8] for i in range(0, 64, 8)),
+    ":".join(HEX64[i:i + 2] for i in range(0, 64, 2)),   # byte pairs (colon)
+    " ".join(HEX64[i:i + 2] for i in range(0, 64, 2)),   # space separated byte pairs
+    "my key: " + " ".join(HEX64[i:i + 16] for i in range(0, 64, 16)) + " thanks",
+    "0x" + HEX64[:30] + " " + HEX64[30:],
+    WIF[:20] + " " + WIF[20:],
+    WIF[:10] + "-" + WIF[10:30] + "_" + WIF[30:],
+    XPRV[:50] + " " + XPRV[50:],
+    # BUG-046: invisible separators, digits/punctuation between seed words, homoglyphs
+    "​".join(HEX64[i:i + 8] for i in range(0, 64, 8)),
+    "‎".join(_words12()),
+    "‮".join(_words12()),
+    "⁡".join(_words12()),
+    " ".join(f"{i} {w}" for i, w in enumerate(_words12(), 1)),
+    " ".join(f"{i}-{w}" for i, w in enumerate(_words12(), 1)),
+    " ".join(f"#{i} {w}" for i, w in enumerate(_words12(), 1)),
+    " / ".join(_words12()),
+    " | ".join(_words12()),
+    "_".join(_words12()),
+    ":".join(_words12()),
+    " ".join(_words12()).replace("a", "а"),            # Cyrillic a
+    " ".join(_words12()).replace("o", "о"),            # Cyrillic o
+])
+def test_bug046_bug102_split_and_obfuscated_secrets_are_caught(text: str) -> None:
+    assert looks_like_secret(text), text
+    assert looks_like_secret(text, address_field=True)
+
+
+@pytest.mark.parametrize("text", [
+    "check this wallet 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa please",
+    "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa 3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
+    "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq and bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0",
+    "is this wallet safe to pay? it was sent by my friend on 12 March 2026 for 150 dollars",
+    "the block height is 2048 and the fee is 12 sat per byte, face cafe bad dad",
+    "e9873d79 c6d87dc0",  # far too short to be a key
+])
+def test_bug046_normal_text_is_not_flagged(text: str) -> None:
+    assert not looks_like_secret(text)
