@@ -17,6 +17,7 @@ export function WalletGuardTile() {
   const router = useRouter();
   const [address, setAddress] = useState("");
   const [warn, setWarn] = useState(false);
+  const [invalid, setInvalid] = useState(false);
 
   function go(e: React.FormEvent) {
     e.preventDefault();
@@ -25,13 +26,16 @@ export function WalletGuardTile() {
     if (looksLikeSecret(a)) {
       setAddress("");
       setWarn(true);
+      setInvalid(false);
       return;
     }
     // Only a well-formed address is passed along, and it is only pre-filled: the user presses Check (1 credit) on the next page.
     if (a && !validateAddress(a, { allowDemo: true }).ok) {
       setWarn(false);
+      setInvalid(true);
       return;
     }
+    setInvalid(false);
     router.push(a ? `/wallet-guard?address=${encodeURIComponent(a)}` : "/wallet-guard");
   }
 
@@ -54,7 +58,8 @@ export function WalletGuardTile() {
         <form onSubmit={go} className="flex flex-col gap-2 sm:flex-row">
           <Input
             value={address}
-            onChange={(e) => setAddress(e.target.value)}
+            onChange={(e) => { setAddress(e.target.value); setInvalid(false); }}
+            aria-invalid={invalid || undefined}
             placeholder={t("d.wg_placeholder", "Paste a Bitcoin address")}
             aria-label={t("d.wg_placeholder", "Paste a Bitcoin address")}
             autoComplete="off"
@@ -68,6 +73,11 @@ export function WalletGuardTile() {
         {warn && (
           <p role="alert" className="text-xs font-medium text-ember">
             {t("d.wg_secret", "That looks like a seed phrase or private key. Never type it anywhere: we cleared it and sent nothing.")}
+          </p>
+        )}
+        {invalid && (
+          <p role="alert" className="text-xs font-medium text-ember">
+            {t("d.wg_invalid", "That is not a valid Bitcoin address. Check it for typos and try again.")}
           </p>
         )}
         <p className="text-[11px] text-pewter">
