@@ -5,7 +5,7 @@
 # Creates/reuses the project, registers a Web app, creates the (default) Firestore database, deploys firestore.rules, tries to enable
 # the sign-in providers from firebase.json, writes frontend\.env.local with the 7 NEXT_PUBLIC_FIREBASE_* values and replaces the old
 # project id in .firebaserc / firebase.json / .env.example. It never creates, downloads or prints a service-account key.
-# Free Spark plan only. This PowerShell script was NOT run (the bash twin was tested against a stubbed CLI on Linux).
+# Free Spark plan only. First run on Windows PowerShell 5.1 found the stderr problem handled by Fb below; the rest of this script is still untested there.
 param([Parameter(Mandatory = $true)][string]$Project, [string]$Region = "asia-south1", [string]$Name = "CryptPilot")
 
 $ErrorActionPreference = "Stop"
@@ -14,7 +14,13 @@ $OldId = "hackmatrix-3764f"
 if ($Project -notmatch '^[a-z0-9-]{6,30}$') { throw "Project id: 6-30 chars, lowercase letters, digits and hyphens only; globally unique." }
 if (-not (Get-Command firebase -ErrorAction SilentlyContinue)) { throw "Install the CLI first: npm i -g firebase-tools" }
 
-function Fb { & firebase @args --non-interactive 2>&1 }
+# Windows PowerShell 5.1 turns every stderr line of a native command into an error record, and the CLI prints progress
+# ("- Preparing the list of your Firebase projects") on stderr. Merge stderr, turn the records into plain strings, and do not stop on them.
+function Fb {
+    $old = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try { & firebase @args --non-interactive 2>&1 | ForEach-Object { "$_" } } finally { $ErrorActionPreference = $old }
+}
 function FbJson { $o = (Fb @args) -join "`n"; $i = $o.IndexOf("{"); if ($i -lt 0) { return $null }; try { $o.Substring($i) | ConvertFrom-Json } catch { $null } }
 function Find-Key($o) {
     if ($null -eq $o) { return $null }
