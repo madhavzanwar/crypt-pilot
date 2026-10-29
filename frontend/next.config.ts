@@ -1,6 +1,25 @@
 import type { NextConfig } from "next";
 
+// BUG-011: baseline security headers on every route. A script-src CSP is not
+// set because Next injects inline bootstrap scripts; the directives below are
+// the ones that are safe without a nonce pipeline.
+const securityHeaders = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+  { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=()" },
+  {
+    key: "Content-Security-Policy",
+    value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'",
+  },
+];
+
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders }];
+  },
   /* config options here */
   // Next.js 16 blocks cross-origin requests to dev-only resources (HMR,
   // dev fonts) by default. The app is reachable via both "localhost" and
