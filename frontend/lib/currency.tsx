@@ -127,9 +127,11 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const config = CURRENCIES[currency] || CURRENCIES.INR;
 
   const formatAmount = (amountInINR: number, options?: { showCents?: boolean }): string => {
-    const converted = amountInINR * config.rateFromINR;
     const isINR = config.code === "INR";
-    const maxDigits = options?.showCents ? 2 : isINR || Math.abs(converted) >= 100 ? 0 : 2;
+    const rawConverted = amountInINR * config.rateFromINR;
+    const maxDigits = options?.showCents ? 2 : isINR || Math.abs(rawConverted) >= 100 ? 0 : 2;
+    // a value that rounds to zero must not print as "-0" / "-₹0"
+    const converted = Math.round(rawConverted * 10 ** maxDigits) / 10 ** maxDigits === 0 ? 0 : rawConverted;
 
     try {
       return new Intl.NumberFormat(config.locale, {
