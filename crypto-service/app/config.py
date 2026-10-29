@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     session_secret: SecretStr = SecretStr("change_me")
     starting_credits: int = 3
+    # A session idle for longer than this is expired server-side (the cookie signature has no timestamp), 0 = never.
+    session_ttl_days: int = Field(default=30, ge=0)
     cache_ttl_seconds: int = 600
     admin_token: SecretStr = SecretStr("")
     log_salt: SecretStr = SecretStr("change_me")

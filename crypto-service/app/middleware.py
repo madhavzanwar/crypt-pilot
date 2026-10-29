@@ -13,7 +13,7 @@ from starlette.responses import JSONResponse, Response
 from app.config import Settings
 from app.logging_setup import log
 from app.ratelimit import client_ip_var, resolve_client_ip
-from app.session import new_session_id, read_session_id, set_session_cookie
+from app.session import new_session_id, read_session_id, session_is_live, set_session_cookie
 
 
 # Stateless public endpoints: no anonymous session (and no Set-Cookie) is minted for them.
@@ -34,6 +34,10 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
 
         client_ip_var.set(resolve_client_ip(request, self.settings))
         sid = read_session_id(request, self.settings)
+        state = getattr(request.app.state, "cryptiq", None)
+        if sid is not None and state is not None and request.url.path not in NO_COOKIE_PATHS \
+                and not session_is_live(state.db, sid, self.settings.session_ttl_days):
+            sid = None  # idle too long: start a fresh session instead of reviving the old one
         is_new = sid is None
         request.state.sid = sid or new_session_id()
 

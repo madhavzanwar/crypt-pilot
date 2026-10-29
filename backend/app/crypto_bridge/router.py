@@ -359,7 +359,7 @@ async def _probe_health() -> dict[str, Any]:
     return status
 
 
-@router.get("/status")
+@router.api_route("/status", methods=["GET", "HEAD"])
 async def crypto_status() -> JSONResponse:
     global _status_cache
     now = time.monotonic()

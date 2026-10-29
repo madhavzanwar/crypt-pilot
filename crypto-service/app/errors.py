@@ -39,7 +39,10 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(RequestValidationError)
     async def _validation(_: Request, exc: RequestValidationError) -> JSONResponse:
         # never echo the input back (it might be a secret)
-        fields = sorted({".".join(str(p) for p in e.get("loc", ())[1:]) for e in exc.errors()})
+        # json_invalid carries the character offset in `loc` ("invalid request: 14"): report "body" instead
+        fields = sorted({"body" if e.get("type") == "json_invalid" else
+                         ".".join(str(p) for p in e.get("loc", ())[1:] if isinstance(p, str))
+                         for e in exc.errors()})
         return _json(422, f"invalid request: {', '.join(f for f in fields if f) or 'body'}")
 
     @app.exception_handler(StarletteHTTPException)

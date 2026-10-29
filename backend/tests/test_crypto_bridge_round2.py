@@ -97,3 +97,9 @@ def test_global_ceiling_bounds_rotating_forwarded_for(monkeypatch):
     codes = [c.post("/api/crypto/check", json={"address": "x"}, headers={"x-forwarded-for": f"10.0.0.{i}"}).status_code
              for i in range(8)]
     assert codes[:5] == [200] * 5 and codes[5:] == [429] * 3
+
+
+def test_status_answers_head(monkeypatch):
+    c, _ = make(monkeypatch, lambda req: httpx.Response(200, json={"engine": "networkx"}))
+    assert c.head("/api/crypto/status").status_code == 200
+    assert c.get("/api/crypto/status").status_code == 200
