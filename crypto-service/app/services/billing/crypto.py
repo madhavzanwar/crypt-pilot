@@ -1,6 +1,6 @@
 """Crypto invoices for the Cake Wallet flow. TESTNET/SIGNET ONLY; this app never holds keys.
 
-BTC: amount = pack price x BTC_SATS_PER_USD + an invoice-specific 1..999 sats, so each payment can be
+BTC: amount = pack price x BTC_SATS_PER_USD + an invoice-specific 1..4999 sats, so each payment can be
 matched by exact amount at the public receive address. Confirmation is read from an Esplora-style
 explorer API (`/address/{addr}/txs`, `/blocks/tip/height`, as served by mempool.space and
 blockstream.info). XMR: payment URI only (`provider: "demo"`); there is no automatic confirmation
@@ -26,6 +26,8 @@ from app.services.billing import ledger
 
 POLL_MIN_INTERVAL_S = 10
 MAX_OPEN_INVOICES_PER_SESSION = 5
+AMOUNT_OFFSETS = 4999        # each open BTC invoice gets a unique 1..4999 sat offset on top of the pack price
+MAX_OPEN_BTC_INVOICES = 2000  # global ceiling on held offsets: beyond it new invoices get 503 instead of starving
 XMR_DEMO_PICONERO_PER_CREDIT = 10_000_000_000  # 0.01 XMR per credit, demo only (no real pricing)
 
 
@@ -57,13 +59,12 @@ class CryptoInvoices:
     def create(self, session_id: str, pack: Pack, coin: Literal["btc", "xmr"]) -> Invoice:
         now = datetime.now(UTC)
         inv_id = "inv_" + secrets.token_hex(10)
+        base_sats = 0
         if coin == "btc":
             if not self._btc_ready():
                 raise ApiError(503, "crypto_unavailable")
-            sats = round(pack.price_usd * self.s.btc_sats_per_usd) + secrets.randbelow(999) + 1
+            base_sats = round(pack.price_usd * self.s.btc_sats_per_usd)
             addr = self.s.btc_receive_address
-            amount = btc_amount_str(sats)
-            uri = f"bitcoin:{addr}?amount={amount}&label=Cryptiq%20{pack.id}"
         else:
             if not self.s.xmr_demo_address:
                 raise ApiError(503, "crypto_unavailable")
@@ -71,23 +72,31 @@ class CryptoInvoices:
             addr = self.s.xmr_demo_address
             amount = f"{sats / 1e12:.12f}".rstrip("0").rstrip(".")
             uri = f"monero:{addr}?tx_amount={amount}&tx_description=Cryptiq%20{pack.id}"
-        inv = Invoice(id=inv_id, session_id=session_id, pack_id=pack.id, coin=coin, address=addr, amount_atomic=sats,
-                      amount=amount, uri=uri, status="waiting", created_at=now,
-                      expires_at=now + timedelta(minutes=self.s.invoice_ttl_minutes))
         with self.db.session() as s:
             ledger.ensure_for_request(s, self.s, session_id)
             # free amounts held by invoices that ran out of time without ever being polled
             for stale in s.query(Invoice).filter(Invoice.status == "waiting", Invoice.expires_at < now):
                 stale.status = "expired"
+            s.flush()
             open_n = s.query(Invoice).filter(Invoice.session_id == session_id, Invoice.status == "waiting").count()
             if open_n >= MAX_OPEN_INVOICES_PER_SESSION:
                 raise ApiError(429, "too_many_open_invoices")
             if coin == "btc":
-                # amounts must be unique among open invoices at this address
-                clash = s.query(Invoice).filter(Invoice.status == "waiting", Invoice.amount_atomic == sats,
-                                                Invoice.coin == "btc").first()
-                if clash is not None:
-                    raise ApiError(409, "try_again")
+                # amounts must be unique among open invoices at this address: pick a free offset (never a blind
+                # random draw that can collide), and refuse politely when every slot is taken
+                taken = {a for (a,) in s.query(Invoice.amount_atomic).filter(
+                    Invoice.status == "waiting", Invoice.coin == "btc")}
+                if len(taken) >= MAX_OPEN_BTC_INVOICES:
+                    raise ApiError(503, "try_again_later")
+                free = [o for o in range(1, AMOUNT_OFFSETS + 1) if base_sats + o not in taken]
+                if not free:
+                    raise ApiError(503, "try_again_later")
+                sats = base_sats + secrets.choice(free)
+                amount = btc_amount_str(sats)
+                uri = f"bitcoin:{addr}?amount={amount}&label=Cryptiq%20{pack.id}"
+            inv = Invoice(id=inv_id, session_id=session_id, pack_id=pack.id, coin=coin, address=addr,
+                          amount_atomic=sats, amount=amount, uri=uri, status="waiting", created_at=now,
+                          expires_at=now + timedelta(minutes=self.s.invoice_ttl_minutes))
             s.add(inv)
         return inv
 
@@ -150,21 +159,38 @@ class CryptoInvoices:
         try:
             txs_r = await self.http.get(f"{base}/address/{address}/txs", timeout=8.0)
             txs_r.raise_for_status()
-            txs: list[dict[str, Any]] = txs_r.json()
+            txs = txs_r.json()
             tip_r = await self.http.get(f"{base}/blocks/tip/height", timeout=8.0)
             tip_r.raise_for_status()
             tip = int(tip_r.text.strip())
         except (httpx.HTTPError, ValueError) as exc:
             raise UpstreamError("explorer", type(exc).__name__) from exc
+        if not isinstance(txs, list):  # e.g. an error object served with HTTP 200
+            raise UpstreamError("explorer", "unexpected_payload")
         for tx in txs:
-            if used_txids and str(tx.get("txid")) in used_txids:
+            if not isinstance(tx, dict) or not isinstance(tx.get("txid"), str):
+                continue
+            if used_txids and tx["txid"] in used_txids:
                 continue  # already credited to another invoice with the same amount
-            status = tx.get("status") or {}
+            status = tx.get("status") if isinstance(tx.get("status"), dict) else {}
             block_time = status.get("block_time")
-            if block_time and datetime.fromtimestamp(int(block_time), UTC) < created_at - timedelta(minutes=5):
-                continue  # older than the invoice: cannot be its payment
-            for out in tx.get("vout", []):
-                if out.get("scriptpubkey_address") == address and int(out.get("value", -1)) == amount_sats:
-                    conf = tip - int(status["block_height"]) + 1 if status.get("confirmed") else 0
-                    return TxMatch(str(tx["txid"]), conf)
+            try:
+                if block_time and datetime.fromtimestamp(int(block_time), UTC) < created_at - timedelta(minutes=5):
+                    continue  # older than the invoice: cannot be its payment
+            except (TypeError, ValueError, OverflowError, OSError):
+                continue
+            vouts = tx.get("vout")
+            for out in vouts if isinstance(vouts, list) else []:
+                if not isinstance(out, dict) or out.get("scriptpubkey_address") != address:
+                    continue
+                try:
+                    value = int(out.get("value", -1))
+                except (TypeError, ValueError):
+                    continue
+                if value == amount_sats:
+                    height = status.get("block_height")
+                    confirmed = status.get("confirmed") is True and isinstance(height, int) \
+                        and not isinstance(height, bool)
+                    conf = tip - height + 1 if confirmed else 0  # a "confirmed" tx without a height counts as 0
+                    return TxMatch(tx["txid"], conf)
         return None

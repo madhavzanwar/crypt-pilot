@@ -328,3 +328,107 @@ def test_bug046_bug102_split_and_obfuscated_secrets_are_caught(text: str) -> Non
 ])
 def test_bug046_normal_text_is_not_flagged(text: str) -> None:
     assert not looks_like_secret(text)
+
+
+# ------------------------------------------------------------------------------------------------ BUG-044 / BUG-045
+
+from tests.test_payments import TB_ADDR  # noqa: E402
+
+import httpx  # noqa: E402
+
+BTC = dict(btc_receive_address=TB_ADDR, btc_sats_per_usd=1000, btc_explorer_base_url="https://explorer.test/api",
+           btc_confirmations=1)
+
+
+def _explorer(txs: Any, tip: str = "1000") -> Any:
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path.endswith("/blocks/tip/height"):
+            return httpx.Response(200, text=tip)
+        return httpx.Response(200, json=txs)
+    return handler
+
+
+def _new_invoice(c: TestClient) -> dict[str, Any]:
+    r = c.post("/api/crypto-invoice", json={"packId": "starter", "coin": "btc"})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+@pytest.mark.parametrize("payload", [
+    {"error": "rate limited"},                      # JSON dict instead of a list
+    "nope",
+    [None, 5, "x", {"txid": 5}],                      # junk entries
+    [{"txid": "ab" * 32, "status": "confirmed", "vout": "x"}],
+    [{"txid": "ab" * 32, "status": {"confirmed": True}, "vout": [None, {"scriptpubkey_address": TB_ADDR, "value": "abc"}]}],
+])
+def test_bug044_malformed_explorer_payloads_never_500(settings: Any, payload: Any) -> None:
+    c = client_with(settings, _explorer(payload), **BTC)
+    inv = _new_invoice(c)
+    r = c.get(f"/api/crypto-invoice/{inv['invoiceId']}")
+    assert r.status_code == 200 and r.json() == {"status": "waiting"}
+
+
+def test_bug044_confirmed_tx_without_block_height_is_unconfirmed_not_500(settings: Any) -> None:
+    box: dict[str, int] = {}
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path.endswith("/blocks/tip/height"):
+            return httpx.Response(200, text="1000")
+        return httpx.Response(200, json=[{"txid": "cd" * 32, "status": {"confirmed": True, "block_time": int(time.time())},
+                                          "vout": [{"scriptpubkey_address": TB_ADDR, "value": box["sats"]}]}])
+
+    c = client_with(settings, handler, **BTC)
+    inv = _new_invoice(c)
+    box["sats"] = round(float(inv["amount"]) * 1e8)
+    r = c.get(f"/api/crypto-invoice/{inv['invoiceId']}")
+    assert r.status_code == 200 and r.json() == {"status": "waiting"}  # needs >=1 confirmation and a height
+
+
+def test_bug045_slots_are_picked_from_free_offsets_and_exhaustion_is_503(settings: Any, monkeypatch: Any) -> None:
+    from app.services.billing import crypto as billing
+
+    monkeypatch.setattr(billing, "AMOUNT_OFFSETS", 6)
+    c = client_with(settings, _explorer([]), **BTC)
+    amounts = []
+    for _ in range(6):  # 6 different cookie-less sessions, one invoice each
+        c.cookies.clear()
+        amounts.append(_new_invoice(c)["amount"])
+    assert len(set(amounts)) == 6, "an offset must never be handed out twice (no random-collision 409s)"
+    c.cookies.clear()
+    r = c.post("/api/crypto-invoice", json={"packId": "starter", "coin": "btc"})
+    assert r.status_code == 503 and r.json() == {"error": "try_again_later"}
+
+
+def test_bug045_offset_space_is_larger_than_999() -> None:
+    from app.services.billing import crypto as billing
+
+    assert billing.AMOUNT_OFFSETS >= 4999 and billing.MAX_OPEN_INVOICES_PER_SESSION <= 5
+
+
+def test_bug045_invoice_creation_is_rate_limited_per_ip(settings: Any, monkeypatch: Any) -> None:
+    from app.ratelimit import limiter
+    from app.routers import crypto as crypto_router
+
+    s = type(settings)(_env_file=None, **{**settings.model_dump(), "app_env": "dev", "rate_limit_invoice": "2/hour",
+                                           "packs_json": __import__("tests.test_payments", fromlist=["PACKS"]).PACKS,
+                                           "trust_proxy": True, **BTC})
+    monkeypatch.setattr(crypto_router, "get_settings", lambda: s)
+    from app.main import build_state, create_app
+
+    limiter.reset()
+    limiter.enabled = True
+    c = TestClient(create_app(s, build_state(s)))
+    c.__enter__()
+    try:
+        codes = []
+        for _ in range(4):
+            c.cookies.clear()
+            codes.append(c.post("/api/crypto-invoice", json={"packId": "starter", "coin": "btc"},
+                                headers={"x-forwarded-for": "198.51.100.7"}).status_code)
+        assert codes == [200, 200, 429, 429]
+        other = c.post("/api/crypto-invoice", json={"packId": "starter", "coin": "btc"},
+                       headers={"x-forwarded-for": "198.51.100.8"})
+        assert other.status_code == 200  # a different client IP is unaffected
+    finally:
+        limiter.reset()
+        c.__exit__(None, None, None)

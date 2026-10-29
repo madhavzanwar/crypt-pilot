@@ -2,15 +2,21 @@ from __future__ import annotations
 
 import hmac
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Request
 
+from app.config import get_settings
 from app.deps import get_session_id, get_state
 from app.errors import ApiError
+from app.ratelimit import limiter
 from app.schemas.contract import CryptoInvoiceRequest, CryptoInvoiceResponse, CryptoInvoiceStatus, ErrorResponse
 from app.services.billing.crypto import CryptoInvoices
 from app.state import AppState
 
 router = APIRouter()
+
+
+def _invoice_limit() -> str:
+    return get_settings().rate_limit_invoice
 
 
 def _svc(state: AppState) -> CryptoInvoices:
@@ -19,7 +25,8 @@ def _svc(state: AppState) -> CryptoInvoices:
 
 @router.post("/api/crypto-invoice", response_model=CryptoInvoiceResponse, response_model_exclude_none=True,
              responses={404: {"model": ErrorResponse}, 503: {"model": ErrorResponse}})
-async def create_invoice(body: CryptoInvoiceRequest, state: AppState = Depends(get_state),
+@limiter.limit(_invoice_limit)
+async def create_invoice(request: Request, body: CryptoInvoiceRequest, state: AppState = Depends(get_state),
                          sid: str = Depends(get_session_id)) -> CryptoInvoiceResponse:
     pack = state.settings.pack(body.pack_id)
     if pack is None:
