@@ -251,6 +251,10 @@ def answer(
     if force_offline or not (settings.has_nvidia or settings.nvidia_chat_api_key):
         result = offline_router.route(user_id, message)
         result.source = "FinPilot rules"
+        if not force_offline:  # no AI key on this server: say so instead of looking broken
+            result.data_gaps.append(DataGap(
+                text="The AI model is not configured on this server, so I answered in basic mode.",
+                what_would_help="The site owner can add NVIDIA_API_KEY (free at build.nvidia.com) to turn on full AI answers."))
         return result
 
     # a short follow-up ("and last month?") inherits the topic of the previous user turn
