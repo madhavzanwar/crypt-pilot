@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import hashlib
 import re
 import time
 from typing import Any
@@ -43,13 +44,57 @@ def short(address: str, head: int = 6, tail: int = 6) -> str:
     return address if len(address) <= head + tail + 1 else f"{address[:head]}…{address[-tail:]}"
 
 
+_B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+_B32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+_B32_GEN = (0x3B6A57B2, 0x26508E6D, 0x1EA119FA, 0x3D4233DD, 0x2A1462B3)
+
+
+def _base58check_ok(a: str) -> bool:
+    n = 0
+    for ch in a:
+        n = n * 58 + _B58.index(ch)
+    raw = n.to_bytes(25, "big") if n.bit_length() <= 200 else b""
+    if len(raw) != 25:
+        return False
+    pad = len(a) - len(a.lstrip("1"))
+    if raw[:pad] != b"\0" * pad:  # each leading '1' is a zero byte
+        return False
+    return hashlib.sha256(hashlib.sha256(raw[:21]).digest()).digest()[:4] == raw[21:]
+
+
+def _bech32_polymod(values: list[int]) -> int:
+    chk = 1
+    for v in values:
+        top = chk >> 25
+        chk = (chk & 0x1FFFFFF) << 5 ^ v
+        for i in range(5):
+            chk ^= _B32_GEN[i] if (top >> i) & 1 else 0
+    return chk
+
+
+def _bech32_ok(a: str) -> bool:
+    """BIP-173 (witness v0, constant 1) / BIP-350 (v1+, bech32m 0x2bc830a3) checksum for a bc1... address."""
+    a = a.lower()
+    if "1" not in a:
+        return False
+    hrp, _, data = a.rpartition("1")
+    if hrp != "bc" or len(data) < 7 or any(c not in _B32 for c in data):
+        return False
+    vals = [_B32.index(c) for c in data]
+    const = _bech32_polymod([ord(c) >> 5 for c in hrp] + [0] + [ord(c) & 31 for c in hrp] + vals)
+    version = vals[0]
+    return const == (1 if version == 0 else 0x2BC830A3)
+
+
 def valid_address(raw: str) -> str | None:
-    """The normalised address when it looks like a Bitcoin address (or a DEMO- placeholder), else None."""
+    """The normalised address when it is a Bitcoin address with a valid checksum (or a DEMO- placeholder), else None."""
     a = (raw or "").strip()
-    if _DEMO.match(a) or _LEGACY.match(a):
+    if _DEMO.match(a):
         return a
+    if _LEGACY.match(a):
+        return a if _base58check_ok(a) else None
     if _BECH32.match(a) and a in (a.lower(), a.upper()):  # mixed case is invalid bech32
-        return a
+        return a if _bech32_ok(a) else None
     return None
 
 
@@ -95,16 +140,38 @@ def _reason(verdict: str, r: dict[str, Any], engine: str | None) -> str:
     return (text[0].upper() + text[1:] + ".")[:220]
 
 
-def _offline(address: str, rtt_ms: int) -> dict[str, Any]:
-    return {"address": address, "status": "offline", "verdict": None, "risk_score": None, "hops": None, "ofac": False,
-            "reason": f"{OFFLINE_NOTE}: the crypto service could not be reached.", "engine": None, "engine_label": None,
+_FAILURE_REASON = {
+    "unreachable": f"{OFFLINE_NOTE}: the crypto service could not be reached.",
+    "rejected": "The crypto service rejected this address as invalid (check the address for typos). It was not screened.",
+    "rate_limited": "The crypto service is rate limiting checks right now. Retry in a minute. This wallet was not screened.",
+}
+_REJECTED_CODES = {"invalid_address", "secret_input", "bad_address", "rejected"}
+_RATE_LIMIT_CODES = {"rate_limited", "too_many_requests"}
+
+
+def _failure_kind(resp: Any) -> str:
+    """Why a wallet got no answer: 'rejected' (HTTP 400), 'rate_limited' (HTTP 429) or 'unreachable' (5xx / network / bad body)."""
+    if isinstance(resp, dict):
+        code = str(resp.get("error") or resp.get("code") or "").lower()
+        http = resp.get("http") if isinstance(resp.get("http"), int) else resp.get("status_code")
+        if code in _REJECTED_CODES or http == 400:
+            return "rejected"
+        if code in _RATE_LIMIT_CODES or http == 429:
+            return "rate_limited"
+    return "unreachable"
+
+
+def _offline(address: str, rtt_ms: int, kind: str = "unreachable") -> dict[str, Any]:
+    """No answer for this wallet. `status` stays 'offline' (the UI contract); `failure` says why."""
+    return {"address": address, "status": "offline", "failure": kind, "verdict": None, "risk_score": None, "hops": None, "ofac": False,
+            "reason": _FAILURE_REASON[kind], "engine": None, "engine_label": None,
             "tigergraph": False, "ms": None, "rtt_ms": rtt_ms, "vote": None, "mock": False, "limitations": []}
 
 
 def summarise(address: str, resp: dict[str, Any] | None, rtt_ms: int = 0) -> dict[str, Any]:
     """One wallet's result in a fixed shape; `vote` is high / medium / low, or None when the agent abstains on it."""
     if not isinstance(resp, dict) or resp.get("status") == "error" or resp.get("verdict") not in ("ALLOW", "WARN", "BLOCK", "UNKNOWN"):
-        return _offline(address, rtt_ms)
+        return _offline(address, rtt_ms, _failure_kind(resp))
     verdict = resp["verdict"]
     engine = resp.get("engine") if resp.get("engine") in _ENGINES else None
     tg = resp.get("tigergraph") if isinstance(resp.get("tigergraph"), dict) else {}
@@ -206,9 +273,24 @@ def _evidence_step(wallets: list[str], lang: str = "en") -> tuple[list[dict[str,
         "graph_ms": max((r["ms"] for r in answered if r["ms"] is not None), default=None),
         "ai": "off",
     }
+    # Wallets with no real verdict (UNKNOWN, rejected, rate limited, unreachable) are unverified, never "clean".
+    extra["unverified"] = unverified_count(results)
     if not answered:
         extra["error"] = OFFLINE_NOTE
     return findings, extra
+
+
+def unverified_count(results: list[dict[str, Any]]) -> int:
+    """Wallets that came back without a verdict that says anything about them (UNKNOWN or no answer)."""
+    return sum(1 for r in results if r["verdict"] not in ("ALLOW", "WARN", "BLOCK"))
+
+
+UNVERIFIED_ACTION = "Treat unverified wallets as unsafe until checked: do not send funds to them yet."
+
+
+def unverified_caveat(n: int) -> str:
+    return (f"{n} wallet{'s' if n != 1 else ''} could not be verified (not in the dataset, rejected or not screened). "
+            "That is not an all-clear: no evidence either way.")
 
 
 # --- Risk Council: one vote ---------------------------------------------------------------------------------------
@@ -222,11 +304,14 @@ def council_vote(results: list[dict[str, Any]]) -> dict[str, Any]:
     if not voting:
         offline = [r for r in results if r["status"] == "offline"]
         if len(offline) == len(results):
-            why, do = f"{OFFLINE_NOTE}: the crypto service could not be reached, so it abstains.", ""
+            kinds = {r.get("failure", "unreachable") for r in offline}
+            why = (f"{OFFLINE_NOTE}: the crypto service could not be reached, so it abstains." if kinds == {"unreachable"}
+                   else "Abstains: the wallet could not be screened (" + ("rejected as invalid" if kinds == {"rejected"} else "rate limited or rejected") + ").")
+            do = UNVERIFIED_ACTION
         else:
             n = len(results) - len(offline)
             why = f"Abstains: {n} wallet{'s' if n != 1 else ''} not in dataset. Not in dataset does not mean safe."
-            do = "Treat unknown wallets with caution."
+            do = UNVERIFIED_ACTION
         return {**base, "score": 0, "level": "abstain", "abstain": True, "why": why[:160], "do": do}
     worst = max(voting, key=lambda r: (_ORDER[r["verdict"]], r["risk_score"] or 0))
     lo, hi, level = _BAND[worst["verdict"]]
