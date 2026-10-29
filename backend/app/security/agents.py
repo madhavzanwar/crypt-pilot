@@ -238,9 +238,17 @@ def write_verdict(findings: list[dict], score: int, run: str | None = None) -> t
     return None, None, "; ".join(errors) + ". The findings above are real; only the written explanation is missing."
 
 
-def verdict_for(findings: list[dict], score: int, run: str | None = None) -> tuple[dict | None, str | None, str | None]:
+def verdict_for(findings: list[dict], score: int, run: str | None = None, unverified: int = 0) -> tuple[dict | None, str | None, str | None]:
+    """`unverified` = wallets the user asked to screen that came back UNKNOWN or got no answer: never an "all clear"."""
+    note = f"{unverified} wallet{'s' if unverified != 1 else ''} could not be verified (not in the dataset, or the crypto service did not answer). That is not a safe signal."
     if findings:
-        return write_verdict(findings, score, run)
+        verdict, source, error = write_verdict(findings, score, run)
+        if verdict and unverified:
+            verdict = {**verdict, "what_to_do": [*verdict.get("what_to_do", []), "Treat unverified wallets with caution."]}
+        return verdict, source, error
+    if unverified:
+        return {"headline": f"No problems found in your own data, but {unverified} wallet{'s' if unverified != 1 else ''} unverified.",
+                "what_is_wrong": note, "what_to_do": ["Treat unverified wallets with caution.", "Re-run the wallet check later."]}, "rules", None
     return {"headline": "No security problems found.", "what_is_wrong": "All checks came back clean on your current data.", "what_to_do": ["Re-run after your next sync."]}, "rules", None
 
 
@@ -269,7 +277,7 @@ def investigate(user_id: str, pace: float = 0.35, wallets: list[str] | None = No
     Scorer. Without wallets it does not run and the nine agents behave exactly as before."""
     rows, accounts = store.query(TransactionRow, user_id=user_id), store.query(AccountRow, user_id=user_id)
     all_findings, summaries = [], {}
-    run, score = uuid.uuid4().hex[:8], 0
+    run, score, unverified = uuid.uuid4().hex[:8], 0, 0
     wallets = list(wallets or [])
     stages = list(AGENTS)
     if wallets:
@@ -288,9 +296,10 @@ def investigate(user_id: str, pace: float = 0.35, wallets: list[str] | None = No
             res, extra = [], {**extra, "score": score}
         elif key == chain_analyst.AGENT_ID:
             res, extra = chain_analyst.evidence_step(wallets, lang)
+            unverified = int(extra.get("unverified", 0))
             all_findings += res
         elif key == "verdict_writer":
-            verdict, source, error = verdict_for(scored(all_findings), score, run)
+            verdict, source, error = verdict_for(scored(all_findings), score, run, unverified)
             res, extra = [], {"source": source, "error": error}
         else:
             res, extra = CHECKS[key](rows, accounts), {}
@@ -302,7 +311,7 @@ def investigate(user_id: str, pace: float = 0.35, wallets: list[str] | None = No
         telemetry.record(kind="stage", run=run, agent=key, step="agent", ms=summaries[key]["ms"], findings=len(res))
         yield {"type": "agent", "agent": key, "status": "done", **summaries[key]}
     report = save_report(user_id, run, rows, all_findings, score, list(summaries.values()), verdict, source, error,
-                         {"wallets_screened": wallets} if wallets else None)
+                         {"wallets_screened": wallets, "wallets_unverified": unverified} if wallets else None)
     yield {"type": "report", "report": report}
 
 
