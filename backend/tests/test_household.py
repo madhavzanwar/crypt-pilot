@@ -196,11 +196,11 @@ def test_managed_member_lifecycle():
     assert t.json()["balance"] == 200 and t.json()["total_out"] == 300
 
     # Real members' data can't be written through this endpoint
-    assert client.post("/api/household/demo-priya/members/demo-arjun/transactions",
+    assert client.post("/api/household/demo-priya/members/demo-rishi/transactions",
                        json={"merchant": "x", "amount": -1}).status_code == 404
-    # Priya can monitor Arjun
-    assert client.get("/api/household/demo-priya/members/demo-arjun/ledger").status_code == 200
-    # Arjun (editor) can see the kid too; managed ids are not usable as logins
+    # Priya can monitor Rishi
+    assert client.get("/api/household/demo-priya/members/demo-rishi/ledger").status_code == 200
+    # Rishi (editor) can see the kid too; managed ids are not usable as logins
     assert client.get(f"/api/household/{kid['user_id']}").status_code in (401, 403, 404)
 
     d = client.delete(f"/api/household/demo-priya/members/{kid['user_id']}")

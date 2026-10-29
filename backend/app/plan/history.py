@@ -26,8 +26,9 @@ def monthly_flows(df: pd.DataFrame) -> pd.DataFrame:
     first, last = work["date"].min(), work["date"].max()
     if first.day > 3:
         work = work[work["month"] != first.strftime("%Y-%m")]
-    if (last + pd.Timedelta(days=3)).month == last.month:
-        work = work[work["month"] != last.strftime("%Y-%m")]
+    # The in-progress calendar month is never complete, whatever day it is today
+    # (a "last 3 days of the month" cut-off treats it as complete on the 29th-31st).
+    work = work[work["month"] != pd.Timestamp.today().strftime("%Y-%m")]
     out = pd.DataFrame({"month": sorted(work["month"].unique())})
     g = lambda mask: work[mask].groupby("month")["amount"].sum().abs()  # noqa: E731
     out["income"] = out["month"].map(g(work["amount"] > 0)).fillna(0.0)

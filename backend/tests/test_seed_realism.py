@@ -86,3 +86,14 @@ def test_risk_score_in_believable_range(checked, uid):
     findings = [x for v in checked[uid][1].values() for x in v]
     lo, hi = RANGES[uid]
     assert lo <= agents.risk_score(findings) <= hi
+
+
+def test_risk_score_counts_one_problem_seen_by_two_agents_once():
+    """BUG-034: one double-charged EMI flagged by two agents must not be scored as two problems."""
+    base = {"severity": "high", "merchant": "EMI", "txn_ids": ["a", "b"]}
+    one = [{**base, "agent": "duplicate_detector"}]
+    two = one + [{**base, "agent": "fraud_hunter"}]
+    assert agents.risk_score(one) == 20
+    assert agents.risk_score(two) == 25  # 20 x 1.25 corroboration uplift, not 40
+    other = {**base, "agent": "merchant_verifier", "txn_ids": ["z"]}
+    assert agents.risk_score(two + [other]) == 45

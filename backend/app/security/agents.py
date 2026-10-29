@@ -183,10 +183,25 @@ def cross_check(findings: list[dict]) -> None:
 
 
 def risk_score(findings: list[dict]) -> int:
-    """Severity weights; corroborated findings count 1.25x, ones the reviewing AI doubts count half."""
-    total = 0.0
+    """Severity weights; corroborated findings count 1.25x, ones the reviewing AI doubts count half.
+
+    Findings from different agents that point at the same transactions are one problem seen twice
+    (e.g. a double-charged EMI flagged by both the duplicate detector and the fraud hunter), so they
+    count once, at the heaviest weight, with the corroboration uplift.
+    """
+    def weight(f: dict, corroborated: bool) -> float:
+        return _WEIGHT[f["severity"]] * (1.25 if corroborated else 1) * (0.5 if f.get("ai", {}).get("verdict") == "doubt" else 1)
+
+    total, groups = 0.0, defaultdict(list)
     for f in findings:
-        total += _WEIGHT[f["severity"]] * (1.25 if f.get("corroborated_by") else 1) * (0.5 if f.get("ai", {}).get("verdict") == "doubt" else 1)
+        ids = frozenset(f.get("txn_ids") or ())
+        if ids:
+            groups[ids].append(f)
+        else:
+            total += weight(f, bool(f.get("corroborated_by")))
+    for group in groups.values():
+        agents_here = {f["agent"] for f in group}
+        total += max(weight(f, bool(f.get("corroborated_by")) or len(agents_here) > 1) for f in group)
     return min(100, round(total))
 
 

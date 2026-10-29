@@ -4,6 +4,7 @@ Pure (no DB) except the one HTTP test of the public synthetic scenario endpoint.
 """
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -135,3 +136,19 @@ def test_connected_guest_inherits_declared_reserve_and_six_periods():
         assert len(out["forecast"]) >= 6 and out["forecast"][0]["debt_min"] > 0
     finally:
         c.delete(f"/api/connectors/{uid}/google_pay")
+
+
+@pytest.mark.parametrize("today", ["2026-10-29", "2026-10-31", "2026-11-29", "2027-01-29", "2026-12-10", "2026-04-20"])
+def test_monthly_flows_always_drops_in_progress_month(monkeypatch, today):
+    """BUG-034: the current calendar month is partial on every day, including the last 3 days."""
+    import pandas as pd
+
+    from app.plan import history
+
+    t = pd.Timestamp(today)
+    monkeypatch.setattr(pd.Timestamp, "today", classmethod(lambda cls, tz=None: t))
+    days = pd.date_range(t - pd.Timedelta(days=200), t, freq="D")
+    df = pd.DataFrame({"date": days, "amount": -100.0, "category": "groceries"})
+    out = history.monthly_flows(df)
+    assert t.strftime("%Y-%m") not in set(out["month"])
+    assert (pd.Timestamp(t.year, t.month, 1) - pd.DateOffset(months=1)).strftime("%Y-%m") in set(out["month"])
