@@ -350,6 +350,9 @@ export interface BudgetStatus {
 
 export interface SafeToSpend {
   amount: number;
+  /** Backend verdict (e.g. "ok" | "low" | "none"). Optional for older servers; the page falls back to the amount. */
+  status?: string;
+  amount_note?: string | null;
   basis: string;
   as_of_date: string;
 }

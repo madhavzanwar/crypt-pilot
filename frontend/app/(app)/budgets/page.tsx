@@ -103,6 +103,14 @@ function normalizePercent(value: number): number {
 
 const PRESET_AMOUNTS = [5000, 10000, 20000, 35000];
 
+function safeToSpendBadge(d: { amount: number; status?: string } | null): { tone: "success" | "warning" | "danger"; label: string } {
+  const amount = d?.amount ?? 0;
+  const st = (d?.status ?? "").toLowerCase();
+  if (amount <= 0 || ["none", "over", "negative", "empty", "overspent"].includes(st)) return { tone: "danger", label: "Nothing safe to spend" };
+  if (["low", "tight", "warn", "warning", "near"].includes(st)) return { tone: "warning", label: "Running low" };
+  return { tone: "success", label: "Available Today" };
+}
+
 export default function BudgetsPage() {
   const userId = useUserId();
 
@@ -240,6 +248,8 @@ export default function BudgetsPage() {
     (budgets.data ?? []).map((b: Budget) => [b.category, b.id])
   );
 
+  // The badge follows the backend's safe_to_spend.status; it is never green at zero or below.
+  const sts = safeToSpendBadge(safeToSpend.data);
   const loadingAll = (status.loading && !status.data) || (safeToSpend.loading && !safeToSpend.data);
   const anyError = status.error ?? budgets.error ?? safeToSpend.error;
 
@@ -321,8 +331,8 @@ export default function BudgetsPage() {
               <div className="lg:col-span-7 flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                    {sts.tone === "success" && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}
+                    <span className={cn("relative inline-flex rounded-full h-2.5 w-2.5", sts.tone === "success" ? "bg-emerald-500" : sts.tone === "warning" ? "bg-amber-500" : "bg-rose-500")} />
                   </span>
                   <span className="text-xs font-semibold text-graphite uppercase tracking-wider">
                     Safe-to-Spend Liquidity
@@ -336,8 +346,8 @@ export default function BudgetsPage() {
                   <span className="font-display text-3xl sm:text-5xl font-bold text-ink tnum tracking-tight">
                     {formatCurrency(safeToSpend.data.amount)}
                   </span>
-                  <Chip tone="success" className="text-xs font-semibold self-center">
-                    Available Today
+                  <Chip tone={sts.tone} className="text-xs font-semibold self-center">
+                    {sts.label}
                   </Chip>
                 </div>
 
