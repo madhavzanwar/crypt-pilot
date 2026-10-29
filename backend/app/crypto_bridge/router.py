@@ -131,12 +131,19 @@ def _is_plain_http(request: Request) -> bool:
     return (proto or request.url.scheme) == "http"
 
 
+# RFC 6265 cookie-octets: printable ASCII without space, double quote, comma, semicolon and backslash.
+_COOKIE_VALUE = re.compile(r"[\x21\x23-\x2b\x2d-\x3a\x3c-\x5b\x5d-\x7e]{1,512}")
+
+
 def _session_cookie_header(request: Request) -> str | None:
-    """Only the crypto session cookie is forwarded; the browser's other cookies are none of the service's business."""
+    """Only the crypto session cookie is forwarded; the browser's other cookies are none of the service's business.
+
+    A value that is not plain cookie-octet ASCII (e.g. a non-ASCII byte, which httpx cannot encode into a header and
+    which used to surface as a 500) is dropped: the service then simply starts a new anonymous session."""
     for part in request.headers.get("cookie", "").split(";"):
         name, _, value = part.strip().partition("=")
         if name == SESSION_COOKIE and value:
-            return f"{SESSION_COOKIE}={value}"
+            return f"{SESSION_COOKIE}={value}" if _COOKIE_VALUE.fullmatch(value) else None
     return None
 
 
