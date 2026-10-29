@@ -426,3 +426,12 @@ crypt-pilot/
 <br/>
 <sub>Built with Next.js, FastAPI and TigerGraph. Payments are test mode only.</sub>
 </div>
+
+---
+
+## Licence, deployment caveats and contributor checks
+
+- **Licence:** none has been chosen yet and the repository has no `LICENSE` file, so by default all rights are reserved by the authors. Do not assume it is open source.
+- **Vercel:** `vercel.json` uses `builds`; in production `CRYPTO_SERVICE_URL` must be set to the crypto-service's public https URL (the code default `127.0.0.1:8200` only works locally). The FinPilot function's size (about 398 MB installed against a believed 250 MB limit) and the `maxDuration` setting are **unverified until a real Vercel build is done**. The deploy workflow is manual (`workflow_dispatch`) and uses the `production` environment.
+- **Audit log:** mutations are recorded in the `audit_logs` collection. These are ordinary application logs, not tamper-evident or write-once.
+- **Contributor checks (test commands and baselines):** [docs/DEV_GATES.md](docs/DEV_GATES.md).

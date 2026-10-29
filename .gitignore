@@ -79,3 +79,6 @@ scripts/.phone-ip
 *.pid
 .demo-logs/
 __MACOSX/
+
+# personal data (BUG-009)
+api-use-case.pdf
