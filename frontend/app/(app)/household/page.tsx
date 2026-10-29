@@ -251,7 +251,7 @@ export default function HouseholdPage() {
             {household ? household.name : "Household Financial Co-Pilot"}
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-graphite max-w-2xl leading-relaxed">
-            Consolidate net worth across partners, assign granular permissions, and share unified financial visibility with cryptographic invitation security.
+            Consolidate net worth across partners, assign granular permissions, and share unified financial visibility through invitations you approve.
           </p>
         </div>
       </div>
@@ -843,6 +843,7 @@ export default function HouseholdPage() {
                           <div className="flex flex-col gap-1">
                             <label className="text-[11px] font-medium text-graphite">Paid By</label>
                             <select
+                              aria-label="Paid by"
                               value={newExpPayer}
                               onChange={(e) => setNewExpPayer(e.target.value)}
                               className="w-full rounded-chip border border-mist bg-white px-2.5 py-1.5 text-xs text-ink focus:border-ember focus:outline-none"
@@ -856,6 +857,7 @@ export default function HouseholdPage() {
                         <div className="flex flex-col gap-1">
                           <label className="text-[11px] font-medium text-graphite">Category</label>
                           <select
+                            aria-label="Expense category"
                             value={newExpCategory}
                             onChange={(e) => setNewExpCategory(e.target.value)}
                             className="w-full rounded-chip border border-mist bg-white px-2.5 py-1.5 text-xs text-ink focus:border-ember focus:outline-none"
@@ -921,7 +923,7 @@ export default function HouseholdPage() {
                   <div>
                     <CardTitle className="text-base font-semibold text-ink">Invitations Sent</CardTitle>
                     <p className="text-xs text-graphite mt-0.5">
-                      Pending partner invitations with SHA-256 cryptographic verification.
+                      Pending partner invitations.
                     </p>
                   </div>
                   <span className="text-xs font-semibold text-pewter uppercase tracking-wider">

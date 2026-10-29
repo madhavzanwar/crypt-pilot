@@ -350,6 +350,7 @@ export default function TransactionsPage() {
               {openPanel === "filters" && (
                 <>
                   <select
+                    aria-label="Filter by category"
                     value={category}
                     onChange={(e) => {
                       setCategory(e.target.value as TxnCategory | "");
@@ -366,6 +367,7 @@ export default function TransactionsPage() {
                     ))}
                   </select>
                   <select
+                    aria-label="Filter by review status"
                     value={reviewStatusFilter}
                     onChange={(e) => {
                       setReviewStatusFilter(e.target.value);
@@ -536,7 +538,7 @@ export default function TransactionsPage() {
             <div className="flex items-center gap-2">
               <label className="flex items-center gap-1.5 text-xs text-graphite">
                 Rows per page
-                <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); resetToFirstPage(); }} className="rounded-xl border border-mist bg-white px-2 py-1 text-xs text-ink">
+                <select aria-label="Rows per page" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); resetToFirstPage(); }} className="rounded-xl border border-mist bg-white px-2 py-1 text-xs text-ink">
                   {PAGE_SIZES.map((n) => (
                     <option key={n} value={n}>
                       {n}
@@ -766,6 +768,7 @@ function ReviewCard({
                     Category:
                   </span>
                   <select
+                    aria-label="Category for this transaction"
                     value={selectedCategory || currentTxn.category}
                     onChange={(e) => setSelectedCategory(e.target.value as TxnCategory)}
                     className="rounded-chip border border-mist bg-fog/60 px-3 py-1.5 text-xs font-semibold text-ink focus:border-ember focus:outline-none focus:ring-1 focus:ring-ember cursor-pointer"
