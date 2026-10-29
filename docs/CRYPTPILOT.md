@@ -2,7 +2,7 @@
 
 CryptPilot is two projects in one repository. **FinPilot** is a personal-finance AI copilot (Next.js frontend, FastAPI backend, 90-day Monte Carlo cash-flow forecasts, an Evidence Council and a Risk Council of specialist agents). **Cryptiq** is a Bitcoin wallet risk checker: paste an address, get ALLOW / WARN / BLOCK / UNKNOWN, with graph evidence and a plain-language explanation in English and Hindi.
 
-This file says what the merge added, what it removed, what has actually been verified, and what is still open. It only describes code that exists on the `cryptiq-merge` branch. For how the pieces connect, see [CRYPTPILOT_ARCHITECTURE.md](CRYPTPILOT_ARCHITECTURE.md). FinPilot's own docs (root `README.md`, `ENVIRONMENT.md`, `docs/FinPilot_Feature_Guide.*`) are unchanged and still describe the baseline product.
+This file says what the merge added, what it removed, what has actually been verified, and what is still open. It only describes code that exists on `main` (the `cryptiq-merge` branch has been merged). For how the pieces connect, see [CRYPTPILOT_ARCHITECTURE.md](CRYPTPILOT_ARCHITECTURE.md). FinPilot's own docs (root `README.md`, `ENVIRONMENT.md`, `docs/FinPilot_Feature_Guide.*`) are unchanged and still describe the baseline product.
 
 ## Why merge them
 
@@ -26,7 +26,7 @@ Everything payment-related is **test mode or testnet only**. No real money moves
 
 ## What was removed or trimmed, and why
 
-The merge narrows FinPilot to the surfaces that support the "AI x crypto" story and makes room for the Crypto navigation group. Removed items are frontend pages and components on this branch; the corresponding FinPilot backend routes were **not** deleted by this diff.
+The merge narrows FinPilot to the surfaces that support the "AI x crypto" story and makes room for the Crypto navigation group. Removed items are frontend pages and components (the API endpoints behind some of them are still served) on this branch; the corresponding FinPilot backend routes were **not** deleted by this diff.
 
 | Removed or trimmed | Detail |
 |---|---|

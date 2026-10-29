@@ -16,7 +16,7 @@
 [![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Framer Motion](https://img.shields.io/badge/Framer_Motion-13.4-FF0055?style=for-the-badge&logo=framer&logoColor=white)](https://www.framer.com/motion/)
 [![Firebase](https://img.shields.io/badge/Firebase-Auth_%2B_Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-amber?style=for-the-badge)](LICENSE)
+![License: not yet chosen](https://img.shields.io/badge/License-not_yet_chosen-lightgrey?style=for-the-badge)
 
 <br/>
 
@@ -130,7 +130,7 @@ flowchart TD
     subgraph Gateway["Security & Ingestion Gateway (FastAPI)"]
         Auth["Local JWKS JWT Validator<br/>(Subject-to-UID Enforcement)"]
         RateLimit["Sliding Window Rate Limiter<br/>(Chat & Upload Protection)"]
-        AuditLog["Immutable Audit Vault<br/>(Mutations & Access Logging)"]
+        AuditLog["Audit log<br/>(Mutations & Access Logging)"]
         Ingest["Banking Feed & CSV Parser<br/>(Categorization Rules Engine)"]
     end
 
@@ -236,14 +236,14 @@ $$P_{90}(t) = \text{Percentile}_{90}\left(\{B_k(t)\}_{k=1}^K\right)$$
 | **Animation & Motion** | Framer Motion 13.4 | LayoutId spring transitions, gesture haptic physics |
 | **Data Visualization** | Recharts 3.10 | Glassmorphic tooltips, multi-band trajectory areas |
 | **Icons & Typography** | Lucide React, Google Fonts | Fraunces (Display Serif), Inter (Sans), Tabular Numerals |
-| **Backend Engine** | Python 3.11+, FastAPI, Uvicorn | Async I/O, Pydantic v2 schemas, automated CORS |
+| **Backend Engine** | Python 3.11+, FastAPI, Uvicorn | Async I/O, Pydantic v2 schemas, CORS allow-list (`ALLOWED_ORIGINS`) |
 | **Database & Auth** | Firebase (Auth, Firestore) | Firestore security rules, backend ID-token verification, TOTP MFA |
 | **AI Copilot** | Google Gemini Pro, Function Calling | Two-phase tool execution, offline deterministic router |
 
 ### Directory Layout
 
 ```
-hackmatrix/
+crypt-pilot/
 ├── backend/
 │   ├── app/
 │   │   ├── analytics/       # 5-Pillar health score, savings rate, runway calculations
@@ -293,8 +293,8 @@ hackmatrix/
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/VeerbhadraMahant/hackmatrix.git
-cd hackmatrix
+git clone https://github.com/madhavzanwar/crypt-pilot.git
+cd crypt-pilot
 ```
 
 ### 2. Backend Setup
@@ -340,7 +340,7 @@ Open **`http://localhost:3000`** in your browser.
 
 ## ☁️ Deploying (Vercel)
 
-One Vercel project, two builds (see `vercel.json`, which uses `builds`/`routes`): the Next.js **frontend** (`frontend/`) serves every path, and the FastAPI **backend** (`backend/`) serves `/api/*` on the same domain -- so no CORS setup or `NEXT_PUBLIC_API_URL` is needed in production (the frontend calls relative `/api/...` URLs).
+One Vercel project, two builds (see `vercel.json`, which uses `builds`/`routes`): the Next.js **frontend** (`frontend/`) serves every path, and the FastAPI **backend** (`backend/`) serves `/api/*` on the same domain -- so the FinPilot API needs no CORS setup or `NEXT_PUBLIC_API_URL` in production (the frontend calls relative `/api/...` URLs). The separate **crypto-service** is a different origin and does have its own CORS allow-list (`CORS_ORIGINS`, `FRONTEND_URL`); the browser reaches it only through the FinPilot API proxy `/api/crypto/*`, but set those if you call it directly. See "Vercel caveats" below.
 
 1. Import the repo into Vercel; it picks up the builds from `vercel.json`.
 2. Add environment variables (they are shared by both services): the `NEXT_PUBLIC_FIREBASE_*` web config, `FIREBASE_PROJECT_ID`, `FIREBASE_SERVICE_ACCOUNT_JSON` (full service-account JSON), `GEMINI_API_KEY` (optional -- the offline copilot works without it), and `RESEND_API_KEY` / `EMAIL_FROM` / `HR_ALERT_EMAIL` if you want alert emails. `NEXT_PUBLIC_*` values are inlined at build time, so redeploy after changing them.
@@ -370,33 +370,43 @@ FinPilot includes 3 realistic personas, each pre-loaded with 12 months of synthe
 - **Per-User Data Isolation**: Firestore security rules (`firestore.rules`) and per-user backend scoping keep each user's documents private. Users cannot access peer data.
 - **Two-Factor Authentication (TOTP MFA)**: Integrated authenticator-app enrollment with QR code generation and challenge gating at sign-in.
 - **100% Offline Privacy Guarantee**: Users can toggle **"Offline Rule-Engine Only"** on `/security` or `/copilot`. When active, zero financial data is ever transmitted to Google Gemini or external APIs; all queries resolve locally via deterministic Python routers.
-- **Immutable Audit Vault**: Every mutation, auth challenge, and export is recorded in `audit_logs` for forensic review.
+- **Audit log**: Every mutation, auth challenge, and export is recorded in the `audit_logs` collection for review. These are ordinary application logs; they are not tamper-evident or write-once.
 - **CSV Hardening**: 5MB file-size ceiling, 20,000-row cap, and strict MIME verification protect against resource exhaustion.
 
 ---
 
 ## 📜 License
 
-This project is open-source software licensed under the [MIT License](LICENSE).
+No licence has been chosen yet and the repository has no `LICENSE` file, so by default all rights are reserved by the authors. Do not assume it is open source. (The `focal/` folder, the stock videos and the images under `assets/` have unverified licences.)
 
 ## CryptPilot: FinPilot x Cryptiq
 
-CryptPilot merges FinPilot (above) with **Cryptiq**, a Bitcoin wallet risk checker, on the `cryptiq-merge` branch. Everything crypto is test mode or testnet only; no real money moves.
+CryptPilot merges FinPilot (above) with **Cryptiq**, a Bitcoin wallet risk checker, (merged into `main`; the `cryptiq-merge` branch no longer needs to be tracked). Everything crypto is test mode or testnet only; no real money moves.
 
 - **Wallet Guard** (`/wallet-guard`): paste or speak a Bitcoin address, get ALLOW / WARN / BLOCK / UNKNOWN, an inspectable evidence graph and an English or Hindi explanation. It is a risk signal from 2016-2018 research data (Elliptic++), not an accusation, and UNKNOWN is not safe.
 - **Credits** (`/credits`, Connectors): Dodo Payments test-mode cards and Cake Wallet Bitcoin testnet / Monero demo invoices (URI + QR) replace the Google Pay connector.
 - **Voice in the Copilot**: Wispr Flow or Sarvam speech-to-text through the service, browser speech as fallback; a chip shows which provider really produced the text.
 - **Chain Analyst** joins the Evidence Room and the Risk Council to screen wallets against a TigerGraph graph; the **statement** page can anchor a hash on Base Sepolia via EAS (the printed audit hash is a real SHA-256 of the statement figures, recomputable from the canonical JSON shown beside it).
-- Removed from the sidebar and pages: Photo prices nav entry (page kept), Invoices, Scheme Analyst, Web Intel, Agent Ops, and the Google Pay / phone-pay card.
+- Removed from the sidebar and pages (UI only): Photo prices nav entry (page kept), Invoices, Scheme Analyst, Web Intel, Agent Ops, and the Google Pay / phone-pay card. The backend API endpoints behind several of these are still served; they are just not reachable from the UI.
 - Details and honest status: [docs/CRYPTPILOT.md](docs/CRYPTPILOT.md). Diagrams, deployment and env vars: [docs/CRYPTPILOT_ARCHITECTURE.md](docs/CRYPTPILOT_ARCHITECTURE.md).
 
 ### Run the merged demo
 
 ```bash
 # keys come from your environment or an untracked .env in the repo root; see docs/CRYPTPILOT_ARCHITECTURE.md for names
-export ARTIFACTS_REPO=<owner>/<private-hf-dataset> HF_TOKEN=<read token>   # data is not in git (no stated licence)
+export ARTIFACTS_REPO=<owner>/<private-hf-dataset> HF_TOKEN=<read token>   # data is not in git (no stated licence). Without it, use the synthetic fixture instead (below)
 scripts/run_cryptpilot_demo.sh          # crypto-service :8132, FinPilot API :8000, frontend :3100; logs in ./.demo-logs/
 scripts/run_cryptpilot_demo.sh stop     # stops by saved PID files
 ```
 
 On Windows use `scripts\run_cryptpilot_demo.ps1` (untested). The FinPilot API still needs its Firestore setup (see `ENVIRONMENT.md`). Open http://localhost:3100.
+
+**Data note.** The Elliptic++ data and trained model are private and not in this repository, so a fresh clone cannot run Wallet Guard on real data unless you set `ARTIFACTS_REPO` (+ `HF_TOKEN`). Without that, generate the synthetic fixture with `make fixture` in `crypto-service/` (addresses prefixed `DEMO-`); it exercises the pipeline but is not real risk data.
+
+### Vercel caveats and CI deploy workflows
+
+- `vercel.json` sets `functions.maxDuration` for the API and crypto routes. In production `CRYPTO_SERVICE_URL` **must** be set to the crypto-service's public https URL (the code default `127.0.0.1:8200` only works locally). The crypto-service is not part of the Vercel build; host it separately (see `docs/CRYPTPILOT_ARCHITECTURE.md`).
+- Unverified, needs a real Vercel build: `backend/requirements.txt` installs to about 398 MB, and Vercel's Python function limit is believed to be 250 MB, so the FinPilot function may not deploy as configured. No deploy has been run.
+- `.github/workflows/deploy-vercel.yml` is manual (`workflow_dispatch`) and uses the `production` environment; add required reviewers to that environment in GitHub settings. `deploy-gh-pages.yml` is manual only and publishes the unrelated legacy `focal/` app, so do not enable Pages unless that is intended.
+- Contributor checks: [docs/DEV_GATES.md](docs/DEV_GATES.md).
+- `vercel.json` uses `builds` (the `functions` key cannot be combined with it), so `maxDuration: 60` is set in the Python build `config`, matching the 60 s allowed by `/api/crypto/check`. Whether Vercel honours that key for `@vercel/python` under `builds` is unverified; it needs a real Vercel build. Vercel also rejects request bodies over 4.5 MB while the bridge allows 6 MB.
