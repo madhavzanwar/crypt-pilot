@@ -1,6 +1,8 @@
 """Aggregate transactions into the monthly streams the planner forecasts."""
 from __future__ import annotations
 
+from datetime import date
+
 import pandas as pd
 
 from app.schemas import TxnCategory
@@ -18,7 +20,7 @@ _EXCLUDED = {TxnCategory.transfer.value, TxnCategory.credit_card_payment.value, 
 
 def monthly_flows(df: pd.DataFrame) -> pd.DataFrame:
     """Index 1..N (month index), columns month ('YYYY-MM'), income, essential,
-    discretionary (positive INR). Drops a partial first/last calendar month."""
+    discretionary (positive INR). Drops a partial first/last calendar month and always the current (in-progress) one."""
     work = df.copy()
     work["date"] = pd.to_datetime(work["date"])
     work = work[~work["category"].isin(_EXCLUDED)]
@@ -28,6 +30,9 @@ def monthly_flows(df: pd.DataFrame) -> pd.DataFrame:
         work = work[work["month"] != first.strftime("%Y-%m")]
     if (last + pd.Timedelta(days=3)).month == last.month:
         work = work[work["month"] != last.strftime("%Y-%m")]
+    # The in-progress calendar month is never a complete month, whatever day it is (a "near the end of the month"
+    # shortcut mis-fires on the last days of a month and on the 31st).
+    work = work[work["month"] != date.today().strftime("%Y-%m")]
     out = pd.DataFrame({"month": sorted(work["month"].unique())})
     g = lambda mask: work[mask].groupby("month")["amount"].sum().abs()  # noqa: E731
     out["income"] = out["month"].map(g(work["amount"] > 0)).fillna(0.0)

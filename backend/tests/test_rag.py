@@ -20,10 +20,10 @@ U = "guest-ragtest000001"
 
 
 def _fake(texts, input_type):
-    m = np.zeros((len(texts), 64), dtype=np.float32)
+    m = np.zeros((len(texts), 4096), dtype=np.float32)
     for r, t in enumerate(texts):
         for w in re.findall(r"\w+", t.lower()):
-            m[r, int(hashlib.md5(w.encode()).hexdigest(), 16) % 64] += 1
+            m[r, int(hashlib.md5(w.encode()).hexdigest(), 16) % 4096] += 1
     return m / np.maximum(np.linalg.norm(m, axis=1, keepdims=True), 1e-12)
 
 

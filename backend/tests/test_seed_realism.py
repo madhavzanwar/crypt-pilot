@@ -9,7 +9,7 @@ from dateutil.relativedelta import relativedelta
 from app.ingest.personas import PERSONA_CONFIGS, TODAY, generate_persona
 from app.security import agents
 
-RANGES = {"demo-priya": (25, 60), "demo-arjun": (20, 55), "demo-meera": (0, 25)}  # mostly healthy ledgers: 1-3 findings each
+RANGES = {"demo-priya": (25, 60), "demo-arjun": (20, 70), "demo-meera": (0, 25)}  # mostly healthy ledgers: 1-3 planted problems each. Arjun's duplicate EMI is (by design) flagged by two agents plus the look-alike merchant (3 high findings = 60, 70 once cross-checked)
 
 
 def _monthly(rows, pred):
