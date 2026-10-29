@@ -112,7 +112,7 @@ export default function TwinSimulatorPage() {
         <Stat label="Flagged merchants" value={String(flagged.length)} tone={flagged.length ? "text-rose-600" : undefined} />
         <Stat label="Money at risk" value={formatCurrency(flagged.reduce((s, m) => s + m.amount, 0))} tone={flagged.length ? "text-rose-600" : undefined} />
         <Stat label="Total spend" value={formatCurrency(total)} />
-        <Stat label="Saved by blocking" value={formatCurrency(saved)} tone="text-lime-dark" />
+        <Stat label="Saved by blocking" value={formatCurrency(saved)} tone="text-lime-text" />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_340px]">

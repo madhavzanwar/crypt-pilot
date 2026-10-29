@@ -27,13 +27,13 @@
   --color-ink: #0d0d0d;
   --color-carbon: #1e293b;
   --color-graphite: #475569;
-  --color-pewter: #7487a3;
+  --color-pewter: #5b6b85; /* 5.4:1 on white (was 3.66) */
   --color-steel: #a3b0c7;
   --color-mist: #e0e6f2;
 
   /* Core Accent (Luminous Ember) */
-  --color-ember: #ff6b1a;
-  --color-ember-dark: #e0540a;
+  --color-ember: #c2410c; /* 5.2:1 on white as text (was 2.85) */
+  --color-ember-dark: #9a3412;
   --color-ember-light: #ff9340;
   --color-ember-glow: rgba(255, 107, 26, 0.22);
   --color-ember-soft: rgba(255, 107, 26, 0.12);
@@ -45,7 +45,7 @@
   --color-navy-glow: rgba(23, 37, 84, 0.22);
 
   /* Colourful accents: green / sky / sun + soft tints for card fills */
-  --color-leaf: #0fb67a;
+  --color-leaf: #0a7d54; /* 5.1:1 on white (was 2.63) */
   --color-sky: #3b6bff;
   --color-sun: #ffb81f;
   --tint-leaf: #d8f6e9;
@@ -54,6 +54,7 @@
   --tint-ember: #ffe6d4;
   --color-lime: #c6f135;
   --color-lime-dark: #a6d11a;
+  --color-lime-text: #4a6600; /* readable lime for text on white, 6:1 */
   --tint-lime: #eefacc;
   --color-sage: #dfe8c4;
   --color-sage-deep: #cddaa6;
@@ -155,6 +156,7 @@
   --color-tint-ember: var(--tint-ember);
   --color-lime: var(--color-lime);
   --color-lime-dark: var(--color-lime-dark);
+  --color-lime-text: var(--color-lime-text);
   --color-sage: var(--color-sage);
   --color-sage-deep: var(--color-sage-deep);
   --color-tint-lime: var(--tint-lime);
