@@ -9,7 +9,7 @@ import { statementSubject } from "@/lib/crypto/eas/statement";
 import { useT } from "@/lib/i18n";
 import { Anchor } from "lucide-react";
 import { useMemo, useState } from "react";
-import { statementDigest, STATEMENT_PERIOD, type StatementData } from "./auditHash";
+import { statementDigest, statementPeriod, type StatementData } from "./auditHash";
 
 /**
  * "Anchor this statement on-chain": SCREEN ONLY (print:hidden, and it lives outside #executive-statement-document,
@@ -20,12 +20,18 @@ import { statementDigest, STATEMENT_PERIOD, type StatementData } from "./auditHa
 export function StatementAnchorPanel({ data }: { data: StatementData }) {
   const { t } = useT();
   const [attestOpen, setAttestOpen] = useState(false);
-  const digest = useMemo(() => statementDigest(data), [data]);
+  // The page hands over a fresh `data` object on every render, so memoise on the pieces, not on the wrapper.
+  const { userId, dashboard, accounts, transactions } = data;
+  const digest = useMemo(
+    () => statementDigest({ userId, dashboard, accounts, transactions }),
+    [userId, dashboard, accounts, transactions],
+  );
+  const period = useMemo(() => statementPeriod(transactions, dashboard.generated_at), [transactions, dashboard.generated_at]);
   const healthScore = data.dashboard.health_score.overall;
   const auditHash = digest.bytes32;
   const subject = useMemo(
-    () => statementSubject({ auditHash, period: STATEMENT_PERIOD, healthScore }),
-    [auditHash, healthScore],
+    () => statementSubject({ auditHash, period, healthScore }),
+    [auditHash, period, healthScore],
   );
 
   return (
@@ -51,9 +57,9 @@ export function StatementAnchorPanel({ data }: { data: StatementData }) {
         </p>
         <dl className="grid gap-x-4 gap-y-1.5 text-xs sm:grid-cols-[max-content_1fr]">
           <dt className="text-graphite">{t("stmt.anchor.audit", "SHA-256 of this statement's figures")}</dt>
-          <dd className="break-all font-mono text-ink">{auditHash}</dd>
+          <dd translate="no" lang="en" className="notranslate break-all font-mono text-ink" data-testid="statement-hash">{auditHash}</dd>
           <dt className="text-graphite">{t("stmt.anchor.period", "Period")}</dt>
-          <dd className="font-medium text-ink">{STATEMENT_PERIOD}</dd>
+          <dd translate="no" className="notranslate font-medium text-ink">{period}</dd>
           <dt className="text-graphite">{t("stmt.anchor.score", "Health score")}</dt>
           <dd className="font-medium text-ink">{Math.round(healthScore)} / 100</dd>
         </dl>
@@ -83,7 +89,7 @@ export function StatementAnchorPanel({ data }: { data: StatementData }) {
           <p className="mt-2 text-graphite">
             {t("stmt.anchor.how.body", "SHA-256 of exactly this text (UTF-8, no trailing newline) gives the hash above, e.g. `printf '%s' '<text>' | sha256sum`:")}
           </p>
-          <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-paper p-2 font-mono text-[11px] text-ink">{digest.canonical}</pre>
+          <pre translate="no" lang="en" className="notranslate mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-paper p-2 font-mono text-[11px] text-ink">{digest.canonical}</pre>
         </details>
         <AttestDisclosure
           subject={subject}

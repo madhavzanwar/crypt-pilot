@@ -5,7 +5,7 @@ import { Ban, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { api, clearApiCache } from "@/lib/api";
 import { DATA_CHANGED_EVENT, useAsync, useUserId } from "@/lib/hooks";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { Button } from "@/components/shadcn/button";
 import { Card, CardContent } from "@/components/shadcn/card";
 import { Input } from "@/components/shadcn/input";

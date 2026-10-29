@@ -31,7 +31,7 @@ export function LandingHeader() {
           <FinPilotLogo variant="horizontal" size={28} showWordmark={true} />
         </Link>
         <div className="flex items-center gap-1 sm:gap-3">
-          <Link href="/dashboard" className={link}>
+          <Link href="/dashboard" className={`${link} hidden sm:inline-flex`}>
             Dashboard
           </Link>
           <Link href="/copilot" className={link}>

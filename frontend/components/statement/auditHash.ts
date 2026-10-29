@@ -1,5 +1,6 @@
 import { canonicalJson } from "@/lib/crypto/api/reportHash";
 import { sha256Hex } from "@/lib/crypto/sha256";
+import { statementPeriod } from "./statementPeriod";
 import type { Account, DashboardSnapshot, Transaction } from "@/lib/types";
 
 /**
@@ -10,8 +11,9 @@ import type { Account, DashboardSnapshot, Transaction } from "@/lib/types";
  * canonical form). Transactions are covered by a second SHA-256 over one line per transaction, sorted by id.
  * Personal data stays out: no names, merchants or account numbers are part of the figures, only amounts, dates and ids.
  */
-export const STATEMENT_PERIOD = "2026-09";
 export const STATEMENT_HASH_VERSION = 1;
+
+export { statementPeriod, periodRangeLabel } from "./statementPeriod";
 
 export interface StatementData {
   userId: string;
@@ -38,7 +40,7 @@ export function statementFigures(d: StatementData): Record<string, unknown> {
     p ? { p10: money(p.p10), p50: money(p.p50), p90: money(p.p90) } : null;
   return {
     version: STATEMENT_HASH_VERSION,
-    period: STATEMENT_PERIOD,
+    period: statementPeriod(transactions, dashboard.generated_at),
     account: d.userId,
     health: {
       overall: Math.round(dashboard.health_score.overall),

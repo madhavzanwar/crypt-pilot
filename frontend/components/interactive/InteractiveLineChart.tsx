@@ -4,7 +4,7 @@ import { useRef, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TrendingDown, TrendingUp, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/format";
+import { formatAxisCurrency, formatCurrency } from "@/components/ui/money";
 
 export interface LineChartPoint {
   day: number;
@@ -244,7 +244,7 @@ export function InteractiveLineChart({
                   fill="#717786"
                   className="font-tabular tnum"
                 >
-                  ₹{(val / 1000).toFixed(0)}k
+                  {formatAxisCurrency(val)}
                 </text>
               </g>
             );

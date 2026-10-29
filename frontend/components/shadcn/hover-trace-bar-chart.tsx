@@ -17,6 +17,8 @@ import {
 import { useMotionValueEvent, useSpring } from "motion/react";
 import NumberFlow from "@number-flow/react";
 import * as React from "react";
+import { useCurrency } from "@/lib/currency";
+import { formatMoney, type MoneyConfig } from "@/components/ui/money";
 
 const CHART_MARGIN = 38;
 
@@ -47,12 +49,14 @@ const chartConfig = {
 export function EvilHoverTraceBarChart({
   data = SAMPLE,
   label = "Value",
-  currency = "INR",
+  monthLabel = "Month",
 }: {
   data?: HoverTracePoint[];
   label?: string;
-  currency?: string;
+  monthLabel?: string;
 }) {
+  // Amounts are INR; show them in the currency the user picked, with that currency's grouping (₹1,33,760).
+  const { config } = useCurrency();
   const [activeIndex, setActiveIndex] = React.useState<number | null>(null);
 
   const maxData = React.useMemo(
@@ -97,13 +101,14 @@ export function EvilHoverTraceBarChart({
     <div className="flex h-full flex-col p-4">
       <div className="mb-4 flex items-end justify-between">
         <div className="space-y-1">
-          <p className="text-muted-foreground font-mono text-xs">{`[${label.toLowerCase()}]`}</p>
-          <p className="text-primary font-mono text-3xl tracking-tighter">
+          <p className="text-xs font-medium text-graphite">{label}</p>
+          <p className="font-display text-3xl font-semibold tracking-tight text-ink tnum">
             <NumberFlow
-              value={selectedData.value}
+              value={Math.round(selectedData.value * config.rateFromINR)}
+              locales={config.locale}
               format={{
                 style: "currency",
-                currency,
+                currency: config.code,
                 currencyDisplay: "narrowSymbol",
                 maximumFractionDigits: 0,
               }}
@@ -112,8 +117,8 @@ export function EvilHoverTraceBarChart({
         </div>
 
         <div className="space-y-1 text-right">
-          <p className="text-muted-foreground font-mono text-[10px]">{"[month]"}</p>
-          <p className="text-primary font-mono text-xs">{selectedData.month}</p>
+          <p className="text-[11px] font-medium text-graphite">{monthLabel}</p>
+          <p className="text-xs font-semibold text-ink">{selectedData.month}</p>
         </div>
       </div>
 
@@ -158,7 +163,7 @@ export function EvilHoverTraceBarChart({
             y={springValue}
             stroke="var(--foreground)"
             strokeDasharray="3 3"
-            label={<HoverTraceLabel value={selectedData.value} />}
+            label={<HoverTraceLabel value={selectedData.value} config={config} />}
           />
         </BarChart>
       </ChartContainer>
@@ -169,12 +174,13 @@ export function EvilHoverTraceBarChart({
 interface HoverTraceLabelProps {
   viewBox?: CartesianViewBox;
   value: number;
+  config: MoneyConfig;
 }
 
-const HoverTraceLabel = ({ viewBox, value }: HoverTraceLabelProps) => {
+const HoverTraceLabel = ({ viewBox, value, config }: HoverTraceLabelProps) => {
   const x = viewBox?.x ?? 0;
   const y = viewBox?.y ?? 0;
-  const formattedValue = value.toLocaleString();
+  const formattedValue = formatMoney(value, config);
   const width = formattedValue.length * 8 + 12;
 
   return (

@@ -120,7 +120,7 @@ export function CopilotToaster() {
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-4 bottom-20 z-[90] flex flex-col gap-2 sm:inset-x-auto sm:right-4 sm:w-96 lg:bottom-6 lg:right-6"
+      className="pointer-events-none fixed inset-x-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] z-[90] flex flex-col gap-2 sm:inset-x-auto sm:right-4 sm:w-96 md:bottom-6 lg:right-6"
     >
       <AnimatePresence initial={false}>
         {toasts.map((t) => (

@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { api, clearApiCache } from "@/lib/api";
 import { DATA_CHANGED_EVENT, useUserId } from "@/lib/hooks";
+import { formatCurrency } from "@/components/ui/money";
 
 /** Polls a cheap server change counter and refreshes every mounted page when data was written elsewhere
  * (e.g. a payment made in the phone demo app), so the dashboard updates without a reload. */
@@ -22,7 +23,7 @@ export function LiveSync() {
           window.dispatchEvent(new Event(DATA_CHANGED_EVENT));
           const top = (await api.payReviews(userId, 1).catch(() => []))[0];
           if (top && seen.current !== null && top.id !== seen.current) {
-            if (top.status === "blocked") toast.error(`Payment of ₹${top.amount.toLocaleString("en-IN")} to ${top.payee_name} was blocked: ${top.review.headline}`);
+            if (top.status === "blocked") toast.error(`Payment of ${formatCurrency(top.amount)} to ${top.payee_name} was blocked: ${top.review.headline}`);
           }
           if (top) seen.current = top.id;
         }

@@ -1,5 +1,5 @@
 import type { PeriodPlan, SequenceResult } from "@/lib/types";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 
 const COLS: [string, (p: PeriodPlan) => string][] = [

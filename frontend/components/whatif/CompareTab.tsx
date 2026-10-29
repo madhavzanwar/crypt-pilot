@@ -6,7 +6,7 @@ import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
-import { formatCurrency } from "@/lib/format";
+import { formatAxisCurrency, formatCurrency, formatSignedCurrency } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 import { simulate, type Baseline, type ScenarioActions, type SimResult } from "@/lib/scenario-sim";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
@@ -222,7 +222,7 @@ function Planner({ initial, usingSample }: { initial: Baseline; usingSample: boo
                   </dl>
                   {i > 0 && (
                     <Badge className={cn("mt-2", dNet >= 0 ? "bg-leaf/15 text-leaf hover:bg-leaf/15" : "bg-rose-50 text-rose-700 hover:bg-rose-50")}>
-                      {dNet >= 0 ? "+" : ""}{formatCurrency(dNet)} vs baseline
+                      {formatSignedCurrency(dNet)} vs baseline
                     </Badge>
                   )}
                 </div>
@@ -252,11 +252,11 @@ function Planner({ initial, usingSample }: { initial: Baseline; usingSample: boo
             <CardDescription>The dashed line is your emergency reserve.</CardDescription>
           </CardHeader>
           <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
               <LineChart data={chartData} margin={{ left: 8, right: 16, top: 12, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,23,42,0.06)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} />
-                <YAxis tickFormatter={(v: number) => formatCurrency(v)} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={82} />
+                <YAxis tickFormatter={(v: number) => formatAxisCurrency(v)} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={82} />
                 <Tooltip formatter={(v) => formatCurrency(Number(v))} />
                 <ReferenceLine y={base.reserve} stroke="#e11d48" strokeDasharray="4 4" label={{ value: "Reserve", position: "insideTopRight", fontSize: 11, fill: "#e11d48" }} />
                 {scenarios.map((s, i) => (

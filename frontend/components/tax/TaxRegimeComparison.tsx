@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import type { TaxOptimizationAnalysis } from "@/lib/types";
 import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatSignedCurrency } from "@/components/ui/money";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -139,7 +139,7 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
                   <>
                     Save <span className="font-bold text-ink">{formatCurrency(savings)}</span>/year
                     <span className="text-graphite font-normal text-lg sm:text-xl ml-2">
-                      (+{formatCurrency(monthlySavings)}/mo take-home)
+                      ({formatSignedCurrency(monthlySavings)}/mo take-home)
                     </span>
                   </>
                 ) : (

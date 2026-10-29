@@ -6,7 +6,8 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { api } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { formatAxisCurrency, formatCurrency } from "@/components/ui/money";
 
 /**
  * Standalone, self-fetching net-worth history chart -- mirrors ForecastChart's
@@ -40,7 +41,7 @@ export function NetWorthTrend({ userId, days = 180 }: { userId: string; days?: n
       {data && data.points.length === 0 && <p className="text-sm text-pewter">{t("n.enough")}</p>}
       {data && data.points.length > 0 && (
         <div className="h-56 sm:h-64">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
             <BarChart data={monthly} margin={{ left: 8, right: 16, top: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-fog)" />
               <XAxis
@@ -50,7 +51,7 @@ export function NetWorthTrend({ userId, days = 180 }: { userId: string; days?: n
                 minTickGap={40}
               />
               <YAxis
-                tickFormatter={(v: number) => formatCurrency(v)}
+                tickFormatter={(v: number) => formatAxisCurrency(v)}
                 tick={{ fontSize: 11, fill: "var(--color-pewter)" }}
                 width={80}
               />

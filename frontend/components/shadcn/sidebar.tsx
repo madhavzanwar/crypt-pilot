@@ -194,6 +194,15 @@ function Sidebar({
             } as React.CSSProperties
           }
           side={side}
+          onOpenAutoFocus={(event) => {
+            // Start on the first link, not on whatever the scroll container's last tabbable happens to be.
+            event.preventDefault()
+            document.querySelector<HTMLElement>('[data-mobile="true"] a[href]')?.focus()
+          }}
+          onCloseAutoFocus={(event) => {
+            // Give focus back to the button that opened the drawer instead of dropping it on <body>.
+            document.querySelector<HTMLElement>('[data-slot="sidebar-trigger"]')?.focus(); if (event) return
+          }}
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Sidebar</SheetTitle>
@@ -244,6 +253,8 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
+          role="navigation"
+          aria-label="Primary"
           className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm"
         >
           {children}
@@ -304,9 +315,10 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
   )
 }
 
-function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
+// A plain container, not <main>: the app shell renders the single <main> landmark inside it, after the header.
+function SidebarInset({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <main
+    <div
       data-slot="sidebar-inset"
       className={cn(
         "relative flex w-full flex-1 flex-col bg-background",

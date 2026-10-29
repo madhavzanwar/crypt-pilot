@@ -14,7 +14,8 @@ import { api } from "@/lib/api";
 import type { NextStep, SourceLink } from "@/lib/types";
 import { useUserId } from "@/lib/hooks";
 import { getOfflineOnly } from "@/lib/user";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { runActions, snapshotScreen } from "@/lib/voiceAgent";
 import { isRecentTransactionQuestion, pageToOpen, scrollCommand, scrollToSelector, speak, stopSpeaking, useVoiceInput } from "@/lib/voice";
 
@@ -230,7 +231,7 @@ export function ChatPopup() {
   }
 
   return (
-    <div className="fixed bottom-20 right-4 z-50 flex flex-col items-end gap-3 md:bottom-5 md:right-5">
+    <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] right-4 z-50 flex flex-col items-end gap-3 md:bottom-5 md:right-5">
       <AnimatePresence>
         {open && (
           <motion.div

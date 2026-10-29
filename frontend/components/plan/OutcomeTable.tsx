@@ -1,6 +1,6 @@
 import type { PlanOutcomeRow } from "@/lib/types";
 import { Chip } from "@/components/ui/Chip";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 
 /** Planned vs realized cash on the held-out test months. */
 export function OutcomeTable({ rows, reserve }: { rows: PlanOutcomeRow[]; reserve: number }) {

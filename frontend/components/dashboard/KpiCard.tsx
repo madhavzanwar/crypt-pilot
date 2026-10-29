@@ -46,7 +46,7 @@ export function KpiCard({ label, value, sub, icon: Icon, variant = "white", seri
       </div>
       {data.length > 1 && (
         <div className="pointer-events-none -mx-5 -mb-5 mt-auto h-14 pt-3">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
             <AreaChart data={data} margin={{ top: 4, bottom: 0, left: 0, right: 0 }}>
               <defs>
                 <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">

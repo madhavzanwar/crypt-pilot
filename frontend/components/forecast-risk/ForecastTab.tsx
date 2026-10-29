@@ -3,6 +3,7 @@
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { ForecastRiskReport } from "@/lib/types";
 import { AXIS, GRID, Section, money } from "./shared";
+import { formatAxisCurrency } from "@/components/ui/money";
 
 type Row = Record<string, string | number | [number, number] | null>;
 
@@ -20,7 +21,7 @@ export function ForecastTab({ r }: { r: ForecastRiskReport }) {
     <>
       <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
       <XAxis dataKey="month" tick={AXIS} tickLine={false} axisLine={{ stroke: "rgba(15, 23, 42, 0.08)" }} minTickGap={16} />
-      <YAxis tickFormatter={money} tick={AXIS} axisLine={false} tickLine={false} width={82} />
+      <YAxis tickFormatter={(v: number) => formatAxisCurrency(v)} tick={AXIS} axisLine={false} tickLine={false} width={82} />
       <Tooltip formatter={(v) => (Array.isArray(v) ? `${money(v[0])} - ${money(v[1])}` : money(Number(v)))} />
     </>
   );
@@ -28,7 +29,7 @@ export function ForecastTab({ r }: { r: ForecastRiskReport }) {
     <div className="flex flex-col gap-6">
       <Section title="Cash balance forecast" sub="Median path and 80% prediction interval (P10-P90) under current spending, against your reserve">
         <div className="h-64 w-full sm:h-72">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
             <ComposedChart data={cash} margin={{ left: 8, right: 16, top: 12, bottom: 4 }}>
               {axes}
               <Area dataKey="band" name="P10-P90" stroke="none" fill="#5f7f0c" fillOpacity={0.16} isAnimationActive={false} />
@@ -42,7 +43,7 @@ export function ForecastTab({ r }: { r: ForecastRiskReport }) {
 
       <Section title="Income vs expenses" sub="Last 12 months of actuals, then the forecast median and P10-P90 band for each">
         <div className="h-64 w-full sm:h-72">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 200 }}>
             <ComposedChart data={flow} margin={{ left: 8, right: 16, top: 12, bottom: 4 }}>
               {axes}
               <Area dataKey="incBand" name="Income P10-P90" stroke="none" fill="#5f7f0c" fillOpacity={0.16} isAnimationActive={false} />

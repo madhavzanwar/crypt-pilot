@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { TRACK_TRANSACTIONS, type TrackTransaction } from "../showcaseData";
 import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { Check, X, CreditCard, ShoppingBag, Laptop, FileText, Briefcase } from "lucide-react";
 
 export function TrackScene() {

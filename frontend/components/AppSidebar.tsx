@@ -143,7 +143,7 @@ export function AppSidebar({ footer }: { footer?: ReactNode }) {
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent className="[@media(max-height:860px)]:gap-0 [@media(max-height:860px)]:[&_[data-sidebar=group]]:py-1 [@media(max-height:860px)]:[&_[data-sidebar=group-label]]:h-6 [@media(max-height:860px)]:[&_[data-sidebar=group-label]]:mb-0 [@media(max-height:860px)]:[&_[data-sidebar=menu]]:gap-0 [@media(max-height:860px)]:[&_[data-sidebar=menu-button]]:h-7">
+      <SidebarContent className="[scrollbar-color:var(--color-pewter)_transparent] [scrollbar-width:thin] md:[@media(max-height:860px)]:gap-0 md:[@media(max-height:860px)]:[&_[data-sidebar=group]]:py-1 md:[@media(max-height:860px)]:[&_[data-sidebar=group-label]]:h-6 md:[@media(max-height:860px)]:[&_[data-sidebar=group-label]]:mb-0 md:[@media(max-height:860px)]:[&_[data-sidebar=menu]]:gap-0 md:[@media(max-height:860px)]:[&_[data-sidebar=menu-button]]:h-7 max-md:[&_[data-sidebar=menu-button]]:min-h-11">
         {NAV_GROUPS.filter((g) => g.links.some((l) => !l.more)).map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel>{t(`nav.${group.label}`, group.label)}</SidebarGroupLabel>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useT } from "@/lib/i18n";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import type { DashboardSnapshot } from "@/lib/types";
 import type { SpendSummary } from "@/lib/spend";
 
