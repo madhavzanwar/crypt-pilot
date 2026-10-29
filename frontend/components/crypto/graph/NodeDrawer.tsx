@@ -65,7 +65,7 @@ export function NodeDrawer({ node, onClose }: { node: GraphNode | null; onClose:
         </button>
       </div>
       <div className="flex min-w-0 items-center gap-2">
-        <span className="min-w-0 truncate font-mono text-xs text-ink" title={node.id}>{middleEllipsis(node.id, 10, 8)}</span>
+        <span data-no-translate translate="no" className="min-w-0 truncate font-mono text-xs text-ink" title={node.id}>{middleEllipsis(node.id, 10, 8)}</span>
         <button
           type="button"
           onClick={copy}
