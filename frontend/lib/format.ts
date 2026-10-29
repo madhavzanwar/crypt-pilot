@@ -1,6 +1,11 @@
 export function formatCurrency(value: number, currencyCode?: string): string {
   if (typeof window !== "undefined" && !currencyCode) {
-    const saved = localStorage.getItem("finpilot_currency");
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem("finpilot_currency");
+    } catch {
+      /* storage blocked: format in INR */
+    }
     if (saved && saved !== "INR") {
       const rates: Record<string, { rate: number; locale: string; code: string }> = {
         USD: { rate: 0.0116, locale: "en-US", code: "USD" },

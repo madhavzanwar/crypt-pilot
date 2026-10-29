@@ -17,6 +17,7 @@ import { ForecastTable } from "@/components/plan/ForecastTable";
 import { BacktestTable } from "@/components/plan/BacktestTable";
 import { OutcomeTable } from "@/components/plan/OutcomeTable";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/format";
 
 const MY_DATA = "my_data";
 const SOURCES: { key: string; label: string }[] = [
@@ -62,12 +63,14 @@ function ParamsForm({ value, onApply }: { value: PlanParams; onApply: (p: PlanPa
     setSeen(value);
     setDraft({});
   }
-  const field = (k: keyof PlanParams, label: string) => (
+  const field = (k: keyof PlanParams, label: string, placeholder: string) => (
     <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-pewter">
       {label}
       <input
         className={INPUT}
         type="number"
+        inputMode="decimal"
+        placeholder={placeholder}
         value={draft[k] ?? (value[k] === undefined ? "" : String(value[k]))}
         onChange={(e) => setDraft({ ...draft, [k]: e.target.value })}
       />
@@ -80,10 +83,10 @@ function ParamsForm({ value, onApply }: { value: PlanParams; onApply: (p: PlanPa
   };
   return (
     <div className="flex flex-wrap items-end gap-3">
-      {field("reserve", "Min reserve")}
-      {field("goal_amount", "Goal amount")}
-      {field("goal_month", "Goal by month")}
-      {field("tolerance", "Risk tolerance (0-1)")}
+      {field("reserve", "Min reserve", "Auto")}
+      {field("goal_amount", "Goal amount", "No goal")}
+      {field("goal_month", "Goal by month", "e.g. 6")}
+      {field("tolerance", "Risk tolerance (0-1)", "e.g. 0.5")}
       <Button variant="primary" onClick={apply}>Plan</Button>
     </div>
   );
@@ -178,7 +181,7 @@ export default function PlanPage() {
             </Section>
           )}
 
-          <Section title="Recommendation and risk" sub={`Starting cash ${plan.starting_cash.toLocaleString("en-IN")} · select a sequence to inspect it`}>
+          <Section title="Recommendation and risk" sub={`Starting cash ${formatCurrency(plan.starting_cash)} · select a sequence to inspect it`}>
             <RiskSummary plan={plan} selectedId={active.id} onSelect={setSelectedId} />
           </Section>
 
