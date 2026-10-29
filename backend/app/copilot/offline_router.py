@@ -350,6 +350,34 @@ def _intent_greeting(user_id: str, message: str) -> AnswerContract:
     )
 
 
+def _intent_help(user_id: str, message: str) -> AnswerContract:
+    return AnswerContract(
+        query=message,
+        narrative="I'm your FinPilot copilot. In basic mode I can answer questions about your spending, savings, debt and "
+        "EMIs, cash flow, what you can afford, and what to do next. Try: \"where is my money going?\", "
+        "\"can I afford a Rs 40,000 phone?\" or \"how do I pay off my credit card faster?\". "
+        "To check a Bitcoin wallet, open Wallet Guard in the sidebar.",
+    )
+
+
+def _intent_overview(user_id: str, message: str) -> AnswerContract:
+    """A plain walk-through of the user's dashboard numbers (also answers 'what did you work out?' follow-ups)."""
+    summary = tools.get_summary(user_id)
+    if "error" in summary or (not summary.get("monthly_income") and not summary.get("monthly_expenses")):
+        return _intent_fallback(user_id, message)
+    income = float(summary.get("monthly_income") or 0)
+    spend = float(summary.get("monthly_expenses") or 0)
+    left = income - spend
+    parts = [f"Here's your picture: about \u20b9{income:,.0f} comes in each month and about \u20b9{spend:,.0f} goes out"]
+    parts.append(f"so roughly \u20b9{left:,.0f} is left over." if left >= 0 else f"so you are spending about \u20b9{-left:,.0f} more than you earn.")
+    return AnswerContract(
+        query=message,
+        facts=_facts_from_summary(summary),
+        recommendations=_recommendation_from_snapshot_insights(user_id),
+        narrative=" ".join(parts) + " The cards below show the details; ask about spending, debt or savings to go deeper.",
+    )
+
+
 def _intent_fallback(user_id: str, message: str) -> AnswerContract:
     summary = tools.get_summary(user_id)
     if "error" not in summary and not summary.get("monthly_income") and not summary.get("monthly_expenses"):
@@ -370,7 +398,8 @@ def _intent_fallback(user_id: str, message: str) -> AnswerContract:
                 what_would_help="Try asking about spending, savings, debt, cash flow, affordability, or recommendations.",
             )
         ],
-        narrative="Here's a general snapshot of your finances while I work out exactly what you're asking.",
+        narrative="I didn't quite catch that. I'm in basic mode, so I only understand questions about spending, savings, "
+        "debt, cash flow, what you can afford and what to do next. Here's a snapshot of your finances meanwhile.",
     )
 
 
@@ -380,6 +409,19 @@ _INTENTS: list[tuple[str, re.Pattern, callable]] = [
         "greeting",
         re.compile(r"^\s*(hi+|hello+|hey+|namaste|yo|good\s+(morning|afternoon|evening)|thanks?|thank you)\W*$", re.IGNORECASE),
         _intent_greeting,
+    ),
+    (
+        "help",
+        re.compile(r"\b(help|what can you do|what do you do|how (do|can) i use|capabilities|open (my )?co ?pilot)\b", re.IGNORECASE),
+        _intent_help,
+    ),
+    (
+        "overview",
+        re.compile(
+            r"\b(dashboard|overview|summary|snapshot|walk me through|how am i doing|my finances|worked out|what did you)\b",
+            re.IGNORECASE,
+        ),
+        _intent_overview,
     ),
     (
         "affordability",

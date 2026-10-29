@@ -200,3 +200,31 @@ def test_eval_runs_and_passes_at_least_80_percent():
     assert pct >= 0.8, f"Only {passed}/{total} eval cases passed:\n" + "\n".join(
         f"{r['status']}: {r['question']} -- {r['reason']}" for r in rows if r["status"] == "FAIL"
     )
+
+
+@pytest.mark.parametrize("message,intent", [
+    ("walk me through my dashboard", "overview"),
+    ("what you worked out on?", "overview"),
+    ("how am i doing", "overview"),
+    ("open my co pilot", "help"),
+    ("what can you do", "help"),
+    ("zzz qqq unmatched nonsense", "fallback"),
+])
+def test_offline_router_dashboard_and_help_intents(message, intent):
+    assert offline_router.classify(message) == intent
+    result = offline_router.route("demo-priya", message)
+    assert result.narrative
+    if intent == "overview":
+        assert "comes in each month" in result.narrative and result.facts
+
+
+def test_no_ai_key_is_reported_not_hidden(monkeypatch):
+    from app.copilot import engine
+    from app.core.config import get_settings
+
+    s = get_settings()
+    monkeypatch.setattr(type(s), "has_nvidia", property(lambda self: False))
+    monkeypatch.setattr(s, "nvidia_chat_api_key", "", raising=False)
+    result = engine.answer("demo-priya", "walk me through my dashboard")
+    assert result.source == "FinPilot rules"
+    assert any("NVIDIA_API_KEY" in g.what_would_help for g in result.data_gaps)
