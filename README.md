@@ -426,3 +426,7 @@ crypt-pilot/
 <br/>
 <sub>Built with Next.js, FastAPI and TigerGraph. Payments are test mode only.</sub>
 </div>
+
+## License
+
+MIT. See [`LICENSE`](LICENSE).
