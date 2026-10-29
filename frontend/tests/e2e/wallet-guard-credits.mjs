@@ -1,6 +1,7 @@
-// Playwright check for BUG-006 / BUG-101. Run: BASE=http://127.0.0.1:3210 node tests/e2e/wallet-guard-credits.js
+// Playwright check for BUG-006 / BUG-101. Run: BASE=http://127.0.0.1:3210 node tests/e2e/wallet-guard-credits.mjs
 // Needs the web app on BASE and the FinPilot + crypto services behind it. It spends credits of a fresh demo session only.
-const { chromium } = require("/home/user/cryptiq/frontend/node_modules/playwright");
+import { createRequire } from "node:module";
+const { chromium } = createRequire(import.meta.url)("/home/user/cryptiq/frontend/node_modules/playwright");
 
 const BASE = process.env.BASE || "http://127.0.0.1:3210";
 const results = [];
