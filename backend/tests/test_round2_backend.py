@@ -242,3 +242,16 @@ def test_store_health_reports_mode_without_credentials():
     j = r.json()
     assert set(j) == {"mode", "projectId", "ok", "error"} and j["mode"] in ("memory", "firestore")
     assert "private_key" not in r.text and "BEGIN" not in r.text
+
+
+def test_finpilot_store_memory_ignores_firebase_credentials(monkeypatch):
+    """FINPILOT_STORE=memory must keep Firestore untouched even when credentials are present (free-plan quota exhaustion)."""
+    from app.core import store
+
+    store._db.cache_clear()
+    monkeypatch.setenv("FINPILOT_STORE", "memory")
+    monkeypatch.setenv("FIREBASE_SERVICE_ACCOUNT_JSON", '{"type":"service_account","project_id":"x"}')
+    try:
+        assert store._db() is None
+    finally:
+        store._db.cache_clear()
