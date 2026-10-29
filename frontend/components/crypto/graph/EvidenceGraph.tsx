@@ -176,7 +176,7 @@ function Panel({ result }: { result: CheckResponse }) {
             className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+14px)] rounded-chip border border-black/[0.1] bg-white px-2.5 py-1 text-xs whitespace-nowrap shadow-md"
             style={{ left: hover.x, top: hover.y }}
           >
-            <span className="font-mono">{middleEllipsis(hover.node.id, 6, 6)}</span>
+            <span className="font-mono" translate="no" lang="en">{middleEllipsis(hover.node.id, 6, 6)}</span>
           </div>
         )}
         <NodeDrawer node={selected} onClose={closeNode} />

@@ -26,7 +26,7 @@ function CopyRow({ label, value }: { label: string; value: string }) {
     <div className="min-w-0">
       <p className="mb-1 text-xs font-medium text-pewter">{label}</p>
       <div className="flex items-center gap-2 rounded-surface border border-mist bg-fog py-1.5 pr-1.5 pl-3">
-        <code className="min-w-0 flex-1 truncate font-mono text-xs text-ink" title={value}>
+        <code className="min-w-0 flex-1 truncate font-mono text-xs text-ink" title={value} translate="no" lang="en">
           {value}
         </code>
         <Button type="button" variant="outline" size="xs" onClick={() => void copy(value, label)} aria-label={`Copy ${label}`}>
@@ -87,7 +87,7 @@ export function InvoiceCard({
         </Button>
       )}
       <p className="-mt-2 text-center text-xs text-pewter">
-        This opens the <code className="font-mono">{isBtc ? "bitcoin:" : "monero:"}</code> link in whichever wallet your device uses, such as Cake Wallet.
+        This opens the <code className="font-mono" translate="no" lang="en">{isBtc ? "bitcoin:" : "monero:"}</code> link in whichever wallet your device uses, such as Cake Wallet.
       </p>
 
       <div className="grid gap-3">

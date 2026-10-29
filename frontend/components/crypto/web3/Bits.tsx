@@ -77,7 +77,7 @@ export function HashLine({ label, value, full = false }: { label: string; value:
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-graphite">
       <span>{label}</span>
-      <span className={cn("font-mono text-ink", full && "break-all")} title={value}>
+      <span className={cn("font-mono text-ink", full && "break-all")} title={value} translate="no" lang="en">
         {full ? value : shortHex(value)}
       </span>
       <CopyIcon value={value} label={`Copy ${label.toLowerCase()}`} />

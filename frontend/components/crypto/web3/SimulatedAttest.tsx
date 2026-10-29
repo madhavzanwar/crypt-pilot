@@ -57,9 +57,9 @@ export function SimulatedAttest({ subject, reason }: { subject: AttestSubject; r
           <p className="font-semibold">{t("web3.simulated.done", "Preview finished: SIMULATED (no transaction)")}</p>
           <dl className="grid gap-x-3 gap-y-1 sm:grid-cols-[max-content_1fr]">
             <dt>{t("web3.success.uid", "Attestation UID")}</dt>
-            <dd className="font-mono">SIMULATED (no transaction)</dd>
+            <dd className="font-mono" translate="no" lang="en">SIMULATED (no transaction)</dd>
             <dt>{t("web3.success.tx", "Transaction")}</dt>
-            <dd className="font-mono">SIMULATED (no transaction)</dd>
+            <dd className="font-mono" translate="no" lang="en">SIMULATED (no transaction)</dd>
           </dl>
         </Notice>
       ) : null}

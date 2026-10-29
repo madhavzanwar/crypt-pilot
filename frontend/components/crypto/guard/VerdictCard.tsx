@@ -88,7 +88,7 @@ export default function VerdictCard({ result }: { result: CheckResponse }) {
         <RiskGauge score={result.riskScore} verdict={result.verdict} />
 
         <div className="flex min-w-0 items-center gap-1">
-          <span className="min-w-0 truncate font-mono text-xs text-graphite" title={result.address}>
+          <span className="min-w-0 truncate font-mono text-xs text-graphite" title={result.address} translate="no" lang="en">
             {middleEllipsis(result.address, 12, 8)}
           </span>
           <CopyAddress value={result.address} />

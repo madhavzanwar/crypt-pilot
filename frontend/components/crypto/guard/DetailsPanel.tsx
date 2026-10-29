@@ -61,7 +61,7 @@ export default function DetailsPanel({ result }: { result: CheckResponse }) {
       </section>
 
       <p className="flex flex-wrap gap-x-2 text-[11px] text-pewter">
-        <span>{g("wg.model")}: <code className="font-mono">{result.model.name}</code></span>
+        <span>{g("wg.model")}: <code className="font-mono" translate="no" lang="en">{result.model.name}</code></span>
         {typeof f1 === "number" && <span className="tnum">F1 {f1.toFixed(3)}</span>}
         {result.graphFeatures.componentSize !== undefined && <span className="tnum">cluster {result.graphFeatures.componentSize}</span>}
       </p>

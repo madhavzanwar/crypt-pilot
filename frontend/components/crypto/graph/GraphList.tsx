@@ -41,7 +41,7 @@ export function GraphList({ nodes }: { nodes: GraphNode[] }) {
             {sorted.map((n) => (
               <tr key={n.id} className="border-t border-black/[0.05]">
                 <td className="px-3 py-2">
-                  <span className="font-mono text-xs" title={n.id}>{middleEllipsis(n.id, 8, 6)}</span>
+                  <span className="font-mono text-xs" title={n.id} translate="no" lang="en">{middleEllipsis(n.id, 8, 6)}</span>
                   {n.isSubject && <span className="ml-2 text-xs text-pewter">{g("wg.graph.list.subject")}</span>}
                 </td>
                 <td className="px-3 py-2">

@@ -74,7 +74,7 @@ export default function WalletsInput({ wallets, onChange, disabled, id = "wallet
       {wallets.length > 0 ? (
         <ul className="flex flex-wrap gap-2">
           {wallets.map((w) => (
-            <li key={w} className="inline-flex items-center gap-1.5 rounded-full bg-fog py-1 pl-3 pr-1 font-mono text-xs text-ink" title={w}>
+            <li key={w} className="inline-flex items-center gap-1.5 rounded-full bg-fog py-1 pl-3 pr-1 font-mono text-xs text-ink" title={w} translate="no" lang="en">
               {shortAddress(w, 8, 6)}
               <button type="button" disabled={disabled} onClick={() => onChange(wallets.filter((x) => x !== w))} aria-label={`Remove ${shortAddress(w)}`} className="flex size-5 items-center justify-center rounded-full text-pewter hover:bg-white hover:text-ink">
                 <X className="size-3" />

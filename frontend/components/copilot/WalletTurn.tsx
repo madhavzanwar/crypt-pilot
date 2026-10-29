@@ -52,7 +52,7 @@ export function WalletTurn({
     <div className="flex w-full flex-col gap-3">
       <p className="flex items-center gap-1.5 text-xs font-semibold text-ink">
         <ShieldCheck className="size-3.5 text-olive" aria-hidden /> {tr("cp.wallet.title")}
-        <span className="font-normal text-pewter" title={address}>
+        <span className="font-normal text-pewter" title={address} translate="no" lang="en">
           {shortAddress(address)}
         </span>
       </p>
@@ -61,7 +61,7 @@ export function WalletTurn({
           <WalletVerdictCard address={address} lang={lang} onResult={onResult} />
           {more.map((a) => (
             <div key={a} className="flex flex-col gap-1.5">
-              <p className="text-xs text-pewter" title={a}>
+              <p className="text-xs text-pewter" title={a} translate="no" lang="en">
                 {shortAddress(a)}
               </p>
               <WalletVerdictCard address={a} lang={lang} />

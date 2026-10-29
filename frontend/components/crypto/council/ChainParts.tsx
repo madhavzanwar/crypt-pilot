@@ -47,7 +47,7 @@ export function ChainChips({ w }: { w: ChainWallet }) {
 export function WalletLine({ w }: { w: ChainWallet }) {
   return (
     <li className="grid gap-1 rounded-xl bg-fog/70 p-2.5">
-      <span className="font-mono text-[11px] text-ink" title={w.address}>{shortAddress(w.address, 8, 6)}</span>
+      <span className="font-mono text-[11px] text-ink" title={w.address} translate="no" lang="en">{shortAddress(w.address, 8, 6)}</span>
       <ChainChips w={w} />
       <p className="text-xs text-graphite">{w.reason}</p>
       {w.mock && <p className="text-[10px] text-pewter">Demo dataset, not real chain data.</p>}
@@ -68,7 +68,7 @@ export function GraphEvidence({ address }: { address: string | null }) {
     <div className="rounded-2xl border border-mist bg-white">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-ink">
         <Link2 className="size-4 text-leaf" /> Graph evidence
-        <span className="font-mono text-xs font-normal text-pewter">{shortAddress(address, 8, 6)}</span>
+        <span className="font-mono text-xs font-normal text-pewter" translate="no" lang="en">{shortAddress(address, 8, 6)}</span>
         <ChevronDown className={cn("ml-auto size-4 text-pewter transition-transform duration-300", open && "rotate-180")} />
       </button>
       {open && (

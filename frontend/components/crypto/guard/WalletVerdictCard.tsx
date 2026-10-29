@@ -66,7 +66,7 @@ export default function WalletVerdictCard({
     </Link>
   );
   const head = (
-    <span className="min-w-0 truncate font-mono text-[11px] text-graphite" title={address}>
+    <span className="min-w-0 truncate font-mono text-[11px] text-graphite" title={address} translate="no" lang="en">
       {middleEllipsis(address, 10, 8)}
     </span>
   );

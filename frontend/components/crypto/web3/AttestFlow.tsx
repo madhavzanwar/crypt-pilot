@@ -196,7 +196,7 @@ export default function AttestFlow({ subject }: { subject: AttestSubject }) {
       )}
       {isConnected && address && !uid && (
         <p className="flex flex-wrap items-center gap-2 text-xs text-graphite">
-          {t("web3.connect.as", "Connected as")} <span className="font-mono text-ink" title={address}>{shortHex(address, 8, 6)}</span>
+          {t("web3.connect.as", "Connected as")} <span className="font-mono text-ink" title={address} translate="no" lang="en">{shortHex(address, 8, 6)}</span>
           <button
             type="button"
             onClick={() => disconnect()}

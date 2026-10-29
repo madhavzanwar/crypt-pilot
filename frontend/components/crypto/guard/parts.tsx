@@ -136,7 +136,7 @@ export function EngineBadge({ result, compact = false }: { result: CheckResponse
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 rounded-chip border border-ember/25 bg-orange-50 px-3 py-2 text-xs text-ink">
           <Zap className="size-4 flex-none text-ember-dark" aria-hidden />
           <span className="font-semibold">{g("wg.engine.tigergraph", { ms })}</span>
-          {!compact && <code className="min-w-0 break-all font-mono text-[11px] text-graphite">{tigergraph.queryName}</code>}
+          {!compact && <code className="min-w-0 break-all font-mono text-[11px] text-graphite" translate="no" lang="en">{tigergraph.queryName}</code>}
           {mock}
           {!compact && tigergraph.gsql && (
             <button

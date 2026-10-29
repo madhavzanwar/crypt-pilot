@@ -100,7 +100,7 @@ export function CryptoInvoice({ pack }: { pack: CreditPack }) {
   return (
     <div className="grid gap-3">
       <p className="text-sm text-graphite">
-        Pays with test coins only. Cake Wallet (or any wallet that handles <code className="font-mono">bitcoin:</code> / <code className="font-mono">monero:</code> links) can open the invoice.
+        Pays with test coins only. Cake Wallet (or any wallet that handles <code className="font-mono" translate="no" lang="en">bitcoin:</code> / <code className="font-mono" translate="no" lang="en">monero:</code> links) can open the invoice.
       </p>
       <div role="radiogroup" aria-label="Coin" className="grid grid-cols-2 gap-2">
         {COINS.map((c) => (
