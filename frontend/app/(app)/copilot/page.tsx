@@ -12,7 +12,7 @@ import { WalletTurn } from "@/components/copilot/WalletTurn";
 import MicButton from "@/components/crypto/voice/MicButton";
 import { VoiceProviderChip } from "@/components/crypto/voice/VoiceProviderChip";
 import type { CheckResponse, Lang as CryptoLang, VoiceProvider } from "@/lib/crypto/api";
-import { messageHasSecret, scanAddress } from "@/lib/crypto/extractAddress";
+import { messageHasSecret, scanAddress, scanAddresses } from "@/lib/crypto/extractAddress";
 import { useVoiceT, type VoiceStringKey } from "@/lib/crypto/voice/strings";
 import { useCryptoStatus } from "@/lib/crypto/voice/useCryptoStatus";
 import { SPEECH_LANG } from "@/lib/i18n";
@@ -212,16 +212,23 @@ export default function CopilotPage() {
   );
   const current = ENGINES.find((e) => e.id === engine)!;
   const scans = useMemo(() => turns.map((t) => (t.role === "user" ? scanAddress(t.message) : null)), [turns]);
+  // BUG-103: every valid address in a message gets a card (capped); `ignored` counts the ones left out.
+  const multi = useMemo(() => turns.map((t) => (t.role === "user" ? scanAddresses(t.message) : null)), [turns]);
 
   /** The wallet verdict (or checksum note) for the user message at index `ui`; talks to the crypto service, not the chat backend. */
   const walletFor = (ui: number) => {
     const sc = scans[ui];
     if (!sc) return null;
+    const extra = multi[ui];
+    const first = sc.checksumValid ? (extra?.addresses[0] ?? sc.address) : sc.address;
+    const more = sc.checksumValid ? (extra?.addresses.filter((a) => a !== first) ?? []) : [];
     const key = `${chatId}:${ui}`;
     return (
       <motion.div key={`w${ui}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="ml-11 min-w-0">
         <WalletTurn
-          address={sc.address}
+          address={first}
+          more={more}
+          ignored={extra?.ignored ?? 0}
           checksumValid={sc.checksumValid}
           lang={cryptoLang}
           armed={!!armed[key]}
