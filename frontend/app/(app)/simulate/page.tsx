@@ -539,6 +539,11 @@ function SimulateTabs() {
           </button>
         ))}
       </div>
+      {tab === "optout" && (
+        <p role="note" className="rounded-2xl bg-fog p-3 text-xs text-graphite">
+          The income, other expenses and subscription list below are an editable example, not your own numbers. Change them to match your life, or import your detected subscriptions.
+        </p>
+      )}
       {tab === "optout" ? <OptOutSimulator /> : <SimulateContent />}
     </div>
   );
