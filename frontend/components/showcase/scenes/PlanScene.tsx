@@ -5,7 +5,7 @@ import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
 import { PLAN_GOALS, type PlanGoal } from "../showcaseData";
 import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { Shield, Palmtree, Car as CarIcon, GraduationCap, Target } from "lucide-react";
 
 export function PlanScene() {

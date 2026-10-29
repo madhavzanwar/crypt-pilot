@@ -29,7 +29,7 @@ export function ChartContainer({
   return (
     <div data-chart={id} className={cn("h-full min-h-48 w-full flex-1", className)}>
       <style dangerouslySetInnerHTML={{ __html: css }} />
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
         {children}
       </ResponsiveContainer>
     </div>

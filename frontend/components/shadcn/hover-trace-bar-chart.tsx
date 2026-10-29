@@ -17,6 +17,7 @@ import {
 import { useMotionValueEvent, useSpring } from "motion/react";
 import NumberFlow from "@number-flow/react";
 import * as React from "react";
+import { useCurrency } from "@/lib/currency";
 
 const CHART_MARGIN = 38;
 
@@ -54,6 +55,7 @@ export function EvilHoverTraceBarChart({
   currency?: string;
 }) {
   const [activeIndex, setActiveIndex] = React.useState<number | null>(null);
+  const { config } = useCurrency();
 
   const maxData = React.useMemo(
     () =>
@@ -97,13 +99,14 @@ export function EvilHoverTraceBarChart({
     <div className="flex h-full flex-col p-4">
       <div className="mb-4 flex items-end justify-between">
         <div className="space-y-1">
-          <p className="text-muted-foreground font-mono text-xs">{`[${label.toLowerCase()}]`}</p>
-          <p className="text-primary font-mono text-3xl tracking-tighter">
+          <p className="text-xs font-medium text-graphite">{label}</p>
+          <p className="font-display text-3xl tnum text-ink">
             <NumberFlow
-              value={selectedData.value}
+              value={selectedData.value * config.rateFromINR}
+              locales={config.locale}
               format={{
                 style: "currency",
-                currency,
+                currency: config.code || currency,
                 currencyDisplay: "narrowSymbol",
                 maximumFractionDigits: 0,
               }}
@@ -112,8 +115,8 @@ export function EvilHoverTraceBarChart({
         </div>
 
         <div className="space-y-1 text-right">
-          <p className="text-muted-foreground font-mono text-[10px]">{"[month]"}</p>
-          <p className="text-primary font-mono text-xs">{selectedData.month}</p>
+          <p className="text-[10px] font-medium text-graphite">Month</p>
+          <p className="text-xs font-semibold text-ink">{selectedData.month}</p>
         </div>
       </div>
 

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { BUDGET_ITEMS, type BudgetItem } from "../showcaseData";
 import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { ShoppingCart, Utensils, ShoppingBag, Car, Film, Sparkles } from "lucide-react";
 
 export function BudgetScene() {

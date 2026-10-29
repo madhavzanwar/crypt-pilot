@@ -194,6 +194,14 @@ function Sidebar({
             } as React.CSSProperties
           }
           side={side}
+          onCloseAutoFocus={(e) => {
+            // return focus to the control that opened the drawer (BUG-026)
+            const trigger = document.querySelector<HTMLElement>('[data-sidebar="trigger"]')
+            if (trigger) {
+              e.preventDefault()
+              trigger.focus()
+            }
+          }}
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Sidebar</SheetTitle>
@@ -304,9 +312,10 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
   )
 }
 
-function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
+function SidebarInset({ className, ...props }: React.ComponentProps<"div">) {
+  // a div, not <main>: NavShell owns the page's single <main> landmark (BUG-069)
   return (
-    <main
+    <div
       data-slot="sidebar-inset"
       className={cn(
         "relative flex w-full flex-1 flex-col bg-background",
@@ -483,7 +492,7 @@ const sidebarMenuButtonVariants = cva(
           "bg-background shadow-[0_0_0_1px_var(--sidebar-border)] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_var(--sidebar-accent)]",
       },
       size: {
-        default: "h-8 text-sm",
+        default: "h-8 text-sm max-md:h-11",
         sm: "h-7 text-xs",
         lg: "h-12 text-sm group-data-[collapsible=icon]:p-0!",
       },

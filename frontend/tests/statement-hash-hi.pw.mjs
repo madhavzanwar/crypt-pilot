@@ -1,6 +1,7 @@
 // BUG-003 regression: switching to Hindi must not change the SHA-256 shown on /statement.
-// Usage: BASE=http://localhost:3230 node tests/statement-hash-hi.pw.cjs
-const { chromium } = require("/home/user/cryptiq/frontend/node_modules/playwright");
+// Usage: BASE=http://localhost:3230 node tests/statement-hash-hi.pw.mjs
+import { createRequire } from "node:module";
+const { chromium } = createRequire(import.meta.url)("/home/user/cryptiq/frontend/node_modules/playwright");
 const BASE = process.env.BASE || "http://localhost:3230";
 (async () => {
   const browser = await chromium.launch();
@@ -16,7 +17,6 @@ const BASE = process.env.BASE || "http://localhost:3230";
   const hashRe = /0x[0-9a-f]{64}/;
   const en = (await page.locator(sel).first().innerText()).trim();
   if (!hashRe.test(en)) throw new Error("no English hash: " + en);
-  const digest = (await page.locator("#executive-statement-document .font-mono.break-all").first().innerText().catch(() => "")).trim();
   await page.evaluate(() => { localStorage.setItem("finpilot_lang", "hi"); window.dispatchEvent(new StorageEvent("storage", { key: "finpilot_lang" })); });
   await page.selectOption("header select", "hi").catch(() => {});
   await page.waitForTimeout(4000);
