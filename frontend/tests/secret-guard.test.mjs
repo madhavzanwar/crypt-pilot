@@ -93,3 +93,15 @@ test("QA3-2: history never re-sends a blocked or split secret", () => {
   const out = cleanHistory(h);
   assert.deepEqual(out.map((x) => x.content), ["ok", "what is my balance"]);
 });
+
+const { showAnswerBubble, isGenericFallbackAnswer } = await import("@/lib/crypto/walletFirst");
+
+test("QA3-5: a wallet question hides the generic snapshot but keeps real answers", async () => {
+  const generic = "I didn't quite catch that. I'm in basic mode, so I only understand questions about spending";
+  assert.equal(isGenericFallbackAnswer(generic), true);
+  assert.equal(showAnswerBubble(1, generic), false);
+  assert.equal(showAnswerBubble(0, generic), true);
+  assert.equal(showAnswerBubble(2, "Your net worth is 5,000."), true);
+  const { scanAddresses } = await import("@/lib/crypto/extractAddress");
+  assert.equal(scanAddresses(`Is ${ADDR} safe to pay?`).scans.length, 1);
+});

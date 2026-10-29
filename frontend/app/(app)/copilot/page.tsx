@@ -13,6 +13,7 @@ import MicButton from "@/components/crypto/voice/MicButton";
 import { VoiceProviderChip } from "@/components/crypto/voice/VoiceProviderChip";
 import type { CheckResponse, Lang as CryptoLang, VoiceProvider } from "@/lib/crypto/api";
 import { messageHasSecret, scanAddresses } from "@/lib/crypto/extractAddress";
+import { showAnswerBubble } from "@/lib/crypto/walletFirst";
 import { cleanHistory, findSplitSecret, REDACTED } from "@/lib/crypto/secretGuard";
 import { toCryptoLang } from "@/lib/crypto/lang";
 import { engineLabel, useVoiceT, type VoiceStringKey } from "@/lib/crypto/voice/strings";
@@ -461,9 +462,10 @@ export default function CopilotPage() {
                         {t.message}
                       </motion.div>,
                     );
-                    // no reply yet (still thinking, or the chat backend failed): the wallet check still shows
-                    if (turns[i + 1]?.role !== "assistant") out.push(walletFor(i));
+                    // a wallet question shows the wallet card first, then (if it says anything useful) the chat answer
+                    out.push(walletFor(i));
                   } else {
+                    if (turns[i - 1]?.role === "user" && !showAnswerBubble(scans[i - 1]?.scans.length ?? 0, t.answer?.narrative)) return out;
                     out.push(
                       <motion.div key={`a${i}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex w-full gap-3">
                         <FinPilotAvatar className="mt-0.5" />
@@ -473,7 +475,6 @@ export default function CopilotPage() {
                         </div>
                       </motion.div>,
                     );
-                    if (turns[i - 1]?.role === "user") out.push(walletFor(i - 1));
                   }
                   return out;
                 })}
