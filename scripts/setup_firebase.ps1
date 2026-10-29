@@ -49,8 +49,15 @@ if (-not $AppId) { throw "No web app id found after creating it." }
 Write-Host "  app id: $AppId"
 
 Write-Host "[3/7] web config"
-$cfg = Find-Key (FbJson apps:sdkconfig WEB $AppId --project $Project --json)
-if (-not $cfg -or -not $cfg.apiKey) { throw "The web config had no apiKey. Copy the values by hand from Project settings." }
+# The CLI's output shape varies (the config can be a JSON object or a string inside one), so read the raw text and pull each value out.
+$raw = ((Fb apps:sdkconfig WEB $AppId --project $Project) -join "`n").Replace('\"', '"').Replace('\n', "`n")
+function Get-CfgVal($key) { if ($raw -match ('"?' + $key + '"?\s*[:=]\s*"([^"]+)"')) { $Matches[1] } else { "" } }
+$cfg = [pscustomobject]@{ apiKey = Get-CfgVal "apiKey"; authDomain = Get-CfgVal "authDomain"; storageBucket = Get-CfgVal "storageBucket";
+                          messagingSenderId = Get-CfgVal "messagingSenderId"; measurementId = Get-CfgVal "measurementId" }
+if (-not $cfg.apiKey) {
+    Write-Host "---- CLI output (no secrets in it; the apiKey of a web app is public) ----"; Write-Host $raw
+    throw "No apiKey found in the output above. Run: firebase apps:sdkconfig WEB $AppId --project $Project   and copy the values by hand."
+}
 $authDomain = if ($cfg.authDomain) { $cfg.authDomain } else { "$Project.firebaseapp.com" }
 
 Write-Host "[4/7] Firestore database (location $Region; cannot be changed later)"

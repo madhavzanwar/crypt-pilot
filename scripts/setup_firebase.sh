@@ -45,11 +45,13 @@ fi
 say "  app id: $APP_ID"
 
 say "[3/7] web config"
-CFG="$(fb apps:sdkconfig WEB "$APP_ID" --project "$PROJECT" --json 2>/dev/null)"
+CFG="$(fb apps:sdkconfig WEB "$APP_ID" --project "$PROJECT" 2>&1)"
 [ -n "$CFG" ] || die "could not read the web config."
-getkey() { printf '%s' "$CFG" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const find=(o)=>{if(o&&typeof o==="object"){if(o.apiKey)return o;for(const v of Object.values(o)){const r=find(v);if(r)return r}}return null};let o=null;try{o=find(JSON.parse(s.slice(s.indexOf("{"))))}catch(e){}if(!o){const m=s.match(new RegExp(process.argv[1]+"\"?\\s*[:=]\\s*\"([^\"]+)"));console.log(m?m[1]:"");return}console.log(o[process.argv[1]]||"")})' "$1"; }
+# The CLI's output shape varies (object, or a string inside JSON), so unescape the raw text and pull each value out.
+CFG="$(printf '%s' "$CFG" | sed -e 's/\\"/"/g' -e 's/\\n/\n/g')"
+getkey() { printf '%s' "$CFG" | grep -Eo "\"?$1\"?[[:space:]]*[:=][[:space:]]*\"[^\"]+\"" | head -1 | sed -E 's/^[^:=]*[:=][[:space:]]*"([^"]*)"$/\1/'; }
 API_KEY="$(getkey apiKey)"; AUTH_DOMAIN="$(getkey authDomain)"; BUCKET="$(getkey storageBucket)"; SENDER="$(getkey messagingSenderId)"; MEAS="$(getkey measurementId)"
-[ -n "$API_KEY" ] && [ -n "$AUTH_DOMAIN" ] || die "the web config did not contain apiKey/authDomain. Copy the values by hand from Project settings."
+[ -n "$API_KEY" ] || { printf '%s\n' "$CFG"; die "no apiKey found in the output above. Run: firebase apps:sdkconfig WEB $APP_ID --project $PROJECT and copy the values by hand."; }
 [ -n "$AUTH_DOMAIN" ] || AUTH_DOMAIN="$PROJECT.firebaseapp.com"
 
 say "[4/7] Firestore database (location $REGION; the location cannot be changed later)"
