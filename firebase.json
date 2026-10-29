@@ -5,7 +5,7 @@
       "googleSignIn": {
         "oAuthBrandDisplayName": "FinPilot",
         "authorizedRedirectUris": [
-          "https://hackmatrix-3764f.firebaseapp.com/__/auth/handler",
+          "https://cryptpilot-madhav-01.firebaseapp.com/__/auth/handler",
           "http://localhost"
         ]
       }
