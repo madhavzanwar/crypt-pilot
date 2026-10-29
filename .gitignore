@@ -48,6 +48,7 @@ Thumbs.db
 antigravity_pack/
 antigravity_pack.zip
 *.mp4
+!assets/showcase/cryptpilot-showcase.mp4
 !assets/*.mp4
 
 # firebase service-account keys
