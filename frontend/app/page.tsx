@@ -61,6 +61,33 @@ function Section({ children, band = false, className = "" }: { children: ReactNo
   );
 }
 
+const CTA_BASE =
+  "inline-flex min-h-12 items-center justify-center gap-2 rounded-chip border px-6 py-3 text-base font-semibold cursor-pointer transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
+const CTA_VARIANT = {
+  lime: "bg-lime text-ink shadow-[0_2px_12px_rgba(166,209,26,0.35)] hover:bg-lime-dark hover:text-white border-lime-dark/40",
+  primary: "bg-navy text-white shadow-[0_2px_10px_rgba(23,37,84,0.22)] hover:bg-navy-light border-navy-dark/30",
+  secondary: "border-mist bg-paper text-ink shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:bg-fog hover:border-black/[0.12]",
+} as const;
+
+/** A link styled as a button. Never nest <button> inside <a> (nested-interactive, BUG-092). */
+function CtaLink({
+  href,
+  variant,
+  className = "",
+  children,
+}: {
+  href: string;
+  variant: keyof typeof CTA_VARIANT;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Link href={href} className={`${CTA_BASE} ${CTA_VARIANT[variant]} w-full sm:w-auto ${className}`}>
+      {children}
+    </Link>
+  );
+}
+
 const ICON = "flex h-11 w-11 items-center justify-center rounded-xl mb-5 border";
 
 const PERSONAS = [
@@ -134,19 +161,15 @@ export default function Home() {
           {/* CTA Group */}
           <Reveal delay={0.15} className="w-full">
             <div className="mt-10 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3.5 w-full">
-              <Link href="/login" className="w-full sm:w-auto">
-                <Button variant="lime" size="lg" className="w-full sm:w-auto px-8 py-3.5 text-base">
+              <CtaLink href="/login" variant="lime">
                   Sign in to get started
                   <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
-                </Button>
-              </Link>
-              <Link href="/wallet-guard" className="w-full sm:w-auto">
-                <Button variant="secondary" size="lg" className="w-full sm:w-auto px-6 py-3.5 text-base">
+                </CtaLink>
+              <CtaLink href="/wallet-guard" variant="secondary">
                   Check a wallet
-                </Button>
-              </Link>
+                </CtaLink>
             </div>
           </Reveal>
 
@@ -204,11 +227,7 @@ export default function Home() {
               ))}
             </ul>
             <div className="mt-8">
-              <Link href="/wallet-guard">
-                <Button variant="lime" size="lg" className="px-7 py-3 text-base">
-                  Open Wallet Guard
-                </Button>
-              </Link>
+              <CtaLink href="/wallet-guard" variant="lime" className="px-7">Open Wallet Guard</CtaLink>
             </div>
           </div>
 
@@ -264,14 +283,14 @@ export default function Home() {
       <section className="w-full">
         <div className="mx-auto w-full max-w-[1240px] px-4 py-12 sm:px-8 sm:py-14">
           <Reveal>
-            <p className="text-center text-xs font-semibold uppercase tracking-wider text-pewter">Built with</p>
+            <p className="text-center text-xs font-semibold uppercase tracking-wider text-pewter">Built with and integrations</p>
             <ul className="mt-5 flex flex-wrap items-center justify-center gap-2.5 text-xs font-medium text-graphite">
               {[
-                "TigerGraph · graph evidence",
+                "Graph evidence · NetworkX (TigerGraph when configured)",
                 "Dodo Payments · test mode",
                 "Cake Wallet · testnet invoices",
                 "Sarvam · voice",
-                "Wispr Flow · voice",
+                "Wispr Flow · optional voice, when configured",
                 "EAS on Base Sepolia · attestations",
               ].map((item) => (
                 <li key={item} className="rounded-full border border-black/[0.06] bg-white/70 px-3.5 py-1.5 backdrop-blur">
@@ -497,16 +516,12 @@ export default function Home() {
                 </p>
 
                 <div className="mt-8 flex flex-col sm:flex-row gap-3.5 w-full sm:w-auto">
-                  <Link href="/dashboard" className="w-full sm:w-auto">
-                    <Button variant="primary" size="lg" className="w-full sm:w-auto px-7 py-3 text-base">
-                      Launch Dashboard
-                    </Button>
-                  </Link>
-                  <Link href="/copilot" className="w-full sm:w-auto">
-                    <Button variant="secondary" size="lg" className="w-full sm:w-auto bg-white/80 text-ink border-ink/15 hover:bg-white text-base shadow-xs">
-                      Ask FinPilot Copilot
-                    </Button>
-                  </Link>
+                  <CtaLink href="/dashboard" variant="primary">
+                  Launch Dashboard
+                </CtaLink>
+                  <CtaLink href="/copilot" variant="secondary" className="bg-white/80 text-ink border-ink/15 hover:bg-white shadow-xs">
+                  Ask FinPilot Copilot
+                </CtaLink>
                 </div>
 
                 <div className="mt-6 flex flex-wrap items-center gap-4 text-xs font-semibold text-graphite">

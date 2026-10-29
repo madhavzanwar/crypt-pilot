@@ -1,30 +1,54 @@
-export function formatCurrency(value: number, currencyCode?: string): string {
-  if (typeof window !== "undefined" && !currencyCode) {
-    const saved = localStorage.getItem("finpilot_currency");
-    if (saved && saved !== "INR") {
-      const rates: Record<string, { rate: number; locale: string; code: string }> = {
-        USD: { rate: 0.0116, locale: "en-US", code: "USD" },
-        EUR: { rate: 0.0107, locale: "de-DE", code: "EUR" },
-        GBP: { rate: 0.0090, locale: "en-GB", code: "GBP" },
-        AED: { rate: 0.0425, locale: "ar-AE", code: "AED" },
-        SGD: { rate: 0.0153, locale: "en-SG", code: "SGD" },
-      };
-      const cfg = rates[saved];
-      if (cfg) {
-        return new Intl.NumberFormat(cfg.locale, {
-          style: "currency",
-          currency: cfg.code,
-          maximumFractionDigits: Math.abs(value * cfg.rate) >= 100 ? 0 : 2,
-        }).format(value * cfg.rate);
-      }
-    }
-  }
+const CURRENCY_RATES: Record<string, { rate: number; locale: string }> = {
+  INR: { rate: 1, locale: "en-IN" },
+  USD: { rate: 0.0116, locale: "en-US" },
+  EUR: { rate: 0.0107, locale: "de-DE" },
+  GBP: { rate: 0.009, locale: "en-GB" },
+  AED: { rate: 0.0425, locale: "ar-AE" },
+  SGD: { rate: 0.0153, locale: "en-SG" },
+};
 
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: currencyCode || "INR",
-    maximumFractionDigits: 0,
-  }).format(value);
+/** Read the saved currency code without ever throwing (storage can be blocked). */
+export function readSavedCurrency(): string | null {
+  try {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem("finpilot_currency");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Format an amount that is stored in INR into `code`. Values that round to
+ * zero (including -0 and -0.3) never get a minus sign ("-₹0" is a bug).
+ */
+export function formatMoney(
+  amountInINR: number,
+  code: string = "INR",
+  options?: { showCents?: boolean },
+): string {
+  const cfg = CURRENCY_RATES[code] ?? CURRENCY_RATES.INR;
+  const isINR = !CURRENCY_RATES[code] || code === "INR";
+  const converted = (Number.isFinite(amountInINR) ? amountInINR : 0) * cfg.rate;
+  const maxDigits = options?.showCents ? 2 : isINR || Math.abs(converted) >= 100 ? 0 : 2;
+  const factor = 10 ** maxDigits;
+  const rounded = Math.round(converted * factor) / factor;
+  const safe = rounded === 0 ? 0 : converted; // drops the sign of -0 and of tiny negatives
+  try {
+    return new Intl.NumberFormat(cfg.locale, {
+      style: "currency",
+      currency: isINR ? "INR" : code,
+      maximumFractionDigits: maxDigits,
+      minimumFractionDigits: options?.showCents ? 2 : 0,
+    }).format(safe);
+  } catch {
+    return `${Math.round(safe).toLocaleString()}`;
+  }
+}
+
+export function formatCurrency(value: number, currencyCode?: string): string {
+  if (currencyCode) return formatMoney(value, currencyCode);
+  const saved = readSavedCurrency();
+  return formatMoney(value, saved && CURRENCY_RATES[saved] ? saved : "INR");
 }
 
 export function formatDate(iso: string): string {

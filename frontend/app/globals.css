@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "@fontsource-variable/plus-jakarta-sans";
 @import "@fontsource-variable/outfit";
+@import "tw-animate-css"; /* BUG-033: enter/exit animation utilities used by drawers, menus, tooltips */
 /*
  ---break---
  */
@@ -26,14 +27,14 @@
   --color-ink: #0d0d0d;
   --color-carbon: #1e293b;
   --color-graphite: #475569;
-  --color-pewter: #7487a3;
+  --color-pewter: #52647f; /* BUG-026: 5.1:1 on the canvas (was #7487a3, 3.1:1) */
   --color-steel: #a3b0c7;
   --color-mist: #e0e6f2;
 
   /* Core Accent (Luminous Ember) */
-  --color-ember: #ff6b1a;
-  --color-ember-dark: #e0540a;
-  --color-ember-light: #ff9340;
+  --color-ember: #b93a08; /* BUG-026: white-on-ember and ember text >= 4.5:1 (was #ff6b1a, 2.8:1) */
+  --color-ember-dark: #9a3412;
+  --color-ember-light: #d9560e;
   --color-ember-glow: rgba(255, 107, 26, 0.22);
   --color-ember-soft: rgba(255, 107, 26, 0.12);
 
@@ -44,7 +45,7 @@
   --color-navy-glow: rgba(23, 37, 84, 0.22);
 
   /* Colourful accents: green / sky / sun + soft tints for card fills */
-  --color-leaf: #0fb67a;
+  --color-leaf: #067550; /* BUG-026: was #0fb67a, 2.3:1 on tints */
   --color-sky: #3b6bff;
   --color-sun: #ffb81f;
   --tint-leaf: #d8f6e9;
@@ -52,17 +53,17 @@
   --tint-sun: #fff0c9;
   --tint-ember: #ffe6d4;
   --color-lime: #c6f135;
-  --color-lime-dark: #a6d11a;
+  --color-lime-dark: #4d7c0f; /* BUG-026: used as text colour; was 1.7:1 on white */
   --tint-lime: #eefacc;
   --color-sage: #dfe8c4;
   --color-sage-deep: #cddaa6;
 
   /* Semantic Category / Telemetry Badges */
-  --badge-emerald: #0fb67a;
+  --badge-emerald: #067550;
   --badge-emerald-bg: rgba(15, 182, 122, 0.12);
-  --badge-amber: #e09400;
+  --badge-amber: #8a5a00;
   --badge-amber-bg: rgba(224, 148, 0, 0.12);
-  --badge-rose: #f0455a;
+  --badge-rose: #c4243a;
   --badge-rose-bg: rgba(240, 69, 90, 0.1);
   --badge-indigo: #3b6bff;
   --badge-indigo-bg: rgba(59, 107, 255, 0.12);

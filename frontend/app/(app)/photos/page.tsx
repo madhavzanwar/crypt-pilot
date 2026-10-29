@@ -148,8 +148,8 @@ export default function PhotosPage() {
           <CardTitle>Add by photo</CardTitle>
         </CardHeader>
         <div className="flex flex-col gap-3 p-5 pt-0">
-          <input ref={snapInput} type="file" accept="image/*" className="hidden" onChange={(e) => snap(e.target.files?.[0])} />
-          <input ref={camInput} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => snap(e.target.files?.[0])} />
+          <input ref={snapInput} type="file" accept="image/*" aria-label="Choose a photo to snap" className="hidden" onChange={(e) => snap(e.target.files?.[0])} />
+          <input ref={camInput} type="file" accept="image/*" capture="environment" aria-label="Take a photo" className="hidden" onChange={(e) => snap(e.target.files?.[0])} />
           {live ? (
             <div className="flex flex-col gap-2">
               <video ref={videoRef} autoPlay playsInline muted className="w-full rounded-xl bg-black" />
@@ -179,8 +179,8 @@ export default function PhotosPage() {
               <p className="text-sm text-ink">
                 {result.suggestion.item ? `Looks like ${result.suggestion.item}.` : "I do not know this one yet."} Confirm the name and price to add it, and I will remember it.
               </p>
-              <input className={field} value={confirmName} onChange={(e) => setConfirmName(e.target.value)} placeholder="What is it?" />
-              <input className={field} value={confirmPrice} onChange={(e) => setConfirmPrice(e.target.value)} placeholder="Price (₹)" inputMode="decimal" />
+              <input className={field} value={confirmName} onChange={(e) => setConfirmName(e.target.value)} aria-label="Item name" placeholder="What is it?" />
+              <input className={field} value={confirmPrice} onChange={(e) => setConfirmPrice(e.target.value)} aria-label="Price (₹)" placeholder="Price (₹)" inputMode="decimal" />
               <Button variant="primary" onClick={confirm} disabled={busy || !confirmName.trim() || !(Number(confirmPrice) > 0)}>
                 Add expense
               </Button>
@@ -194,9 +194,9 @@ export default function PhotosPage() {
           <CardTitle>Teach a photo</CardTitle>
         </CardHeader>
         <form onSubmit={teach} className="flex flex-col gap-3 p-5 pt-0">
-          <input type="file" accept="image/*" capture="environment" required={!teachFile} onChange={(e) => setTeachFile(e.target.files?.[0] ?? null)} className="text-sm" />
-          <input className={field} value={teachName} onChange={(e) => setTeachName(e.target.value)} placeholder="Name, e.g. tea" required />
-          <input className={field} value={teachPrice} onChange={(e) => setTeachPrice(e.target.value)} placeholder="Price (₹), e.g. 15" inputMode="decimal" required />
+          <input type="file" accept="image/*" capture="environment" aria-label="Photo of the item to teach" required={!teachFile} onChange={(e) => setTeachFile(e.target.files?.[0] ?? null)} className="text-sm" />
+          <input className={field} value={teachName} onChange={(e) => setTeachName(e.target.value)} aria-label="Item name" placeholder="Name, e.g. tea" required />
+          <input className={field} value={teachPrice} onChange={(e) => setTeachPrice(e.target.value)} aria-label="Price (₹)" placeholder="Price (₹), e.g. 15" inputMode="decimal" required />
           <Button type="submit" variant="primary" disabled={busy || !teachFile}>
             Remember this
           </Button>

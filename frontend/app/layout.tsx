@@ -2,8 +2,12 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://finpilot.ai"),
-  title: "CryptPilot",
+  // BUG-029: the canonical origin comes from the deployment, never a hard-coded third-party domain.
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ||
+      (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000"),
+  ),
+  title: { default: "CryptPilot", template: "%s | CryptPilot" },
   description:
     "AI x crypto: a personal-finance copilot with 90-day Monte Carlo cash-flow forecasts, plus graph-verified Bitcoin wallet risk checks with plain-language, multilingual explanations.",
   icons: {
@@ -39,6 +43,7 @@ export const viewport: Viewport = {
 import { CurrencyProvider } from "@/lib/currency";
 import { ThemeProvider } from "next-themes";
 import { AutoTranslate } from "@/components/AutoTranslate";
+import { SkipLink } from "./SkipLink";
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
@@ -48,6 +53,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col bg-paper text-ink">
+        <SkipLink />
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <CurrencyProvider>{children}</CurrencyProvider>
         </ThemeProvider>

@@ -118,8 +118,8 @@ export default function UploadPage() {
           </CardTitle>
         </CardHeader>
         <div className="flex flex-col items-start gap-3 p-5 pt-0">
-          <input ref={input} type="file" accept="image/*,.txt,.csv" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
-          <input ref={camInput} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
+          <input ref={input} type="file" accept="image/*,.txt,.csv" aria-label="Choose a document to upload" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
+          <input ref={camInput} type="file" accept="image/*" capture="environment" aria-label="Take a photo of a document" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
           {live ? (
             <div className="flex w-full flex-col gap-2">
               <video ref={videoRef} autoPlay playsInline muted className="w-full rounded-xl bg-black" />

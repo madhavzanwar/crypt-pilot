@@ -117,7 +117,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
+    <div className="grid min-h-screen grid-cols-[minmax(0,1fr)] lg:grid-cols-2">
       {/* Brand panel */}
       <div className="relative hidden overflow-hidden bg-sage p-10 text-ink lg:flex lg:flex-col lg:justify-start lg:gap-8">
         <Link
@@ -140,9 +140,9 @@ export default function LoginPage() {
       </div>
 
       {/* Form panel */}
-      <div className="relative flex items-center justify-center p-6">
+      <div className="relative flex min-w-0 items-center justify-center p-4 pt-16 sm:p-6">
         <LanguageSwitcher className="absolute right-4 top-4" />
-        <div className="w-full max-w-md space-y-6 rounded-3xl bg-white p-8 shadow-[0_24px_60px_-28px_rgba(15,23,42,0.35)]">
+        <div className="w-full max-w-md space-y-6 rounded-3xl bg-white p-6 sm:p-8 shadow-[0_24px_60px_-28px_rgba(15,23,42,0.35)]">
           <div className="space-y-2">
             <Link href="/" className="inline-block lg:hidden">
               <FinPilotLogo variant="horizontal" size={32} showWordmark={true} />
