@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { looksLikeSecret } from "@/lib/crypto/address/seedGuard";
 import { validateAddress } from "@/lib/crypto/address/validate";
-import { useWalletCheck, type WalletCheckState } from "@/lib/crypto/useWalletCheck";
+import { findRecent, useWalletCheck, type WalletCheckState } from "@/lib/crypto/useWalletCheck";
 import { cn } from "@/lib/utils";
 import { openCreditsDrawer } from "@/components/crypto/credits/openCredits";
 import AttestButton from "@/components/crypto/web3/AttestButton";
@@ -104,14 +104,16 @@ export default function WalletGuard() {
     [guardSecret, reqLang, run],
   );
 
-  // Deep link from the Copilot card: /wallet-guard?address=... prefills the field and runs once.
+  // Deep link from the Copilot card: /wallet-guard?address=...&run=1 prefills the field and, ONLY when this address was
+  // already checked in this session (a free, remembered result), shows that result. Otherwise it only prefills: a link
+  // must never spend a credit. The effect runs once (the ref survives StrictMode's double effect) and the language is
+  // latched at that moment.
   useEffect(() => {
-    // Auto-run only for the in-app link from a wallet card (run=1: that address was just checked, so it is cached and free).
-    // A plain ?address= only pre-fills: opening a link must never spend a credit.
     if (autoRan.current || !initial || initialIsSecret || params.get("run") !== "1") return;
     autoRan.current = true;
-    void submit(initial);
-  }, [initial, initialIsSecret, params, submit]);
+    const v = validateAddress(initial.trim(), { allowDemo: true });
+    if (v.ok && findRecent(v.address)) void run(v.address, reqLang, { reuse: true });
+  }, [initial, initialIsSecret, params, reqLang, run]);
 
   // On small screens bring the result into view when it arrives.
   const done = state.phase === "done";

@@ -13,6 +13,7 @@ import MicButton from "@/components/crypto/voice/MicButton";
 import { VoiceProviderChip } from "@/components/crypto/voice/VoiceProviderChip";
 import type { CheckResponse, Lang as CryptoLang, VoiceProvider } from "@/lib/crypto/api";
 import { messageHasSecret, scanAddress } from "@/lib/crypto/extractAddress";
+import { toCryptoLang } from "@/lib/crypto/lang";
 import { useVoiceT, type VoiceStringKey } from "@/lib/crypto/voice/strings";
 import { useCryptoStatus } from "@/lib/crypto/voice/useCryptoStatus";
 import { SPEECH_LANG } from "@/lib/i18n";
@@ -55,8 +56,8 @@ export default function CopilotPage() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const { lang, tr } = useVoiceT();
-  // the crypto service speaks en/hi only: Marathi is sent as Hindi
-  const cryptoLang: CryptoLang = lang === "en" ? "en" : "hi";
+  // the crypto service speaks en/hi only: the shared mapping sends Marathi as Hindi, same as Wallet Guard
+  const cryptoLang: CryptoLang = toCryptoLang(lang);
   const cryptoStatus = useCryptoStatus();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [secretWarn, setSecretWarn] = useState(false);

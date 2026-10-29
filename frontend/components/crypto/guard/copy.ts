@@ -2,6 +2,7 @@
 
 import { translate, useLang } from "@/lib/i18n";
 import type { Lang } from "@/lib/crypto/api";
+import { toCryptoLang } from "@/lib/crypto/lang";
 
 /**
  * Wallet Guard strings, English + Hindi. Looked up here first (FinPilot's own i18n table has no wallet-guard rows,
@@ -204,8 +205,8 @@ export function useGuardT(): { g: (key: string, vars?: Record<string, string | n
   return {
     g: (key, vars) => gt(uiLang, key, vars),
     uiLang,
-    /** Language to request from the service: Hindi when the UI is Hindi, English otherwise. */
-    reqLang: uiLang === "hi" ? "hi" : "en",
+    /** Language to request from the service: the shared mapping (Hindi for hi and mr, English otherwise). */
+    reqLang: toCryptoLang(uiLang),
   };
 }
 
