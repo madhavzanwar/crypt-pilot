@@ -194,7 +194,7 @@ export default function PhotosPage() {
           <CardTitle>Teach a photo</CardTitle>
         </CardHeader>
         <form onSubmit={teach} className="flex flex-col gap-3 p-5 pt-0">
-          <input type="file" accept="image/*" capture="environment" required={!teachFile} onChange={(e) => setTeachFile(e.target.files?.[0] ?? null)} className="text-sm" />
+          <input type="file" accept="image/*" capture="environment" required={!teachFile} onChange={(e) => setTeachFile(e.target.files?.[0] ?? null)} className="text-sm text-graphite file:mr-3 file:min-h-10 file:cursor-pointer file:rounded-chip file:border file:border-mist file:bg-white file:px-4 file:py-2 file:text-sm file:font-medium file:text-ink hover:file:bg-fog" />
           <input className={field} value={teachName} onChange={(e) => setTeachName(e.target.value)} placeholder="Name, e.g. tea" required />
           <input className={field} value={teachPrice} onChange={(e) => setTeachPrice(e.target.value)} placeholder="Price (₹), e.g. 15" inputMode="decimal" required />
           <Button type="submit" variant="primary" disabled={busy || !teachFile}>
