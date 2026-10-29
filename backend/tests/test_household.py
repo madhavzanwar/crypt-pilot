@@ -38,7 +38,7 @@ def test_get_household_demo_priya():
 
 def test_get_household_unassigned_user():
     resp = client.get("/api/household/demo-meera")
-    assert resp.status_code == 404
+    assert resp.status_code == 200 and resp.json() is None  # BUG-020: empty state, not an error
 
 
 def test_create_household_demo_meera():
@@ -151,8 +151,17 @@ def test_viewer_only_sees_their_own_spending(monkeypatch):
     assert data["members"][0]["share_pct"] == 100.0
 
 
-def test_spending_requires_a_household():
-    assert client.get("/api/household/demo-meera/spending").status_code == 404
+def test_spending_for_a_user_without_a_household_is_an_empty_state():
+    r = client.get("/api/household/demo-meera/spending")
+    assert r.status_code == 200 and r.json() is None  # BUG-020: the page's create/join cards handle this, no console 404
+
+
+def test_household_and_insights_for_a_user_without_a_household_are_null_not_404():
+    for path in ("", "/insights"):
+        r = client.get(f"/api/household/demo-arjun{path}")
+        assert r.status_code == 200 and r.json() is None
+    # writing still needs a household
+    assert client.post("/api/household/demo-arjun/invites", json={"email": "a@b.co", "role": "viewer"}).status_code == 404
 
 
 def test_seed_family_replaces_an_older_demo_household():

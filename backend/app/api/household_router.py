@@ -190,11 +190,13 @@ def _build_household_summary(
     )
 
 
-@router.get("/api/household/{user_id}", response_model=HouseholdSummary)
-def get_household(user_id: str = Depends(resolve_user_id)) -> HouseholdSummary:
+@router.get("/api/household/{user_id}", response_model=HouseholdSummary | None)
+def get_household(user_id: str = Depends(resolve_user_id)) -> HouseholdSummary | None:
+    """The household summary, or `null` (HTTP 200) for someone who is not in a household: that is the normal empty state of
+    the page (create / join cards), not an error."""
     membership = _get_user_membership(user_id)
     if not membership:
-        raise HTTPException(404, "User does not belong to any household")
+        return None
     household, _ = membership
     return _build_household_summary(household, user_id)
 
@@ -473,12 +475,12 @@ def add_managed_transaction(
 _NON_SPEND = {"income", "transfer", "credit_card_payment", "investment_sip"}
 
 
-@router.get("/api/household/{user_id}/insights", response_model=HouseholdInsights)
-def household_insights(user_id: str = Depends(resolve_user_id)) -> HouseholdInsights:
-    """Household-wide spending aggregates for charts: monthly trend, categories, per-member cashflow."""
+@router.get("/api/household/{user_id}/insights", response_model=HouseholdInsights | None)
+def household_insights(user_id: str = Depends(resolve_user_id)) -> HouseholdInsights | None:
+    """Household-wide spending aggregates for charts: monthly trend, categories, per-member cashflow. `null` (200) when not in a household."""
     membership = _get_user_membership(user_id)
     if not membership:
-        raise HTTPException(404, "User does not belong to any household")
+        return None
     household, me = membership
     members = store.query(HouseholdMemberRow, household_id=household.id)
     if me.role not in ("owner", "editor"):
@@ -663,12 +665,13 @@ def _member_spending(m: HouseholdMemberRow, days: int, today: date) -> MemberSpe
     )
 
 
-@router.get("/api/household/{user_id}/spending", response_model=HouseholdSpending)
-def get_household_spending(days: int = Query(30, ge=7, le=365), user_id: str = Depends(resolve_user_id)) -> HouseholdSpending:
-    """What each household member has spent. The owner and editors see everyone; a viewer sees only their own spending."""
+@router.get("/api/household/{user_id}/spending", response_model=HouseholdSpending | None)
+def get_household_spending(days: int = Query(30, ge=7, le=365), user_id: str = Depends(resolve_user_id)) -> HouseholdSpending | None:
+    """What each household member has spent. The owner and editors see everyone; a viewer sees only their own spending.
+    `null` (200) when the user is not in a household."""
     membership = _get_user_membership(user_id)
     if not membership:
-        raise HTTPException(404, "User does not belong to any household")
+        return None
     household, me = membership
     can_view_all = me.role in ("owner", "editor")
     members = store.query(HouseholdMemberRow, household_id=household.id)
