@@ -258,10 +258,6 @@ export const api = {
     apiFetch<{ consent_id: string }>(`/api/aa/${userId}/consent/approve`, { method: "POST", body: JSON.stringify({ handle, otp }) }),
   aaImport: (userId: string, consentId: string) =>
     apiFetch<{ accounts: number; transactions: number }>(`/api/aa/${userId}/import`, { method: "POST", body: JSON.stringify({ consent_id: consentId }) }),
-  /** Plaid: get a Link token, then trade the public token Link returns for a one-time import. */
-  plaidLinkToken: (userId: string) => apiFetch<{ link_token: string }>(`/api/plaid/${userId}/link-token`, { method: "POST" }),
-  plaidImport: (userId: string, publicToken: string) =>
-    apiFetch<{ accounts: number; transactions: number }>(`/api/plaid/${userId}/import`, { method: "POST", body: JSON.stringify({ public_token: publicToken }) }),
   connectConnector: (userId: string, connector: string, profile: ConnectProfile, url = "") =>
     apiFetch<{ connected: boolean; accounts: number; transactions: number }>(
       `/api/connectors/${userId}/${connector}/connect`,

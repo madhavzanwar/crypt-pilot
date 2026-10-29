@@ -36,7 +36,6 @@ CATALOG: dict[str, tuple[str, str, bool]] = {
     "google_sheets": ("Google Sheets", "A live expense sheet: edit it and the app updates", True),
     "invoices": ("Gmail & Drive invoices", "Bills and invoices parsed automatically", True),
     "investments": ("Mutual funds & stocks", "SIPs and holdings from your depository", True),
-    "plaid": ("Plaid", "Link a US or European bank (sandbox) to import accounts and transactions", True),
     "dodo": ("Dodo Payments", "Card checkout for CryptPilot credits. Test mode, no real charge", True),
     "cake_wallet": ("Cake Wallet", "Bitcoin testnet / Monero demo invoices, opened as a bitcoin: or monero: link in your wallet", True),
 }
@@ -231,7 +230,7 @@ def export(connector: str, user_id: str = Depends(resolve_user_id)) -> Response:
         raise HTTPException(409, f"{_label(connector)} is a payment rail, it has no data to export")
     if store.get(ConnectionRow, f"{user_id}:{connector}") is None:
         raise HTTPException(409, f"{_label(connector)} isn't connected")
-    if connector in ("google_pay", "google_sheets", "plaid"):
+    if connector in ("google_pay", "google_sheets"):
         data = {"transactions": [t.model_dump(mode="json") for t in store.query(TransactionRow, user_id=user_id)]}
     else:
         data = _dataset(connector)
@@ -250,10 +249,7 @@ def disconnect(connector: str, user_id: str = Depends(resolve_user_id)) -> None:
     if store.get(ConnectionRow, f"{user_id}:{connector}") is None:
         raise HTTPException(404, f"{_label(connector)} isn't connected")
     # Only connectors that own ledger rows remove data; dataset-only ones (bank, invoices, investments) just unlink.
-    if connector == "plaid":
-        from app.api.plaid_router import clear_plaid
-        clear_plaid(user_id)
-    elif connector == "google_sheets":
+    if connector == "google_sheets":
         _clear_sheet(user_id) if user_id in DEMO_USER_IDS else _clear_user(user_id)
     elif connector == "google_pay" and user_id not in DEMO_USER_IDS:
         _clear_user(user_id)

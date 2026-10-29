@@ -25,7 +25,6 @@ KEYS = {
     "TAVILY_API_KEY": ("Tavily", "Web Intel page and the Web Checker agent"),
     "FIRECRAWL_API_KEY": ("Firecrawl", "Page scraping fallback"),
     "RESEND_API_KEY": ("Resend", "Email alerts"),
-    "PLAID_SECRET": ("Plaid", "US / EU bank linking (sandbox)"),
     "INNGEST_EVENT_KEY": ("Inngest", "Background Evidence Council runs"),
 }
 # env var -> (url, how the secret is sent). Free read-only GETs only; keys with no safe test are reported from real usage.

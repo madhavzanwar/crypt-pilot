@@ -29,7 +29,6 @@ from app.api.web_router import router as web_router
 from app.api.voice_router import router as voice_router
 from app.api.ops_router import router as ops_router
 from app.api.jobs_router import router as jobs_router
-from app.api.plaid_router import router as plaid_router
 from app.api.pay_router import router as pay_router
 from app.api.webhooks_router import router as webhooks_router
 from app.api.tax_router import router as tax_router
@@ -125,7 +124,6 @@ app.include_router(web_router)
 app.include_router(voice_router)
 app.include_router(ops_router)
 app.include_router(jobs_router)
-app.include_router(plaid_router)
 app.include_router(pay_router, prefix="/api")
 app.include_router(household_router)
 app.include_router(networth_router)
@@ -186,7 +184,7 @@ async def audit_log_middleware(request: Request, call_next):
         # user_id is always the 3rd segment for these resources (even when
         # further sub-path segments follow, e.g. /api/budgets/{user_id}/status
         # or /api/transactions/{user_id}/{transaction_id}).
-        if parts[1] in {"transactions", "budgets", "goals", "tax", "rules", "household", "plan", "profile", "aa", "security", "connectors", "documents", "pay", "expenses", "plaid"}:
+        if parts[1] in {"transactions", "budgets", "goals", "tax", "rules", "household", "plan", "profile", "aa", "security", "connectors", "documents", "pay", "expenses"}:
             return parts[2]
 
         # For these, user_id is the LAST segment (/api/dashboard/{user_id},
