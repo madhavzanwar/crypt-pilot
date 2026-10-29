@@ -1018,7 +1018,7 @@ function TransactionRowItem({
           </span>
         </td>
         <td className="px-3 py-3.5 text-xs text-graphite">
-          <span className="inline-flex max-w-[150px] truncate rounded-full border border-mist bg-white px-2.5 py-0.5">{accountName}</span>
+          <span title={accountName} className="inline-block max-w-[220px] truncate rounded-full border border-mist bg-white px-2.5 py-0.5 align-middle">{accountName}</span>
         </td>
         {/* Interactive Category Badge & Popover Picker */}
         <td className="px-3 py-3.5 relative">

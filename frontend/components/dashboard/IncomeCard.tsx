@@ -53,7 +53,7 @@ export function IncomeCard({ months, txns }: { months: MonthTotals[]; txns: Tran
         </div>
       </div>
       <div className="flex flex-wrap gap-2 text-xs text-graphite">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-fog px-3 py-2">
+        <span className="inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-2xl bg-fog px-3 py-2">
           {delta >= 0 ? <TrendingUp className="size-4 text-ink" /> : <TrendingDown className="size-4 text-ink" />}
           {tr("i.last")} <span className="font-semibold tnum text-ink">{prev ? formatCurrency(prev.income) : "--"}</span>
           {tr("home.this_month")} <span className="font-semibold tnum text-ink">{formatCurrency(total)}</span>
@@ -67,10 +67,10 @@ export function IncomeCard({ months, txns }: { months: MonthTotals[]; txns: Tran
         </span>
       </div>
       {sources.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(7.5rem,1fr))]">
           {sources.map(([name, amt], i) => (
             <div key={name} className={`min-w-0 border-l-2 pl-3 ${SOURCE_COLORS[i]}`}>
-              <p className="truncate text-xs text-graphite">{name}</p>
+              <p className="truncate text-xs text-graphite" title={name}>{name}</p>
               <p className="text-sm font-semibold tnum text-ink">{formatCurrency(amt)}</p>
             </div>
           ))}
