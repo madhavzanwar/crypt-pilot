@@ -104,6 +104,8 @@ class CheckPipeline:
         self.usage_hook: Callable[[str], Awaitable[None]] | None = None
         self._tasks: set[asyncio.Future[Any]] = set()
         self._inflight: dict[str, tuple[asyncio.Lock, int]] = {}
+        # keyed by ADDRESS ONLY (never the UI language): {"langs": {lang: response dump}}. A language switch on a
+        # result the visitor already paid for must not be a second paid check.
         self.cache: TTLCache[dict[str, Any]] = TTLCache(settings.cache_ttl_seconds)
         self.data_source = scorer.data_source if scorer else "not_loaded"
         self.tg_subset = self._read_tg_subset()
@@ -136,15 +138,22 @@ class CheckPipeline:
             raise ApiError(400, "invalid_address") from exc
         with self.db.session() as s:
             ledger.ensure_for_request(s, self.s, session_id)
-            if ledger.balance(s, session_id) <= 0:
+            if ledger.balance(s, session_id) <= 0 and not self._free_answer(info.address):
                 raise ApiError(402, "no_credits")
         return Prepared(info.address, lang, session_id)
 
+    def _free_answer(self, address: str) -> bool:
+        """Answers that never cost a credit stay available at a zero balance: a cached result, or a wallet that is
+        not in the research dataset (UNKNOWN / list-only verdicts are not charged)."""
+        if self.cache.get(address) is not None:
+            return True
+        return self.scorer is not None and not self.scorer.has(address)
+
     # ------------------------------------------------------------------ run
     async def execute(self, p: Prepared) -> AsyncIterator[Step | Result]:
-        """Single-flight per address+lang: identical concurrent requests (double click, StrictMode
-        double effect, retry) queue behind the first one and are then served from the cache, uncharged."""
-        key = f"{p.address}|{p.lang}"
+        """Single-flight per address: identical concurrent requests (double click, StrictMode double effect, retry,
+        a language toggle) queue behind the first one and are then served from the cache, uncharged."""
+        key = p.address
         lock, _ = self._inflight.get(key, (asyncio.Lock(), 0))
         self._inflight[key] = (lock, self._inflight.get(key, (lock, 0))[1] + 1)
         try:
@@ -160,7 +169,9 @@ class CheckPipeline:
 
     async def _execute_locked(self, p: Prepared) -> AsyncIterator[Step | Result]:
         yield Step(*STEPS[0])
-        cached = self.cache.get(f"{p.address}|{p.lang}")
+        entry = self.cache.get(p.address)
+        cached = entry["langs"].get(p.lang) if entry is not None else None
+        already_paid = entry is not None  # same address already answered (and charged) in another language
         if cached is not None:
             resp = CheckResponse.model_validate(cached)
             resp.cached = True
@@ -172,7 +183,7 @@ class CheckPipeline:
         if self.s.demo_replay:
             replayed = self._replay(p)
             if replayed is not None:
-                async for ev in self._finish(p, replayed, charge=replayed.status == "ok"):
+                async for ev in self._finish(p, replayed, charge=replayed.status == "ok" and not already_paid):
                     yield ev
                 return
 
@@ -189,7 +200,7 @@ class CheckPipeline:
                         addr=hash_address(p.address))
             replayed = self._replay(p) if self.s.replay_fallback else None
             if replayed is not None:
-                async for ev in self._finish(p, replayed, charge=replayed.status == "ok"):
+                async for ev in self._finish(p, replayed, charge=replayed.status == "ok" and not already_paid):
                     yield ev
                 return
             yield Result(self._error_response(p, "graph_unavailable"), 503)
@@ -206,8 +217,7 @@ class CheckPipeline:
         resp.explanation = Explanation(en=en, hi=hi)
         if self.tts is not None:
             resp.audio_url = await self.tts.synthesize(en if p.lang == "en" else hi, p.lang)
-        self.cache.set(f"{p.address}|{p.lang}", resp.model_dump(mode="json", exclude={"credits_remaining"}))
-        async for ev in self._finish(p, resp, charge=resp.status == "ok"):
+        async for ev in self._finish(p, resp, charge=resp.status == "ok" and not already_paid):
             yield ev
 
     async def compute(self, address: str, lang: Lang) -> CheckResponse:
@@ -229,9 +239,15 @@ class CheckPipeline:
             yield Result(None, 402, "no_credits")
             return
         resp.credits_remaining = remaining
+        self._cache_put(p, resp)  # only after the charge succeeded: a lost credit race must not publish its result
         if charge and self.usage_hook is not None:
             self._spawn(self.usage_hook(p.session_id))
         yield Result(resp)
+
+    def _cache_put(self, p: Prepared, resp: CheckResponse) -> None:
+        entry = self.cache.get(p.address) or {"langs": {}}
+        entry["langs"][p.lang] = resp.model_dump(mode="json", exclude={"credits_remaining"})
+        self.cache.set(p.address, entry)
 
     def _spawn(self, coro: Any) -> None:
         """Fire-and-forget (usage reporting); failures are logged and never affect the check."""

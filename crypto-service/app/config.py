@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     # rate limits (slowapi syntax)
     rate_limit_check: str = "30/minute"
     rate_limit_transcribe: str = "10/minute"
+    rate_limit_invoice: str = "10/hour"  # per client IP: creating BTC/XMR invoices holds payment slots
     max_request_bytes: int = 6 * 1024 * 1024
     # Only true when the app is reachable ONLY through Fly's proxy, which overwrites Fly-Client-IP
     trust_fly_client_ip: bool = False

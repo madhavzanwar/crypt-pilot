@@ -23,7 +23,10 @@ COPY --chown=cryptiq:cryptiq app ./app
 COPY --chown=cryptiq:cryptiq scripts ./scripts
 COPY --chown=cryptiq:cryptiq docker-entrypoint.sh ./docker-entrypoint.sh
 # data/ and artifacts/ are mounted (volume) or fetched at start-up; they are never in the image
-ENV PORT=8000 PATH="/app/.venv/bin:${PATH}"
+# Production by default: a plain `docker run` must never boot in dev mode with the published placeholder secrets.
+# APP_ENV=prod makes the app refuse to start without SESSION_SECRET/LOG_SALT/CORS_ORIGINS set (see app/main.py);
+# pass APP_ENV=dev explicitly (docker-compose.dev / `-e APP_ENV=dev`) for local experiments.
+ENV APP_ENV=prod PORT=8000 PATH="/app/.venv/bin:${PATH}"
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s CMD python -c "import os,sys,urllib.request as u; \
 sys.exit(0 if u.urlopen('http://127.0.0.1:%s/api/health' % os.environ.get('PORT','8000'), timeout=4).status == 200 else 1)"

@@ -73,3 +73,23 @@ def payment_fields(event: dict[str, Any]) -> tuple[str | None, str | None, str |
     customer = obj(data.get("customer"))
     return (text(data.get("payment_id")), text(meta.get("session_id")), text(meta.get("pack_id")),
             text(customer.get("customer_id")))
+
+
+def payment_extras(event: dict[str, Any]) -> tuple[set[str], int | None, str | None]:
+    """(product ids, total amount in minor units, currency) when the payload carries them; empty/None otherwise."""
+    data = event.get("data")
+    data = data if isinstance(data, dict) else {}
+    products: set[str] = set()
+    cart = data.get("product_cart")
+    if isinstance(cart, list):
+        for item in cart:
+            pid = item.get("product_id") if isinstance(item, dict) else None
+            if isinstance(pid, str) and pid:
+                products.add(pid)
+    single = data.get("product_id")
+    if isinstance(single, str) and single:
+        products.add(single)
+    total = data.get("total_amount")
+    amount = total if isinstance(total, int) and not isinstance(total, bool) else None
+    cur = data.get("currency")
+    return products, amount, cur.upper() if isinstance(cur, str) else None

@@ -124,7 +124,7 @@ def test_btc_invoice_paid_once(settings: Any) -> None:
     with db.session() as s:
         row = s.get(Invoice, inv["invoiceId"])
         box["sats"] = row.amount_atomic
-        assert 1001 <= row.amount_atomic <= 1999  # base + unique 1..999 sats
+        assert 1001 <= row.amount_atomic <= 5999  # base + unique 1..4999 sats
         row.last_polled_at = None
     assert c.get(f"/api/crypto-invoice/{inv['invoiceId']}").json() == {"status": "paid"}
     assert c.get(f"/api/crypto-invoice/{inv['invoiceId']}").json() == {"status": "paid"}

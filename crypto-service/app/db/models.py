@@ -65,6 +65,22 @@ class WebhookEvent(Base):
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class UnmatchedPayment(Base):
+    """A signed paid event that could not be matched to a known session/pack: kept for manual reconciliation.
+
+    One row per webhook id (re-deliveries bump `attempts`). Never creates a session or credits anything."""
+    __tablename__ = "unmatched_payments"
+    event_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    payment_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    session_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    pack_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    reason: Mapped[str] = mapped_column(String(32))
+    attempts: Mapped[int] = mapped_column(Integer, default=1)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class CheckLog(Base):
     __tablename__ = "check_log"
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
