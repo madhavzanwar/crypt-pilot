@@ -68,6 +68,31 @@ export function scanAddress(text: string, opts: { allowDemo?: boolean } = {}): A
   return malformed;
 }
 
+/**
+ * Every distinct address in `text` (valid checksums first), at most `max` of them, plus how many more were ignored.
+ * A message such as "compare A and B" gives two cards instead of silently dropping B.
+ */
+export function scanAddresses(text: string, opts: { allowDemo?: boolean } = {}, max = 3): { scans: AddressScan[]; ignored: number } {
+  const valid: AddressScan[] = [];
+  const bad: AddressScan[] = [];
+  const seen = new Set<string>();
+  for (const raw of text.split(/[^A-Za-z0-9-]+/)) {
+    const token = raw.replace(/^-+|-+$/g, "");
+    if (token === "") continue;
+    const v = validateAddress(token, opts);
+    if (!v.ok || seen.has(v.address)) continue;
+    seen.add(v.address);
+    if (v.kind === "demo" || checksumOk(v.address)) valid.push({ address: v.address, checksumValid: true });
+    else bad.push({ address: v.address, checksumValid: false });
+  }
+  if (valid.length === 0) {
+    const squashed = scanSquashed(text);
+    if (squashed) valid.push({ address: squashed, checksumValid: true });
+  }
+  const all = valid.length > 0 ? valid : bad.slice(0, 1);
+  return { scans: all.slice(0, max), ignored: Math.max(0, all.length - max) };
+}
+
 /** The first address with a valid checksum, or null. */
 export function extractAddress(text: string, opts: { allowDemo?: boolean } = {}): string | null {
   const scan = scanAddress(text, opts);

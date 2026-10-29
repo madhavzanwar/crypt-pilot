@@ -45,3 +45,18 @@ test("BUG-105: a trailing zero-width space does not make a valid address invalid
   assert.equal(r.ok, true);
   assert.equal(r.address, ADDR);
 });
+
+test("BUG-103: every address in a message is found (cap 3, the rest counted)", async () => {
+  const { scanAddresses } = await import("@/lib/crypto/extractAddress");
+  const two = scanAddresses(`compare ${ADDR} and ${OLD}`);
+  assert.deepEqual(two.scans.map((s) => s.address), [ADDR, OLD]);
+  assert.equal(two.ignored, 0);
+  const A3 = "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy";
+  const A4 = "bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0";
+  const four = scanAddresses(`${ADDR} ${OLD} ${A3} ${A4} ${ADDR}`);
+  assert.equal(four.scans.length, 3);
+  assert.equal(four.ignored, 1);
+  assert.equal(scanAddresses("hello there").scans.length, 0);
+  const typo = scanAddresses(`${OLD.slice(0, -1)}b`);
+  assert.deepEqual(typo.scans.map((s) => s.checksumValid), [false]);
+});
