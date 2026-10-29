@@ -16,7 +16,7 @@ export function LandingHeader() {
   }, []);
 
   const link =
-    "inline-flex min-h-11 items-center rounded-chip px-2.5 text-xs sm:text-sm font-medium text-graphite hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember";
+    "inline-flex min-h-11 items-center whitespace-nowrap rounded-chip px-2.5 text-xs sm:text-sm font-medium text-graphite hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember";
 
   return (
     <header
@@ -27,17 +27,17 @@ export function LandingHeader() {
       }`}
     >
       <div className="mx-auto flex w-full max-w-[1240px] items-center justify-between px-4 py-2 sm:px-8">
-        <Link href="/" aria-label="FinPilot home" className="flex min-h-11 items-center gap-2">
+        <Link href="/" aria-label="FinPilot home" className="flex min-h-11 shrink-0 items-center gap-2">
           <FinPilotLogo variant="horizontal" size={28} showWordmark={true} />
         </Link>
-        <div className="flex items-center gap-1 sm:gap-3">
-          <Link href="/dashboard" className={link}>
+        <div className="flex min-w-0 items-center gap-1 sm:gap-3">
+          <Link href="/dashboard" className={`${link} max-sm:hidden`}>
             Dashboard
           </Link>
           <Link href="/copilot" className={link}>
             AI Copilot
           </Link>
-          <Link href="/wallet-guard" className={`${link} hidden sm:inline-flex`}>
+          <Link href="/wallet-guard" className={`${link} max-sm:hidden`}>
             Wallet Guard
           </Link>
           <SignInButton />
