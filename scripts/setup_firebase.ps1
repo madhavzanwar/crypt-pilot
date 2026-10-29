@@ -37,9 +37,19 @@ Write-Host "[0/7] checking login"
 if (-not ((Fb login:list) -match "@")) { throw "Not logged in. Run: firebase login   (then run this script again)" }
 
 Write-Host "[1/7] project $Project"
-$pl = FbJson projects:list --json
-if ($pl -and ($pl.result | Where-Object { $_.projectId -eq $Project })) { Write-Host "  already exists, reusing it" }
-else { Fb projects:create $Project --display-name $Name | Write-Host; if ($LASTEXITCODE -ne 0) { throw "Could not create the project (id may be taken)." } }
+# Do not depend on the shape of the CLI's JSON: the id appearing in the project list (JSON or table) means we have it.
+$listRaw = (Fb projects:list --json) -join "`n"
+if ($listRaw -match [regex]::Escape($Project)) { Write-Host "  already exists, reusing it" }
+else {
+    $out = (Fb projects:create $Project --display-name $Name) -join "`n"
+    Write-Host $out
+    if ($out -match "already a project with ID") {
+        # Taken: by you (earlier run) or by someone else. Access to its apps tells them apart.
+        $probe = (Fb apps:list --project $Project) -join "`n"
+        if ($probe -match "(?i)permission|not have|denied|403|not found|404") { throw "The project id '$Project' is taken by another account. Pick a different id." }
+        Write-Host "  already yours, reusing it"
+    } elseif ($out -match "(?i)error") { throw "Could not create the project: see the message above." }
+}
 
 Write-Host "[2/7] web app"
 function Get-AppId { $r = FbJson apps:list WEB --project $Project --json; if ($r -and $r.result) { @($r.result)[0].appId } }
