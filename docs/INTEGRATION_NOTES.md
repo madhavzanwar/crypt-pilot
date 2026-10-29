@@ -10,10 +10,10 @@ verification results are added by the lead after integration.
   question for the owner, not an automatic clean-up.
 - **`api-use-case.pdf` (BUG-009).** Removed from the working tree only. It stays in git history. Purging history
   (`git filter-repo` plus a force-push) rewrites every commit id and needs the owner's explicit approval; it was not done.
-- **`focal/` and `frontend/public/public/`.** Report only, not deleted. `focal/` is an unrelated Vite app (154 tracked
+- **`focal/` and `frontend/public/public/`.** DELETED on the owner's instruction (see the 2026-10-29 decisions below). Earlier text: report only, not deleted. `focal/` is an unrelated Vite app (154 tracked
   files); `frontend/public/public/` (31 tracked files) is a duplicate subset of `frontend/public/`. Removing either is
   the owner's decision.
-- **Licence (BUG-053).** No licence is chosen. The README no longer claims MIT and says the licence is undecided; no
+- **Licence (BUG-053).** Earlier: no licence chosen. SUPERSEDED: the owner chose MIT on 2026-10-29 and a `LICENSE` file was added. (Old text:) No licence is chosen. The README no longer claims MIT and says the licence is undecided; no
   `LICENSE` file is added.
 
 ## CI and deployment (BUG-010)
@@ -59,3 +59,8 @@ Not run on this tree: the Playwright browser scripts, a live backend/crypto smok
 - **Free-credit cap (BUG-049).** `FREE_SESSIONS_PER_IP_PER_DAY` (default 25) counted every visitor behind the bridge as one IP unless `CRYPTO_TRUST_PROXY=true`, so the 26th new visitor of the day would have received 0 credits. The cap now applies only when the IP identifies a visitor: `CRYPTO_TRUST_PROXY=true`, or a public peer address. Verified live: 30 cookie-less visitors from a loopback peer all received 3 credits. **Set `CRYPTO_TRUST_PROXY=true` on the crypto-service wherever the bridge fronts it** to enable the cap.
 - **API error text.** A non-JSON 4xx body (an HTML 404 page from a missing proxy rewrite) was shown verbatim in the UI; it now goes to the console and the user sees `API <path> failed: <status>`.
 - **Production build needs `BACKEND_URL` at build time.** The `/api/*` rewrite is baked in; without it the app proxies nothing (in dev the rewrite defaults to `http://127.0.0.1:8000`).
+
+## Owner decisions, 2026-10-29
+- Licence: **MIT**. `LICENSE` added (copyright holder is the GitHub owner name; change it if you want your legal name).
+- `api-use-case.pdf` stays deleted: it holds a third party's name and a partly masked personal email and is not part of the product. It is still in git history; purging history needs a force-push and explicit approval.
+- `focal/` (154 files, unrelated Vite app) and `frontend/public/public/` (31 duplicate files) deleted.
