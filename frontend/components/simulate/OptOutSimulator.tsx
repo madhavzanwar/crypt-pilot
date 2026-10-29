@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Area,
@@ -104,6 +104,17 @@ export function OptOutSimulator() {
 
   const fetchDashboard = useCallback(() => api.dashboard(userId), [userId]);
   const { data: dashboard } = useAsync(fetchDashboard, [userId]);
+  // BUG-062: the 10,000 / 3,500 defaults are an editable example. When the user has data, seed from it once
+  // (never overwriting something they typed).
+  const [seeded, setSeeded] = useState<"example" | "data">("example");
+  const touched = useRef(false);
+  useEffect(() => {
+    if (!dashboard?.has_data || touched.current || dashboard.monthly_income <= 0) return;
+    const listed = DEFAULT_ITEMS.reduce((n, i) => n + i.cost, 0);
+    setIncome(Math.round(dashboard.monthly_income));
+    setOther(Math.max(0, Math.round(dashboard.monthly_expenses - listed)));
+    setSeeded("data");
+  }, [dashboard]);
   const detected = (dashboard?.recurring_obligations ?? []).filter((o) => o.category === "subscriptions");
 
   const patch = (id: string, p: Partial<Item>) =>
@@ -251,11 +262,15 @@ export function OptOutSimulator() {
           <Card>
             <Head>
               <CardTitle className="font-display text-lg">Your month</CardTitle>
-              <CardDescription>Income and everything else you spend on, outside the list below.</CardDescription>
+              <CardDescription>
+                {seeded === "data"
+                  ? "Started from your monthly income and spending. Edit any number; the subscription list below is an example."
+                  : "Income and everything else you spend on, outside the list below. These are editable example numbers."}
+              </CardDescription>
             </Head>
             <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <NumField label="Monthly income" value={income} onChange={setIncome} />
-              <NumField label="Other expenses (rent, food, travel…)" value={other} onChange={setOther} />
+              <NumField label="Monthly income" value={income} onChange={(v) => { touched.current = true; setIncome(v); }} />
+              <NumField label="Other expenses (rent, food, travel…)" value={other} onChange={(v) => { touched.current = true; setOther(v); }} />
             </CardContent>
           </Card>
 
