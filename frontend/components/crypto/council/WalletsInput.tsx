@@ -10,6 +10,7 @@ const REASON = {
   empty: "Paste a wallet address first.",
   format: "That does not look like a Bitcoin address (it starts with 1, 3 or bc1).",
   mixed_case: "Mixed-case bc1 addresses are invalid. Copy the address again.",
+  checksum: "The address checksum does not match: there is probably a typo. Copy it again.",
 } as const;
 
 /** "Crypto wallets to screen": up to five public addresses for the Chain Analyst. Seed phrases and keys are refused and cleared. */
