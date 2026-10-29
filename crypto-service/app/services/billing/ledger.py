@@ -19,9 +19,29 @@ def ensure_for_request(s: Session, settings: Settings, session_id: str) -> bool:
     """ensure_session with the request's client IP (set by the middleware) and the configured daily cap."""
     from app.ratelimit import client_ip_var
 
-    return ensure_session(s, session_id, settings.starting_credits, client_ip=client_ip_var.get(),
-                          daily_cap=settings.free_sessions_per_ip_per_day,
+    ip = client_ip_var.get()
+    return ensure_session(s, session_id, settings.starting_credits, client_ip=ip,
+                          daily_cap=settings.free_sessions_per_ip_per_day if _ip_identifies_visitor(ip, settings) else 0,
                           salt=settings.log_salt.get_secret_value())
+
+
+def _ip_identifies_visitor(ip: str | None, settings: Settings) -> bool:
+    """The per-IP free-grant cap is only fair when the IP tells visitors apart.
+
+    Behind the bridge without CRYPTO_TRUST_PROXY every request arrives from loopback/private, so one shared bucket
+    would hand out the daily quota to the first N visitors and leave everyone else with 0 credits. Skip the cap then.
+    """
+    if not ip:
+        return False
+    if settings.trust_proxy:
+        return True
+    import ipaddress
+
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return not (addr.is_loopback or addr.is_private or addr.is_link_local)
 
 
 def balance(s: Session, session_id: str) -> int:

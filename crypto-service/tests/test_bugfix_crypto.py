@@ -47,7 +47,8 @@ def test_free_grants_capped_per_ip_per_day(settings: Settings) -> None:
     for _ in range(4):
         c.cookies.clear()  # a cookie-less visitor
         balances.append(c.get("/api/credits").json()["balance"])
-    assert balances == [3, 3, 0, 0]
+    # loopback peer without a trusted proxy does not identify a visitor: the cap is skipped (no shared bucket)
+    assert balances == [3, 3, 3, 3]
     # a different client IP (via trusted proxy header) still gets its grant
     c2 = client_with(settings, free_sessions_per_ip_per_day=1, trust_proxy=True)
     for ip, want in (("1.1.1.1", 3), ("1.1.1.1", 0), ("2.2.2.2", 3)):

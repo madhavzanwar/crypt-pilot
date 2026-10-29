@@ -46,3 +46,18 @@ def test_json_parse_error_does_not_leak_offset(client: Any) -> None:
 
 def test_head_on_health_and_status(client: Any) -> None:
     assert client.head("/api/health").status_code == 200
+
+
+def test_free_grant_cap_skipped_when_ip_does_not_identify_visitor() -> None:
+    """Loopback/private peers (behind the bridge, proxy not trusted) must not share one capped bucket."""
+    from types import SimpleNamespace
+
+    from app.services.billing.ledger import _ip_identifies_visitor
+
+    untrusted = SimpleNamespace(trust_proxy=False)
+    trusted = SimpleNamespace(trust_proxy=True)
+    assert not _ip_identifies_visitor("127.0.0.1", untrusted)
+    assert not _ip_identifies_visitor("10.1.2.3", untrusted)
+    assert not _ip_identifies_visitor(None, untrusted)
+    assert _ip_identifies_visitor("8.8.8.8", untrusted)  # a real public peer
+    assert _ip_identifies_visitor("127.0.0.1", trusted)  # trusted proxy: the forwarded IP is the visitor
