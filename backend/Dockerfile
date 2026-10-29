@@ -8,7 +8,7 @@ COPY requirements.txt requirements-ml.txt ./
 RUN pip install --no-cache-dir -r requirements.txt -r requirements-ml.txt
 COPY . .
 # bake the models into the image so a cold start does not download ~600 MB
-RUN python -c "from app.expenses import vision; vision._image_model(); vision._text_model()" \
+RUN (python -c "from app.expenses import vision; vision._image_model(); vision._text_model()" || echo "Vision model warm-up skipped (models download on first use)") \
  && (python -c "from app.ocr import warm; warm()" || echo "OCR warm-up skipped (models download on first use)")
 # run unprivileged: the app only needs to read its code and write the model/cache dirs
 RUN useradd --system --create-home --uid 10001 app \
