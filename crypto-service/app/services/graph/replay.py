@@ -28,7 +28,7 @@ class ReplayStore:
         p = replay_path(self.dir, address, lang)
         if p is None or not p.exists():
             return None
-        data: dict[str, Any] = json.loads(p.read_text())
+        data: dict[str, Any] = json.loads(p.read_text(encoding="utf-8"))
         return data
 
     def put(self, address: str, lang: str, recorded_at: str, response: dict[str, Any]) -> Path:
@@ -36,7 +36,7 @@ class ReplayStore:
         if p is None:
             raise ValueError("unsafe address for a replay file name")
         self.dir.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps({"recordedAt": recorded_at, "response": response}, indent=2, ensure_ascii=False))
+        p.write_text(json.dumps({"recordedAt": recorded_at, "response": response}, indent=2, ensure_ascii=False), encoding="utf-8")
         return p
 
     def count(self) -> int:

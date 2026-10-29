@@ -83,3 +83,5 @@ scripts/.phone-ip
 *.pid
 .demo-logs/
 __MACOSX/
+.vercel
+.env*

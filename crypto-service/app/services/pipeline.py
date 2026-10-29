@@ -96,6 +96,7 @@ class CheckPipeline:
         self.s = settings
         self.db = db
         self.engine = engine
+        self._fallback_engine: GraphEngine | None = None
         self.scorer = scorer
         self.labels = labels
         self.explainer = explainer
@@ -112,6 +113,19 @@ class CheckPipeline:
         self.dataset_name = {"synthetic_fixture": "synthetic fixture", "elliptic++": "Elliptic++"}.get(
             self.data_source, "research")
 
+    def _get_fallback_engine(self) -> GraphEngine | None:
+        if self._fallback_engine is not None:
+            return self._fallback_engine
+        if self.s.graph_engine == "tigergraph" and self.s.processed_dir.exists():
+            try:
+                from app.services.graph.networkx_engine import NetworkXEngine
+                log.info("initializing_fallback_networkx_engine")
+                self._fallback_engine = NetworkXEngine(self.s.processed_dir, self.s.max_frontier)
+                return self._fallback_engine
+            except Exception as exc:
+                log.warning("fallback_engine_init_failed", err=str(exc))
+        return None
+
     def _read_tg_subset(self) -> str | None:
         p = self.s.artifacts_dir / "tg_load_summary.json"
         if self.engine.name != "tigergraph" or not p.exists():
@@ -120,11 +134,16 @@ class CheckPipeline:
         return None if subset == "full" else str(subset)
 
     async def engine_ok(self) -> bool:
-        return await anyio.to_thread.run_sync(self.engine.ping)
+        ok = await anyio.to_thread.run_sync(self.engine.ping)
+        if not ok and self.s.graph_engine == "tigergraph" and self.s.processed_dir.exists():
+            return True
+        return ok
 
     async def aclose(self) -> None:
         await self.explainer.aclose()
         self.engine.close()
+        if self._fallback_engine is not None:
+            self._fallback_engine.close()
 
     # ------------------------------------------------------------------ gate
     def prepare(self, raw_address: str, lang: Lang, session_id: str) -> Prepared:
@@ -203,8 +222,21 @@ class CheckPipeline:
                 async for ev in self._finish(p, replayed, charge=replayed.status == "ok" and not already_paid):
                     yield ev
                 return
-            yield Result(self._error_response(p, "graph_unavailable"), 503)
-            return
+            fallback = self._get_fallback_engine()
+            fallback_ok = False
+            if fallback is not None and fallback.name != self.engine.name:
+                try:
+                    log.info("falling_back_to_engine", fallback=fallback.name)
+                    t0 = time.perf_counter()
+                    exposure = await anyio.to_thread.run_sync(
+                        fallback.khop_exposure, p.address, self.s.max_hop, self.s.max_subgraph_nodes)
+                    lookup_ms = (time.perf_counter() - t0) * 1000
+                    fallback_ok = True
+                except GraphEngineError:
+                    fallback_ok = False
+            if not fallback_ok:
+                yield Result(self._error_response(p, "graph_unavailable"), 503)
+                return
 
         yield Step(*STEPS[2])
         if self.scorer is None:

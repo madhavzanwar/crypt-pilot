@@ -1,27 +1,17 @@
 @echo off
-REM Starts FinPilot: backend (FastAPI :8000) and frontend (Next.js :3000) in separate windows.
+REM Starts CryptPilot: crypto-service (:8132), FinPilot backend (:8000), and frontend (:3000)
 set ROOT=%~dp0
 
-if not exist "%ROOT%backend\.venv\Scripts\activate.bat" (
-  echo Creating backend venv and installing requirements...
-  python -m venv "%ROOT%backend\.venv" || goto :fail
-  call "%ROOT%backend\.venv\Scripts\activate.bat"
-  pip install -r "%ROOT%backend\requirements-local.txt" || goto :fail
-)
-if not exist "%ROOT%frontend\node_modules" (
-  echo Installing frontend dependencies...
-  pushd "%ROOT%frontend" && call npm install || goto :fail
-  popd
-)
+set VENV_PY=%ROOT%backend\.venv\Scripts\python.exe
 
-start "FinPilot Backend" cmd /k "cd /d %ROOT%backend && call .venv\Scripts\activate.bat && uvicorn app.main:app --reload --host 127.0.0.1 --port 8000"
-start "FinPilot Frontend" cmd /k "cd /d %ROOT%frontend && npm run dev"
+start "CryptPilot Crypto Service (:8132)" cmd /k "cd /d %ROOT%crypto-service && "%VENV_PY%" -m uvicorn app.main:app --host 127.0.0.1 --port 8132"
+start "CryptPilot Backend (:8000)" cmd /k "cd /d %ROOT%backend && "%VENV_PY%" -m uvicorn app.main:app --host 127.0.0.1 --port 8000"
+start "CryptPilot Frontend (:3000)" cmd /k "cd /d %ROOT%frontend && npx next dev -p 3000"
 
-echo Backend:  http://127.0.0.1:8000/docs
-echo Frontend: http://localhost:3000
+echo ===================================================
+echo CryptPilot is starting!
+echo Frontend:       http://localhost:3000
+echo Backend API:    http://127.0.0.1:8000/docs
+echo Crypto Service: http://127.0.0.1:8132/docs
+echo ===================================================
 exit /b 0
-
-:fail
-echo Setup failed.
-pause
-exit /b 1
