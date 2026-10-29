@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
 import type { Debt } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 
 const HIGH_APR = 12; // % — paying this off beats the typical long-run equity return after tax
@@ -126,7 +126,7 @@ export function InvestGuide({ userId, income, expenses, debts }: { userId: strin
           </div>
           <div className="flex items-center gap-4">
             <div className="relative size-36 shrink-0">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
                 <PieChart>
                   <Pie data={split} dataKey="pct" innerRadius={42} outerRadius={66} paddingAngle={2} stroke="none" isAnimationActive={false}>
                     {split.map((b) => (

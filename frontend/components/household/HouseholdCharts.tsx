@@ -1,5 +1,6 @@
 "use client";
 
+import { categoryLabel } from "@/components/ui/categoryLabel";
 import {
   Bar,
   BarChart,
@@ -15,15 +16,14 @@ import {
 } from "recharts";
 import type { HouseholdInsights, HouseholdNetWorthSummary } from "@/lib/types";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
-import { formatCurrency } from "@/lib/format";
+import { formatCompact, formatCurrency } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 
 /** Stable per-member colours so a person looks the same in every chart. */
 export const MEMBER_COLORS = ["#ff6b1a", "#0fb67a", "#3b6bff", "#ffb81f", "#a855f7", "#f0455a", "#14b8a6", "#64748b"];
 export const colorFor = (idx: number) => MEMBER_COLORS[idx % MEMBER_COLORS.length];
 
-const compact = (n: number) =>
-  Math.abs(n) >= 1e7 ? `${(n / 1e7).toFixed(1)}Cr` : Math.abs(n) >= 1e5 ? `${(n / 1e5).toFixed(1)}L` : Math.abs(n) >= 1e3 ? `${(n / 1e3).toFixed(0)}k` : `${Math.round(n)}`;
+const compact = formatCompact;
 
 const monthLabel = (m: string) =>
   new Date(`${m}-01T00:00:00`).toLocaleDateString("en-IN", { month: "short" });
@@ -74,7 +74,7 @@ export function NetWorthDonut({ summary, className }: { summary: HouseholdNetWor
         <Empty />
       ) : (
         <div className="relative h-52">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
             <PieChart>
               <Pie data={data} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="92%" paddingAngle={2} stroke="none">
                 {data.map((d) => (
@@ -108,7 +108,7 @@ export function AssetsLiabilitiesChart({ summary, className }: { summary: Househ
   return (
     <ChartCard title="Assets vs Liabilities" subtitle="Balance sheet by member" className={className}>
       <div className="h-52">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
           <BarChart data={data} barGap={4}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.06)" />
             <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={11} />
@@ -145,7 +145,7 @@ export function SpendTrendChart({
         <Empty />
       ) : (
         <div className="h-60">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
             <BarChart data={data}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.06)" />
               <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
@@ -169,14 +169,14 @@ export function SpendTrendChart({
 
 /** Horizontal bars: where the household's money goes. */
 export function CategoryChart({ insights, className }: { insights: HouseholdInsights | null; className?: string }) {
-  const top = (insights?.categories ?? []).slice(0, 6).map((c) => ({ name: c.category.replace(/_/g, " "), value: c.total }));
+  const top = (insights?.categories ?? []).slice(0, 6).map((c) => ({ name: categoryLabel(c.category), value: c.total }));
   return (
     <ChartCard title="Top Spending Categories" subtitle={insights?.window_label ?? "Last 90 days"} className={className}>
       {top.length === 0 ? (
         <Empty />
       ) : (
         <div className="h-60">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
             <BarChart data={top} layout="vertical" margin={{ left: 8 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(0,0,0,0.06)" />
               <XAxis type="number" tickFormatter={compact} tickLine={false} axisLine={false} fontSize={11} />
@@ -202,7 +202,7 @@ export function CashflowChart({ insights, className }: { insights: HouseholdInsi
       ) : (
         <>
           <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
               <BarChart data={data} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.06)" />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={11} />

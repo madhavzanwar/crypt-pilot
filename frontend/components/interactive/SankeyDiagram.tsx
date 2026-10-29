@@ -4,7 +4,7 @@ import { useState, useRef, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Info, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 
 export interface SankeyNode {
   id: string;

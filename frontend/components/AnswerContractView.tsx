@@ -3,7 +3,8 @@ import Link from "next/link";
 import type { AnswerContract } from "@/lib/types";
 import { ConfidenceChip } from "@/components/ui/ConfidenceChip";
 import { Chip } from "@/components/ui/Chip";
-import { formatCurrency, formatImpactValue } from "@/lib/format";
+import { formatImpactValue } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 
 /**

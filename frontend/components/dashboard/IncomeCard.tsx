@@ -2,7 +2,7 @@ import { useT } from "@/lib/i18n";
 import { TrendingDown, TrendingUp, Zap } from "lucide-react";
 import type { Transaction } from "@/lib/types";
 import type { MonthTotals } from "@/lib/spend";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { BigAmount } from "@/components/dashboard/BigAmount";
 
 const SOURCE_COLORS = ["border-[#3f7d5c]", "border-lime-dark", "border-[#4fe0b0]"];

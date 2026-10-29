@@ -1,4 +1,4 @@
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 
 /** Big figure with a muted, smaller fractional part, e.g. ₹74,503.00 */

@@ -7,7 +7,7 @@ import { useAsync } from "@/lib/hooks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn/card";
 import { Badge } from "@/components/shadcn/badge";
 import { Button } from "@/components/shadcn/button";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 
 const TYPE_ICON: Record<string, LucideIcon> = {
   credit_card: CreditCard,

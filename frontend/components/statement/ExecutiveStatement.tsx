@@ -2,7 +2,8 @@
 
 import React, { useMemo } from "react";
 import type { DashboardSnapshot, Account, Transaction } from "@/lib/types";
-import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
+import { formatPercent, formatDate } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 import { ShieldCheck, CheckCircle2, Activity } from "lucide-react";
 import { FinPilotLogo } from "@/components/FinPilotLogo";
@@ -10,7 +11,7 @@ import { CategoryDonut, IncomeVsSpend, TopMerchants } from "@/components/dashboa
 import { ForecastChart } from "@/components/dashboard/ForecastChart";
 import { NetWorthTrend } from "@/components/dashboard/NetWorthTrend";
 import { CATEGORY_META, summarizeSpend } from "@/lib/spend";
-import { statementDigest } from "@/components/statement/auditHash";
+import { statementDigest, statementPeriod } from "@/components/statement/auditHash";
 
 interface ExecutiveStatementProps {
   dashboard: DashboardSnapshot;
@@ -96,6 +97,30 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
   const totalInvestments = investmentAccounts.reduce((sum, a) => sum + a.balance, 0);
   const totalDebts = dashboard.debts.reduce((sum, d) => sum + d.principal, 0);
 
+  // Statement window derived from the data, not hard-coded (BUG-040)
+  const period = statementPeriod({ dashboard, transactions });
+  const periodLabel = (() => {
+    const [y, m] = period.split("-").map(Number);
+    if (!y || !m) return "Period not available";
+    const first = new Date(Date.UTC(y, m - 1, 1)), last = new Date(Date.UTC(y, m, 0));
+    const f = (d: Date) => d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+    return `${f(first)} – ${f(last)}`;
+  })();
+  const auditStamp = (() => {
+    const d = new Date(dashboard.generated_at);
+    return Number.isNaN(d.getTime())
+      ? "Not available"
+      : `${d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })}, ${d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })} IST`;
+  })();
+  /** "+₹1,234" / "-₹1,234": the sign is added exactly once (BUG-021). */
+  const signedAmount = (n: number) => (n > 0 ? `+${formatCurrency(n)}` : formatCurrency(n));
+  /** Account name instead of the raw id; an unknown UUID is shown generically, never as a hex string. */
+  const accountLabel = (id: string) => {
+    const name = accounts.find((a) => a.id === id)?.name;
+    if (name) return name;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id) ? "Linked account" : id.replace(/_/g, " ");
+  };
+
   // SHA-256 of the figures printed here (see components/statement/auditHash.ts): recomputable by anyone with the same data.
   const digest = useMemo(
     () => statementDigest({ userId, dashboard, accounts, transactions }),
@@ -140,13 +165,13 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
 
           <div className="text-left sm:text-right text-xs text-neutral-600 space-y-0.5">
             <div className="font-mono text-[11px] font-bold text-black uppercase tracking-wider">
-              DOC REF: FP-AUDIT-2026-09-{userId.replace("demo-", "").toUpperCase()}
+              DOC REF: FP-AUDIT-{period}-{userId.replace("demo-", "").toUpperCase()}
             </div>
             <div>
-              <span className="text-neutral-400">Statement Period:</span> 01 Sep 2026 – 30 Sep 2026
+              <span className="text-neutral-400">Statement Period:</span> {periodLabel}
             </div>
             <div>
-              <span className="text-neutral-400">Audit Timestamp:</span> 29 Sep 2026, 17:14 IST
+              <span className="text-neutral-400">Audit Timestamp:</span> {auditStamp}
             </div>
             <div>
               <span className="text-neutral-400">Classification:</span> Privileged & Confidential
@@ -184,7 +209,7 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
               Jurisdiction & Tax Ref
             </span>
             <span className="font-medium text-black">{profile.city}</span>
-            <span className="font-mono text-[11px] text-neutral-600 block">{profile.pan}</span>
+            <span translate="no" className="font-mono text-[11px] text-neutral-600 block">{profile.pan}</span>
           </div>
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 block">
@@ -368,7 +393,7 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
                 isNetPositive ? "text-emerald-700 print:text-black" : "text-ember print:text-black"
               )}
             >
-              {isNetPositive ? `+${formatCurrency(netMonthlyDelta)}` : formatCurrency(netMonthlyDelta)}
+              {signedAmount(netMonthlyDelta)}
             </span>
             <span className="text-[10px] text-neutral-500 mt-0.5 block">
               Savings Rate: {formatPercent(dashboard.savings_rate)}
@@ -424,7 +449,7 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
                   <div key={d.id} className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <span className="font-medium text-black capitalize">
-                        {d.account_id.replace(/_/g, " ")}
+                        {accountLabel(d.account_id)}
                       </span>
                       <span className="text-[10px] text-neutral-400 ml-1.5">
                         ({d.interest_rate_apr.toFixed(1)}% APR)
@@ -719,7 +744,7 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
                   <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
                     <span className="min-w-0 font-bold text-black text-sm">{rec.text}</span>
                     <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 print:border print:border-black print:text-black">
-                      +{formatCurrency(rec.impact.delta)} Net Gain
+                      {signedAmount(rec.impact.delta)} {rec.impact.delta >= 0 ? "Net Gain" : "Net Change"}
                     </span>
                   </div>
                   <p className="text-neutral-600 text-[11px]">{rec.rationale}</p>
@@ -760,7 +785,7 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
             <div className="text-[10px] text-neutral-500 mt-1 font-mono break-all">
               SHA-256 of the figures in this statement:
               <br />
-              <span className="text-black">{digest.hex}</span>
+              <span translate="no" lang="en" className="text-black">{digest.hex}</span>
             </div>
             <div className="text-[10px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
               <ShieldCheck className="h-3 w-3" />

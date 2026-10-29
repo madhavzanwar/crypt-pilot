@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
 import { summarizeSpend } from "@/lib/spend";
 import type { Transaction } from "@/lib/types";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { WeeklyCompare } from "@/components/transactions/WeeklyCompare";
 import { BigAmount } from "@/components/dashboard/BigAmount";
 

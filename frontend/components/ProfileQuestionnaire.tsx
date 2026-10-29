@@ -322,7 +322,6 @@ export function ProfileQuestionnaire() {
                 value={answers.age}
                 onChange={(event) => update("age", event.target.value)}
                 className="h-10 rounded-lg border border-border bg-white px-3 text-sm text-ink"
-                aria-label="Age range"
               >
                 <option value="">Prefer not to say</option>
                 <option value="under18">Under 18</option>
@@ -346,7 +345,6 @@ export function ProfileQuestionnaire() {
                 value={answers.income}
                 onChange={(event) => update("income", event.target.value)}
                 className="h-10 rounded-lg border border-border bg-white px-3 text-sm text-ink"
-                aria-label="Monthly household income"
               >
                 <option value="">Prefer not to say</option>
                 <option value="under15000">Under ₹15,000</option>

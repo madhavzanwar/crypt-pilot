@@ -83,7 +83,7 @@ export function TimelineTab() {
 
           {kind === "recurring" && (
             <Field label="Billing frequency">
-              <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+              <select aria-label="Frequency" value={frequency} onChange={(e) => setFrequency(e.target.value)} className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
                 <option value="weekly">Weekly</option>
                 <option value="biweekly">Biweekly</option>
                 <option value="monthly">Monthly</option>

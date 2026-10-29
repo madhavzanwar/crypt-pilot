@@ -2,7 +2,7 @@
 
 import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import type { SequenceResult } from "@/lib/types";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 
 const SEQ_COLORS = ["#64748b", "#ff5900", "#0ea5e9", "#10b981", "#8b5cf6"];
 
@@ -22,7 +22,7 @@ export function CashBandChart({ sequences, reserve }: { sequences: SequenceResul
   return (
     <div className="flex flex-col gap-3">
       <div className="h-64 sm:h-72 w-full">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
           <ComposedChart data={data} margin={{ left: 8, right: 16, top: 12, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(15, 23, 42, 0.05)" vertical={false} />
             <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--color-pewter)" }} tickLine={false} axisLine={{ stroke: "rgba(15, 23, 42, 0.08)" }} />

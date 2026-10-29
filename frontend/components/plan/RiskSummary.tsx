@@ -1,7 +1,8 @@
 import type { PlanResult } from "@/lib/types";
 import { Chip } from "@/components/ui/Chip";
 import { StatTile } from "@/components/ui/StatTile";
-import { formatCurrency, formatPercent } from "@/lib/format";
+import { formatPercent } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 
 export function RiskSummary({

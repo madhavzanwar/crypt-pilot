@@ -4,7 +4,7 @@ import { useRef, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TrendingDown, TrendingUp, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 
 export interface LineChartPoint {
   day: number;

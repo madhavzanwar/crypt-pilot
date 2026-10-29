@@ -4,7 +4,8 @@ import { useState } from "react";
 import type { PlanResult, PlanShock, ReplanResult } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
-import { formatCurrency, formatPercent } from "@/lib/format";
+import { formatPercent } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 
 const INPUT =
   "min-h-11 w-28 rounded-chip border border-black/[0.1] bg-white px-3 text-sm text-ink tnum outline-none focus-visible:ring-2 focus-visible:ring-ember";

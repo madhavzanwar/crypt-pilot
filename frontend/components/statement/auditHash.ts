@@ -10,7 +10,8 @@ import type { Account, DashboardSnapshot, Transaction } from "@/lib/types";
  * canonical form). Transactions are covered by a second SHA-256 over one line per transaction, sorted by id.
  * Personal data stays out: no names, merchants or account numbers are part of the figures, only amounts, dates and ids.
  */
-export const STATEMENT_PERIOD = "2026-09";
+/** Fallback only; the real period comes from `statementPeriod()` (BUG-040). */
+export const STATEMENT_PERIOD_FALLBACK = "unknown";
 export const STATEMENT_HASH_VERSION = 1;
 
 export interface StatementData {
@@ -18,6 +19,14 @@ export interface StatementData {
   dashboard: DashboardSnapshot;
   accounts: Account[];
   transactions: Transaction[];
+}
+
+/** "YYYY-MM" of the statement window: the month of the newest transaction, else of the dashboard snapshot. */
+export function statementPeriod(d: Pick<StatementData, "dashboard" | "transactions">): string {
+  let newest = "";
+  for (const t of d.transactions) if (t.date > newest) newest = t.date;
+  const src = /^\d{4}-\d{2}/.test(newest) ? newest : d.dashboard.generated_at ?? "";
+  return /^\d{4}-\d{2}/.test(src) ? src.slice(0, 7) : STATEMENT_PERIOD_FALLBACK;
 }
 
 const money = (n: number): string => (Math.round((Number.isFinite(n) ? n : 0) * 100) / 100).toFixed(2);
@@ -38,7 +47,7 @@ export function statementFigures(d: StatementData): Record<string, unknown> {
     p ? { p10: money(p.p10), p50: money(p.p50), p90: money(p.p90) } : null;
   return {
     version: STATEMENT_HASH_VERSION,
-    period: STATEMENT_PERIOD,
+    period: statementPeriod(d),
     account: d.userId,
     health: {
       overall: Math.round(dashboard.health_score.overall),

@@ -1,5 +1,6 @@
 "use client";
 
+import { categoryLabel } from "@/components/ui/categoryLabel";
 import { useState } from "react";
 import {
   flexRender,
@@ -16,7 +17,8 @@ import { Badge } from "@/components/shadcn/badge";
 import { Button } from "@/components/shadcn/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/shadcn/table";
 import { ConfidenceChip } from "@/components/ui/ConfidenceChip";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 
 function SortHeader({
   label,
@@ -61,7 +63,7 @@ const columns: ColumnDef<RecurringObligation>[] = [
     header: "Category",
     cell: ({ row }) => (
       <Badge variant="secondary" className="hidden capitalize sm:inline-flex">
-        {row.original.category.replace(/_/g, " ")}
+        {categoryLabel(row.original.category)}
       </Badge>
     ),
   },

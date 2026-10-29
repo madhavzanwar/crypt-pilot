@@ -32,7 +32,7 @@ export function RiskTab({ risk }: { risk: FrRisk }) {
 
       <Section title="Risk by month" sub="Probability that the month-end balance is below your reserve, and that this is the first month it happens">
         <div className="h-60 w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
             <BarChart data={data} margin={{ left: 0, right: 16, top: 12, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
               <XAxis dataKey="month" tick={AXIS} tickLine={false} />

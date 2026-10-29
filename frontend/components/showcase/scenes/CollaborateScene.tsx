@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { COLLABORATE_DATA, type CollaborateData } from "../showcaseData";
 import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { Wallet, Landmark, TrendingUp, ShieldCheck } from "lucide-react";
 
 export function CollaborateScene() {

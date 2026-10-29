@@ -6,7 +6,7 @@ import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 import { simulate, type Baseline, type ScenarioActions, type SimResult } from "@/lib/scenario-sim";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
@@ -205,7 +205,7 @@ function Planner({ initial, usingSample }: { initial: Baseline; usingSample: boo
                     <ActionSlider label="Income change" value={s.incomeChange} max={20000} onChange={(n) => patch(s.id, { incomeChange: n })} />
                     <label className="flex items-center justify-between text-xs font-medium text-graphite">
                       Starts in month
-                      <select value={s.startMonth} onChange={(e) => patch(s.id, { startMonth: Number(e.target.value) })} className="rounded-chip border border-mist bg-white px-2 py-1 text-ink">
+                      <select aria-label={`Start month for ${s.name}`} value={s.startMonth} onChange={(e) => patch(s.id, { startMonth: Number(e.target.value) })} className="rounded-chip border border-mist bg-white px-2 py-1 text-ink">
                         {Array.from({ length: months }, (_, k) => k + 1).map((m) => <option key={m} value={m}>{m}</option>)}
                       </select>
                     </label>
@@ -252,7 +252,7 @@ function Planner({ initial, usingSample }: { initial: Baseline; usingSample: boo
             <CardDescription>The dashed line is your emergency reserve.</CardDescription>
           </CardHeader>
           <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
               <LineChart data={chartData} margin={{ left: 8, right: 16, top: 12, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,23,42,0.06)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} />

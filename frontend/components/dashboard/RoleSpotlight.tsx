@@ -6,7 +6,7 @@ import { useCallback } from "react";
 import { ExternalLink } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 
 interface Track {
   title: string;

@@ -28,7 +28,7 @@ export function ForecastTab({ r }: { r: ForecastRiskReport }) {
     <div className="flex flex-col gap-6">
       <Section title="Cash balance forecast" sub="Median path and 80% prediction interval (P10-P90) under current spending, against your reserve">
         <div className="h-64 w-full sm:h-72">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
             <ComposedChart data={cash} margin={{ left: 8, right: 16, top: 12, bottom: 4 }}>
               {axes}
               <Area dataKey="band" name="P10-P90" stroke="none" fill="#5f7f0c" fillOpacity={0.16} isAnimationActive={false} />
@@ -42,7 +42,7 @@ export function ForecastTab({ r }: { r: ForecastRiskReport }) {
 
       <Section title="Income vs expenses" sub="Last 12 months of actuals, then the forecast median and P10-P90 band for each">
         <div className="h-64 w-full sm:h-72">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 320, height: 200 }} width="100%" height="100%">
             <ComposedChart data={flow} margin={{ left: 8, right: 16, top: 12, bottom: 4 }}>
               {axes}
               <Area dataKey="incBand" name="Income P10-P90" stroke="none" fill="#5f7f0c" fillOpacity={0.16} isAnimationActive={false} />

@@ -1,5 +1,6 @@
 import type { BacktestRow, PlanTimeline } from "@/lib/types";
-import { formatCurrency, formatPercent } from "@/lib/format";
+import { formatPercent } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 
 const MODEL_LABEL: Record<BacktestRow["model"], string> = {
   bootstrap: "Bootstrap (model)",

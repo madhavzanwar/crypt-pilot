@@ -6,7 +6,7 @@ import { ArrowUpRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
 import { CATEGORY_META, type SpendSummary } from "@/lib/spend";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 
 const BAR_TONES = ["bg-[#3f7d5c] text-white", "bg-lime text-ink", "bg-[#4fe0b0] text-ink"];
@@ -43,23 +43,23 @@ export function BudgetRemainingCard({ userId, spend }: { userId: string; spend: 
         </Link>
       </div>
       <div className="flex items-end justify-between gap-4">
-        <p className="font-display text-6xl font-semibold tnum text-ink">
+        <p className="shrink-0 font-display text-5xl font-semibold tnum text-ink sm:text-6xl">
           {remaining ?? "--"}
           <span className="text-3xl text-ink/45">%</span>
         </p>
-        <p className="max-w-[11rem] text-right text-xs text-graphite">{message}</p>
+        <p className="min-w-0 max-w-[11rem] text-right text-xs text-graphite">{message}</p>
       </div>
       {rows.length > 0 && (
         <div className="mt-auto grid grid-cols-3 items-end gap-2">
           {rows.map((r, i) => (
             <div
               key={r.b.id}
-              className={cn("flex flex-col justify-between rounded-2xl p-3", BAR_TONES[i])}
+              className={cn("flex min-w-0 flex-col justify-between overflow-hidden rounded-2xl p-3", BAR_TONES[i])}
               style={{ height: `${Math.max(96, Math.min(180, 60 + r.pct * 110))}px` }}
               title={`${formatCurrency(r.used)} of ${formatCurrency(r.b.monthly_limit)}`}
             >
-              <span className="font-display text-2xl font-semibold tnum">{Math.round(r.pct * 100)}%</span>
-              <span className="text-xs opacity-80">{t("cat." + CATEGORY_META[r.b.category].label, CATEGORY_META[r.b.category].label)}</span>
+              <span className="font-display text-xl font-semibold tnum sm:text-2xl">{Math.round(r.pct * 100)}%</span>
+              <span className="break-words text-xs opacity-80">{t("cat." + CATEGORY_META[r.b.category].label, CATEGORY_META[r.b.category].label)}</span>
             </div>
           ))}
         </div>
