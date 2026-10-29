@@ -91,6 +91,9 @@ export function checkEnteredHash(subject: AttestSubject, raw: string, keccak: Ke
   let entered: string;
   let derived = false;
   if (isBytes32(text)) entered = text.toLowerCase();
+  // BUG-108: something that is shaped like a hash but is not a valid 0x + 64 hex value ("0xzz", a bare 64-hex string)
+  // is "Not a hash" on every screen, never a misleading "Does not match" against keccak256 of that text.
+  else if (/^0x/i.test(text) || /^[0-9a-f]{64}$/i.test(text)) return { outcome: "invalid" };
   else if (subject.acceptRawInput) {
     entered = keccak(text).toLowerCase();
     derived = true;

@@ -12,5 +12,11 @@ export async function resolve(specifier, context, next) {
       if (isFile(cand)) return next(pathToFileURL(cand).href, context);
     }
   }
+  if (specifier.startsWith(".") && context.parentURL?.startsWith("file:") && !path.extname(specifier)) {
+    const base = path.resolve(path.dirname(fileURLToPath(context.parentURL)), specifier);
+    for (const cand of [`${base}.ts`, `${base}.tsx`, path.join(base, "index.ts")]) {
+      if (isFile(cand)) return next(pathToFileURL(cand).href, context);
+    }
+  }
   return next(specifier, context);
 }
