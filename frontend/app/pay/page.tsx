@@ -330,7 +330,7 @@ function PayApp() {
           <Avatar name="Priya" size={48} />
         </header>
         <div className="px-6 pb-2 pt-6">
-          <p className="text-3xl font-normal leading-tight">Pay anyone,<br />instantly</p>
+          <h1 className="text-3xl font-normal leading-tight">Pay anyone,<br />instantly</h1>
           <p className="mt-2 text-xs text-[#5f6368]">FinPilot Pay · demo, no real money moves</p>
         </div>
         <div className="h-16" />

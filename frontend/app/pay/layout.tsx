@@ -19,7 +19,7 @@ export default function PayLayout({ children }: { children: ReactNode }) {
       >
         Demo / test mode: no real money moves and nothing is sent to a bank.
       </div>
-      <div className="pt-5">{children}</div>
+      <main className="pt-5">{children}</main>
     </>
   );
 }
