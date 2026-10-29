@@ -1,9 +1,32 @@
 import type { Engine, Verdict } from "@/lib/crypto/api";
 
+export type ChainWalletStatus = "ok" | "not_in_dataset" | "offline" | "rate_limited" | "rejected";
+
+/** Statuses where the service gave no verdict about the wallet. */
+export const NO_ANSWER: readonly ChainWalletStatus[] = ["offline", "rate_limited", "rejected"];
+
+/** Wallets that must never read as safe: no answer, or UNKNOWN. Mirrors chain_analyst.unverified_count(). */
+export const isUnverified = (w: Pick<ChainWallet, "status">): boolean => w.status !== "ok";
+
+/**
+ * Extra fields the council verdict carries when wallets were requested (backend/app/security/council.py):
+ * `unverified` (count) and `caveat` (sentence), plus `chain.unverified` and `chain.offline`.
+ */
+export interface UnverifiedInfo {
+  unverified?: number;
+  caveat?: string;
+}
+
 /** One wallet as the Chain Analyst reports it (backend/app/security/chain_analyst.py, snake_case like the rest of FinPilot's council). */
 export interface ChainWallet {
   address: string;
-  status: "ok" | "not_in_dataset" | "offline";
+  /**
+   * Contract with backend/app/security/chain_analyst.py (Agent B, BUG-016/017):
+   *  - ok / not_in_dataset: the service gave a verdict (not_in_dataset = UNKNOWN, which is NOT a safe signal);
+   *  - offline: network error or 5xx; rate_limited: HTTP 429 (retry in a minute); rejected: HTTP 400 (address refused).
+   * The last three have `verdict === null` and are all "unverified".
+   */
+  status: ChainWalletStatus;
   verdict: Verdict | null;
   risk_score: number | null;
   hops: number | null;

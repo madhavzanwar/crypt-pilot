@@ -2,7 +2,7 @@
 
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
-import { useT } from "@/lib/i18n";
+import { useCryptoT as useT } from "@/lib/crypto/i18n";
 import { Link2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { Notice } from "./Bits";

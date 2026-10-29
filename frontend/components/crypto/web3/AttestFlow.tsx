@@ -6,7 +6,7 @@ import { ATTEST_ERROR_TEXT, classifyAttestError, HashMismatchError, isBytes32, t
 import type { AttestSubject } from "@/lib/crypto/eas/subject";
 import { checkSubjectHash, type LocalHashCheck } from "@/lib/crypto/eas/verify";
 import { CHAIN, HAS_WALLETCONNECT } from "@/lib/crypto/web3Config";
-import { useT } from "@/lib/i18n";
+import { useCryptoT as useT } from "@/lib/crypto/i18n";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useEffect, useState } from "react";
 import { useAccount, useDisconnect, useSwitchChain, useWalletClient } from "wagmi";
@@ -48,6 +48,17 @@ function useHashGuard(subject: AttestSubject): Guard {
  * The real flow. MUST be rendered inside <Web3Scope> (see AttestScope). Connect -> Switch network -> Sign -> Done.
  * Browser/extension wallets are always offered; WalletConnect appears only if NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is set.
  */
+/** Environment-variable names are for whoever deploys the site, so they sit in a closed disclosure, not in the main text (BUG-109). */
+function OwnerNote({ children }: { children: React.ReactNode }) {
+  const { t } = useT();
+  return (
+    <details className="mt-1 text-xs text-graphite">
+      <summary className="cursor-pointer select-none underline underline-offset-2">{t("web3.setup.owner", "For the site owner")}</summary>
+      <p className="mt-1" translate="no" lang="en">{children}</p>
+    </details>
+  );
+}
+
 export default function AttestFlow({ subject }: { subject: AttestSubject }) {
   const { t } = useT();
   const { address, chainId, isConnected } = useAccount();
@@ -117,7 +128,7 @@ export default function AttestFlow({ subject }: { subject: AttestSubject }) {
   if (!uid) {
     if (step === 0) {
       action = (
-        <Button variant="primary" className="self-start" onClick={openConnectModal} disabled={!openConnectModal}>
+        <Button variant="primary" className="self-start" onClick={openConnectModal} disabled={!openConnectModal || !schemaValid}>
           {t("web3.button.connectFirst", "Connect wallet")}
         </Button>
       );
@@ -154,23 +165,25 @@ export default function AttestFlow({ subject }: { subject: AttestSubject }) {
           <p>
             {t(
               "web3.setup.schema",
-              "Set NEXT_PUBLIC_EAS_SCHEMA_UID (the UID of the registered EAS schema on Base Sepolia) to enable signing. Until then the sign button stays disabled; use the SIMULATED preview to see the steps.",
+              "Signing on Base Sepolia is not switched on for this site yet, so Connect wallet and Sign are disabled. Use the SIMULATED preview to see the steps.",
             )}
           </p>
+          <OwnerNote>
+            {t("web3.setup.ownerSchema", "Set NEXT_PUBLIC_EAS_SCHEMA_UID to the UID of the registered EAS schema on Base Sepolia.")}
+          </OwnerNote>
         </Notice>
       )}
       {schemaSet && !schemaValid && (
         <Notice tone="error">
-          {t("web3.setup.schemaInvalid", "NEXT_PUBLIC_EAS_SCHEMA_UID is not a 0x-prefixed 32-byte value, so signing is disabled.")}
+          <p>{t("web3.setup.schemaInvalid", "Signing is disabled because this site's attestation schema is misconfigured.")}</p>
+          <OwnerNote>{t("web3.setup.ownerSchemaInvalid", "NEXT_PUBLIC_EAS_SCHEMA_UID is not a 0x-prefixed 32-byte value.")}</OwnerNote>
         </Notice>
       )}
       {!HAS_WALLETCONNECT && step === 0 && (
-        <p className="text-xs text-pewter">
-          {t(
-            "web3.connect.noProject",
-            "Browser and extension wallets only. WalletConnect (mobile wallets) needs NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID.",
-          )}
-        </p>
+        <div className="text-xs text-pewter">
+          {t("web3.connect.noProject", "Browser and extension wallets only; mobile wallets (WalletConnect) are not switched on for this site.")}
+          <OwnerNote>{t("web3.setup.ownerWc", "WalletConnect needs NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID.")}</OwnerNote>
+        </div>
       )}
       <SubjectSummary subject={subject} />
       {guard.outcome === "mismatch" && (
@@ -183,7 +196,7 @@ export default function AttestFlow({ subject }: { subject: AttestSubject }) {
       )}
       {isConnected && address && !uid && (
         <p className="flex flex-wrap items-center gap-2 text-xs text-graphite">
-          {t("web3.connect.as", "Connected as")} <span className="font-mono text-ink" title={address}>{shortHex(address, 8, 6)}</span>
+          {t("web3.connect.as", "Connected as")} <span className="font-mono text-ink" title={address} translate="no" lang="en">{shortHex(address, 8, 6)}</span>
           <button
             type="button"
             onClick={() => disconnect()}

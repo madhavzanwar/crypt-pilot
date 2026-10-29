@@ -32,6 +32,7 @@ export default function WalletVerdictCard({
   const reqL: Lang = lang ?? reqLang;
   const { state, run } = useWalletCheck();
   const ranFor = useRef<string | null>(null);
+  const latchedLang = useRef<Lang>(reqL); // the language of the first run: a later language switch must not start a paid re-check
   const reported = useRef<CheckResponse | null>(null);
   const onResultRef = useRef(onResult);
 
@@ -39,12 +40,12 @@ export default function WalletVerdictCard({
     onResultRef.current = onResult;
   }, [onResult]);
 
-  // One check per address (and language): StrictMode double effects and re-renders do not repeat it.
+  // One check per address (the language is latched at the first run): StrictMode double effects and re-renders do not repeat it.
   useEffect(() => {
-    const key = `${address}|${reqL}`;
-    if (ranFor.current === key) return;
-    ranFor.current = key;
-    void run(address, reqL, { reuse: true });
+    if (ranFor.current === address) return;
+    ranFor.current = address;
+    latchedLang.current = reqL;
+    void run(address, latchedLang.current, { reuse: true });
   }, [address, reqL, run]);
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export default function WalletVerdictCard({
     </Link>
   );
   const head = (
-    <span className="min-w-0 truncate font-mono text-[11px] text-graphite" title={address}>
+    <span className="min-w-0 truncate font-mono text-[11px] text-graphite" title={address} translate="no" lang="en">
       {middleEllipsis(address, 10, 8)}
     </span>
   );

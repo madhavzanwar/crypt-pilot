@@ -3,7 +3,7 @@
 import type { CheckResponse } from "@/lib/crypto/api";
 import { canAttest } from "@/lib/crypto/eas/rules";
 import { walletSubject } from "@/lib/crypto/eas/subject";
-import { useT } from "@/lib/i18n";
+import { useCryptoT as useT } from "@/lib/crypto/i18n";
 import { Ban } from "lucide-react";
 import { useMemo } from "react";
 import { Card } from "@/components/ui/Card";

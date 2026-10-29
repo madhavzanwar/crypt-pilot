@@ -26,7 +26,7 @@ export function VerdictBadge({ verdict, size = "md", className }: { verdict: Ver
     >
       <Icon className={cn(size === "lg" ? "size-6" : size === "md" ? "size-5" : "size-4")} aria-hidden />
       <span>{meta.word}</span>
-      {uiLang === "hi" && <span className="sr-only">{verdictWord(uiLang, verdict)}</span>}
+      {(uiLang === "hi" || uiLang === "mr") && <span className="sr-only">{verdictWord(uiLang, verdict)}</span>}
     </span>
   );
 }
@@ -136,7 +136,7 @@ export function EngineBadge({ result, compact = false }: { result: CheckResponse
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 rounded-chip border border-ember/25 bg-orange-50 px-3 py-2 text-xs text-ink">
           <Zap className="size-4 flex-none text-ember-dark" aria-hidden />
           <span className="font-semibold">{g("wg.engine.tigergraph", { ms })}</span>
-          {!compact && <code className="min-w-0 break-all font-mono text-[11px] text-graphite">{tigergraph.queryName}</code>}
+          {!compact && <code className="min-w-0 break-all font-mono text-[11px] text-graphite" translate="no" lang="en">{tigergraph.queryName}</code>}
           {mock}
           {!compact && tigergraph.gsql && (
             <button

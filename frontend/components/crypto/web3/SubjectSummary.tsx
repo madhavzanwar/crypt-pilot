@@ -1,6 +1,6 @@
 "use client";
 
-import { useT } from "@/lib/i18n";
+import { useCryptoT as useT } from "@/lib/crypto/i18n";
 import type { AttestSubject } from "@/lib/crypto/eas/subject";
 import { useEffect, useState } from "react";
 import { HashLine } from "./Bits";
@@ -43,7 +43,7 @@ export function SubjectSummary({ subject }: { subject: AttestSubject }) {
         {subject.rows.map((r) => (
           <div key={r.label} className="contents">
             <dt className="text-graphite">{r.label}</dt>
-            <dd className={r.mono ? "break-all font-mono text-ink" : "font-medium text-ink"}>{r.value}</dd>
+            <dd className={r.mono ? "break-all font-mono text-ink" : "font-medium text-ink"} translate="no" lang="en">{r.value}</dd>
           </div>
         ))}
       </dl>

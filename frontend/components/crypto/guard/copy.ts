@@ -2,10 +2,11 @@
 
 import { translate, useLang } from "@/lib/i18n";
 import type { Lang } from "@/lib/crypto/api";
+import { MR } from "./copy.mr";
+import { toRequestLang } from "@/lib/crypto/lang";
 
 /**
- * Wallet Guard strings, English + Hindi. Looked up here first (FinPilot's own i18n table has no wallet-guard rows,
- * and other UI languages such as Marathi fall back to English), then through FinPilot's `translate(lang, key, default)`.
+ * Wallet Guard strings, English + Hindi (+ Marathi in ./copy.mr.ts). Looked up here first (FinPilot's own i18n table has no wallet-guard rows), then through FinPilot's `translate(lang, key, default)`.
  * `{name}` placeholders are filled from the `vars` argument.
  */
 const COPY: Record<string, [string, string]> = {
@@ -21,6 +22,10 @@ const COPY: Record<string, [string, string]> = {
   "wg.input.err.mixed": [
     "Mixed upper and lower case: please check the address.",
     "बड़े और छोटे अक्षर मिले हुए हैं: कृपया पता जाँचें।",
+  ],
+  "wg.input.err.checksum": [
+    "The address checksum does not match: there is probably a typo. Please copy it again.",
+    "पते का चेकसम मेल नहीं खाता: शायद टाइपिंग की गलती है। कृपया दोबारा कॉपी करें।",
   ],
   "wg.input.paste": ["Paste", "पेस्ट करें"],
   "wg.input.clear": ["Clear", "साफ़ करें"],
@@ -192,8 +197,8 @@ const COPY: Record<string, [string, string]> = {
 /** Looks a key up in the Wallet Guard table; falls back to FinPilot's i18n, then the key. */
 export function gt(lang: string, key: string, vars?: Record<string, string | number>): string {
   const row = COPY[key];
-  const idx = lang === "hi" ? 1 : 0;
-  let text = row ? row[idx] || row[0] : translate(lang as Parameters<typeof translate>[0], key);
+  const idx = lang === "hi" || lang === "mr" ? 1 : 0; // Marathi falls back to the Hindi column when ./copy.mr.ts lacks a key
+  let text = (lang === "mr" ? MR[key] : undefined) ?? (row ? row[idx] || row[0] : translate(lang as Parameters<typeof translate>[0], key));
   if (vars) for (const [k, v] of Object.entries(vars)) text = text.replaceAll(`{${k}}`, String(v));
   return text;
 }
@@ -205,7 +210,7 @@ export function useGuardT(): { g: (key: string, vars?: Record<string, string | n
     g: (key, vars) => gt(uiLang, key, vars),
     uiLang,
     /** Language to request from the service: Hindi when the UI is Hindi, English otherwise. */
-    reqLang: uiLang === "hi" ? "hi" : "en",
+    reqLang: toRequestLang(uiLang),
   };
 }
 

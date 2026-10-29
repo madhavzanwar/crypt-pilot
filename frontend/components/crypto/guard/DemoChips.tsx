@@ -25,7 +25,7 @@ export default function DemoChips({ onPick, selected, disabled }: { onPick: (add
               const on = selected === w.address;
               const meta = VERDICT_META[w.expected];
               const Icon = meta.icon;
-              const label = w.note.length <= 28 ? w.note : verdictWord(uiLang, w.expected);
+              const label = verdictWord(uiLang, w.expected); // always the verdict word ("Warn"), never the free-text note (BUG-106)
               return (
                 <button
                   key={w.address}
@@ -42,7 +42,7 @@ export default function DemoChips({ onPick, selected, disabled }: { onPick: (add
                 >
                   <Icon className={cn("size-4 flex-none", meta.text)} aria-hidden />
                   <span className="min-w-0 flex-shrink truncate font-semibold">{label}</span>
-                  <span className="tnum min-w-0 flex-shrink-[2] truncate font-mono text-[11px] opacity-70">{middleEllipsis(w.address, 6, 5)}</span>
+                  <span className="tnum min-w-0 flex-shrink-[2] truncate font-mono text-[11px] opacity-70" translate="no" lang="en">{middleEllipsis(w.address, 6, 5)}</span>
                 </button>
               );
             })}

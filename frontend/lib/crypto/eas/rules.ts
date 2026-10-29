@@ -93,7 +93,7 @@ export const ATTEST_ERROR_TEXT: Record<AttestErrorKind, { key: string; text: str
   },
   schema: {
     key: "web3.error.schema",
-    text: "The configured EAS schema was not found on Base Sepolia. Check NEXT_PUBLIC_EAS_SCHEMA_UID.",
+    text: "The configured EAS schema was not found on Base Sepolia. The site owner needs to check the schema setting.",
   },
   hash_mismatch: {
     key: "web3.error.hashMismatch",

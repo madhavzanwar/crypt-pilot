@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Link2, Wallet } from "lucide-react";
+import { AlertTriangle, ChevronDown, Link2, Wallet } from "lucide-react";
 import WalletVerdictCard from "@/components/crypto/guard/WalletVerdictCard";
 import { shortAddress } from "@/lib/crypto/address/validate";
 import { VERDICT_META } from "@/lib/crypto/verdict";
 import { cn } from "@/lib/utils";
-import type { ChainWallet } from "./types";
+import { isUnverified, type ChainWallet } from "./types";
 
 /** Engine tag: the TigerGraph badge appears only when the service said engine === "tigergraph"; otherwise the engine that answered is named. */
 export function EngineTag({ w }: { w: Pick<ChainWallet, "tigergraph" | "engine_label" | "ms" | "status"> }) {
   if (w.status === "offline") return <span className="rounded-full bg-fog px-2 py-0.5 text-[10px] font-semibold text-graphite">Chain Analyst offline</span>;
+  if (w.status === "rate_limited") return <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Rate limited, retry soon</span>;
+  if (w.status === "rejected") return <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700">Address rejected</span>;
   const ms = w.ms !== null ? ` · ${w.ms} ms` : "";
   return w.tigergraph ? (
     <span className="rounded-full bg-tint-ember px-2 py-0.5 text-[10px] font-semibold text-ink ring-1 ring-ember/30">TigerGraph{ms}</span>
@@ -20,7 +22,15 @@ export function EngineTag({ w }: { w: Pick<ChainWallet, "tigergraph" | "engine_l
 }
 
 export function VerdictChip({ w }: { w: ChainWallet }) {
-  if (!w.verdict) return <span className="rounded-full border border-mist bg-fog px-2 py-0.5 text-[11px] font-semibold text-graphite">Offline</span>;
+  if (!w.verdict) {
+    const [text, cls] =
+      w.status === "rate_limited"
+        ? ["RATE LIMITED", "border-amber-300 bg-amber-50 text-amber-800"]
+        : w.status === "rejected"
+          ? ["INVALID ADDRESS", "border-rose-300 bg-rose-50 text-rose-700"]
+          : ["OFFLINE", "border-mist bg-fog text-graphite"];
+    return <span className={cn("rounded-full border px-2 py-0.5 text-[11px] font-semibold", cls)}>{text}</span>;
+  }
   const m = VERDICT_META[w.verdict];
   const Icon = m.icon;
   return (
@@ -47,11 +57,26 @@ export function ChainChips({ w }: { w: ChainWallet }) {
 export function WalletLine({ w }: { w: ChainWallet }) {
   return (
     <li className="grid gap-1 rounded-xl bg-fog/70 p-2.5">
-      <span className="font-mono text-[11px] text-ink" title={w.address}>{shortAddress(w.address, 8, 6)}</span>
+      <span className="font-mono text-[11px] text-ink" title={w.address} translate="no" lang="en">{shortAddress(w.address, 8, 6)}</span>
       <ChainChips w={w} />
       <p className="text-xs text-graphite">{w.reason}</p>
+      {isUnverified(w) && <p className="text-[10px] font-medium text-amber-800">Unverified: this is not a safe signal.</p>}
       {w.mock && <p className="text-[10px] text-pewter">Demo dataset, not real chain data.</p>}
     </li>
+  );
+}
+
+/**
+ * Banner for a council / evidence result that has unverified wallets (UNKNOWN, offline, rate limited, rejected):
+ * it must never read like an all-clear. `caveat` is the backend sentence when there is one.
+ */
+export function UnverifiedCaveat({ count, caveat }: { count?: number; caveat?: string }) {
+  if (!count) return null;
+  return (
+    <div role="note" className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900">
+      <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <span>{caveat ?? `${count} wallet${count === 1 ? "" : "s"} could not be verified. That is not a safe signal.`}</span>
+    </div>
   );
 }
 
@@ -68,7 +93,7 @@ export function GraphEvidence({ address }: { address: string | null }) {
     <div className="rounded-2xl border border-mist bg-white">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-ink">
         <Link2 className="size-4 text-leaf" /> Graph evidence
-        <span className="font-mono text-xs font-normal text-pewter">{shortAddress(address, 8, 6)}</span>
+        <span className="font-mono text-xs font-normal text-pewter" translate="no" lang="en">{shortAddress(address, 8, 6)}</span>
         <ChevronDown className={cn("ml-auto size-4 text-pewter transition-transform duration-300", open && "rotate-180")} />
       </button>
       {open && (
@@ -93,5 +118,5 @@ export function AddWalletInvite({ compact = false }: { compact?: boolean }) {
 
 /** First wallet worth showing in Graph evidence: one the service answered about, else the first listed. */
 export function firstScreened(wallets: ChainWallet[] | undefined, listed: string[]): string | null {
-  return wallets?.find((w) => w.status !== "offline")?.address ?? listed[0] ?? null;
+  return wallets?.find((w) => w.status === "ok" || w.status === "not_in_dataset")?.address ?? listed[0] ?? null;
 }

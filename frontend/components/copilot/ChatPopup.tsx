@@ -11,6 +11,7 @@ import { Check, Loader2, Maximize2, MessageCircle, Mic, RotateCcw, Sparkles, Squ
 import { PromptInputBox } from "@/components/copilot/PromptInputBox";
 import { hostOf } from "@/components/copilot/AnswerView";
 import { api } from "@/lib/api";
+import { messageHasSecret } from "@/lib/crypto/extractAddress";
 import type { NextStep, SourceLink } from "@/lib/types";
 import { useUserId } from "@/lib/hooks";
 import { getOfflineOnly } from "@/lib/user";
@@ -168,6 +169,12 @@ export function ChatPopup() {
   async function send(text?: string, spoken = false) {
     const message = (text ?? input).trim();
     if (!message || loading) return;
+    // BUG-102: a seed phrase or private key never leaves the browser (not to /api/chat, not to the voice agent, not into history).
+    if (messageHasSecret(message)) {
+      setInput("");
+      setMsgs((m) => [...m, { role: "assistant", text: "That looks like a seed phrase or private key, so I cleared it and sent nothing. Never share it with anyone, including me." }]);
+      return;
+    }
     const history = msgs.slice(-8).map((m) => ({ role: m.role, content: m.text }));
     setMsgs((m) => [...m, { role: "user", text: message }]);
     setInput("");

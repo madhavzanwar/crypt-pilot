@@ -6,14 +6,13 @@ import { toast } from "sonner";
 import { api, messageFor } from "@/lib/crypto/api";
 import type { CreditPack, CryptoCoin, CryptoInvoice as Invoice, InvoiceState } from "@/lib/crypto/api";
 import { notifyCreditsChanged } from "@/lib/crypto/creditsEvents";
-import { useT } from "@/lib/i18n";
+import { toRequestLang } from "@/lib/crypto/lang";
+import { useCryptoT as useT } from "@/lib/crypto/i18n";
 import { Button } from "@/components/shadcn/button";
 import { cn } from "@/lib/utils";
 import { InvoiceCard } from "./InvoiceCard";
 
 const POLL_MS = 10_000;
-/** Keep checking this long after the countdown ends: a payment confirmed right at expiry must still be seen. */
-const GRACE_MS = 60_000;
 
 const COINS: { id: CryptoCoin; label: string }[] = [
   { id: "btc", label: "Bitcoin (testnet)" },
@@ -25,8 +24,13 @@ function useRemaining(expiresAt: string | undefined): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!expiresAt) return;
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
+    const tick = () => setNow(Date.now());
+    const id = window.setInterval(tick, 1000);
+    document.addEventListener("visibilitychange", tick); // refresh straight away when a hidden tab returns
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", tick);
+    };
   }, [expiresAt]);
   if (!expiresAt) return 0;
   const end = Date.parse(expiresAt);
@@ -44,12 +48,11 @@ export function CryptoInvoice({ pack }: { pack: CreditPack }) {
   const celebrated = useRef<string | null>(null);
 
   const remaining = useRemaining(invoice?.expiresAt);
-  const [graceOverFor, setGraceOverFor] = useState<string | null>(null);
-  const status: InvoiceState =
-    apiStatus === "waiting" && invoice && remaining === 0 && graceOverFor === invoice.invoiceId ? "expired" : apiStatus;
+  // The server decides when an invoice is expired or paid (BUG-071): the client clock only drives the countdown, so a
+  // tab with a wrong or sleeping clock can neither declare "expired" early nor stop polling for a payment.
+  const status: InvoiceState = apiStatus;
 
   const invoiceId = invoice?.invoiceId;
-  const expiresAt = invoice?.expiresAt;
   useEffect(() => {
     if (!invoiceId || apiStatus !== "waiting") return;
     let stop = false;
@@ -62,20 +65,16 @@ export function CryptoInvoice({ pack }: { pack: CreditPack }) {
       }
     };
     const id = window.setInterval(() => void poll(), POLL_MS);
-    // one final check once the grace period after expiry is over, then the invoice may show as expired
-    const end = expiresAt ? Date.parse(expiresAt) : NaN;
-    const delay = Number.isFinite(end) ? Math.max(0, end - Date.now()) + GRACE_MS : GRACE_MS;
-    const last = window.setTimeout(() => {
-      void poll().finally(() => {
-        if (!stop) setGraceOverFor(invoiceId);
-      });
-    }, delay);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void poll(); // a sleeping tab catches up as soon as it wakes
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       stop = true;
       window.clearInterval(id);
-      window.clearTimeout(last);
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [invoiceId, apiStatus, expiresAt]);
+  }, [invoiceId, apiStatus]);
 
   useEffect(() => {
     if (status !== "paid" || !invoiceId || celebrated.current === invoiceId) return;
@@ -92,7 +91,7 @@ export function CryptoInvoice({ pack }: { pack: CreditPack }) {
       setApiStatus("waiting");
       setInvoice(inv);
     } catch (e) {
-      setError(messageFor(e, lang === "hi" ? "hi" : "en").message);
+      setError(messageFor(e, toRequestLang(lang)).message);
     } finally {
       setBusy(false);
     }
@@ -101,7 +100,7 @@ export function CryptoInvoice({ pack }: { pack: CreditPack }) {
   return (
     <div className="grid gap-3">
       <p className="text-sm text-graphite">
-        Pays with test coins only. Cake Wallet (or any wallet that handles <code className="font-mono">bitcoin:</code> / <code className="font-mono">monero:</code> links) can open the invoice.
+        Pays with test coins only. Cake Wallet (or any wallet that handles <code className="font-mono" translate="no" lang="en">bitcoin:</code> / <code className="font-mono" translate="no" lang="en">monero:</code> links) can open the invoice.
       </p>
       <div role="radiogroup" aria-label="Coin" className="grid grid-cols-2 gap-2">
         {COINS.map((c) => (

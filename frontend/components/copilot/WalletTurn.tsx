@@ -21,6 +21,8 @@ export function WalletTurn({
   result,
   onResult,
   evidenceOpen,
+  more = [],
+  ignored = 0,
 }: {
   address: string;
   checksumValid: boolean;
@@ -30,6 +32,10 @@ export function WalletTurn({
   result?: CheckResponse;
   onResult: (r: CheckResponse) => void;
   evidenceOpen: boolean;
+  /** Further addresses from the same message (BUG-103): one card each. The caller caps the list (see scanAddresses). */
+  more?: string[];
+  /** How many addresses beyond the cap were left out. */
+  ignored?: number;
 }) {
   const { tr } = useVoiceT();
 
@@ -46,12 +52,22 @@ export function WalletTurn({
     <div className="flex w-full flex-col gap-3">
       <p className="flex items-center gap-1.5 text-xs font-semibold text-ink">
         <ShieldCheck className="size-3.5 text-olive" aria-hidden /> {tr("cp.wallet.title")}
-        <span className="font-normal text-pewter" title={address}>
+        <span className="font-normal text-pewter" title={address} translate="no" lang="en">
           {shortAddress(address)}
         </span>
       </p>
       {armed ? (
-        <WalletVerdictCard address={address} lang={lang} onResult={onResult} />
+        <>
+          <WalletVerdictCard address={address} lang={lang} onResult={onResult} />
+          {more.map((a) => (
+            <div key={a} className="flex flex-col gap-1.5">
+              <p className="text-xs text-pewter" title={a} translate="no" lang="en">
+                {shortAddress(a)}
+              </p>
+              <WalletVerdictCard address={a} lang={lang} />
+            </div>
+          ))}
+        </>
       ) : (
         <div className="flex flex-col items-start gap-1.5 rounded-2xl bg-fog p-4">
           <button
@@ -64,6 +80,7 @@ export function WalletTurn({
           <span className="text-[11px] text-pewter">{tr("cp.wallet.runNote")}</span>
         </div>
       )}
+      {ignored > 0 && <p role="note" className="text-[11px] text-amber-800">{tr("cp.wallet.more").replace("{n}", String(ignored))}</p>}
       {armed && <p className="text-[11px] text-pewter">{tr("cp.wallet.sub")}</p>}
       {evidenceOpen && result && <WalletEvidenceNote result={result} />}
     </div>
