@@ -91,6 +91,12 @@ _memory_store: dict[str, dict[str, dict]] = {}
 
 @lru_cache
 def _db():
+    # FINPILOT_STORE=memory: never touch Firestore (demo personas live in process memory, nothing persists across restarts).
+    # The free Firebase plan allows ~50k reads / 20k writes a day and one dashboard build reads thousands of rows, so a public
+    # demo exhausts it quickly ("ResourceExhausted: 429 Quota exceeded") and every data page then returns 500.
+    if os.getenv("FINPILOT_STORE", "").strip().lower() == "memory":
+        logger.info("FINPILOT_STORE=memory: using the in-memory store.")
+        return None
     # Lazy so pure tests never need credentials or an emulator.
     pid = get_settings().firestore_project_id
     if os.getenv("FIRESTORE_EMULATOR_HOST"):
