@@ -122,7 +122,7 @@ class CheckPipeline:
                 log.info("initializing_fallback_networkx_engine")
                 self._fallback_engine = NetworkXEngine(self.s.processed_dir, self.s.max_frontier)
                 return self._fallback_engine
-            except Exception as exc:
+            except (Exception, MemoryError) as exc:
                 log.warning("fallback_engine_init_failed", err=str(exc))
         return None
 
@@ -232,7 +232,7 @@ class CheckPipeline:
                         fallback.khop_exposure, p.address, self.s.max_hop, self.s.max_subgraph_nodes)
                     lookup_ms = (time.perf_counter() - t0) * 1000
                     fallback_ok = True
-                except GraphEngineError:
+                except (GraphEngineError, Exception, MemoryError):
                     fallback_ok = False
             if not fallback_ok:
                 yield Result(self._error_response(p, "graph_unavailable"), 503)
