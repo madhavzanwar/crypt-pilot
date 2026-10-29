@@ -62,6 +62,8 @@ export function setAuthUserId(id: string | null) {
   if (typeof window === "undefined") return;
   try {
     if (id) {
+      // A real sign-in ends demo mode (a stale flag would otherwise keep AuthGate "in" after the session expires).
+      clearDemoState();
       if (window.localStorage.getItem(AUTH_USER_KEY) === id) return;
       window.localStorage.setItem(AUTH_USER_KEY, id);
     } else {
@@ -97,13 +99,31 @@ export function startDemo() {
   setUserId(DEMO_PERSONAS[0].id);
 }
 
-export function endDemo() {
+/** Drop the demo flag, and the demo persona id with it so the next anonymous session gets a fresh guest id. */
+function clearDemoState(): boolean {
+  let changedId = false;
   try {
     window.localStorage.removeItem(DEMO_MODE_KEY);
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored && isDemoUserId(stored)) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      changedId = true;
+    }
+  } catch {
+    // ignore
+  }
+  return changedId;
+}
+
+export function endDemo() {
+  if (typeof window === "undefined") return;
+  const changedId = clearDemoState();
+  try {
     window.sessionStorage.clear();
   } catch {
     // ignore
   }
+  if (changedId) window.dispatchEvent(new CustomEvent(USER_ID_CHANGE_EVENT));
 }
 
 export function setUserId(id: string) {

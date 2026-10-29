@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 import { InvoiceCard } from "./InvoiceCard";
 
 const POLL_MS = 10_000;
+/** Keep checking this long after the countdown ends: a payment confirmed right at expiry must still be seen. */
+const GRACE_MS = 60_000;
 
 const COINS: { id: CryptoCoin; label: string }[] = [
   { id: "btc", label: "Bitcoin (testnet)" },
@@ -42,11 +44,14 @@ export function CryptoInvoice({ pack }: { pack: CreditPack }) {
   const celebrated = useRef<string | null>(null);
 
   const remaining = useRemaining(invoice?.expiresAt);
-  const status: InvoiceState = apiStatus === "waiting" && invoice && remaining === 0 ? "expired" : apiStatus;
+  const [graceOverFor, setGraceOverFor] = useState<string | null>(null);
+  const status: InvoiceState =
+    apiStatus === "waiting" && invoice && remaining === 0 && graceOverFor === invoice.invoiceId ? "expired" : apiStatus;
 
   const invoiceId = invoice?.invoiceId;
+  const expiresAt = invoice?.expiresAt;
   useEffect(() => {
-    if (!invoiceId || status !== "waiting") return;
+    if (!invoiceId || apiStatus !== "waiting") return;
     let stop = false;
     const poll = async () => {
       try {
@@ -57,11 +62,20 @@ export function CryptoInvoice({ pack }: { pack: CreditPack }) {
       }
     };
     const id = window.setInterval(() => void poll(), POLL_MS);
+    // one final check once the grace period after expiry is over, then the invoice may show as expired
+    const end = expiresAt ? Date.parse(expiresAt) : NaN;
+    const delay = Number.isFinite(end) ? Math.max(0, end - Date.now()) + GRACE_MS : GRACE_MS;
+    const last = window.setTimeout(() => {
+      void poll().finally(() => {
+        if (!stop) setGraceOverFor(invoiceId);
+      });
+    }, delay);
     return () => {
       stop = true;
       window.clearInterval(id);
+      window.clearTimeout(last);
     };
-  }, [invoiceId, status]);
+  }, [invoiceId, apiStatus, expiresAt]);
 
   useEffect(() => {
     if (status !== "paid" || !invoiceId || celebrated.current === invoiceId) return;

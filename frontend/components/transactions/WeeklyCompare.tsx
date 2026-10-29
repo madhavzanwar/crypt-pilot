@@ -24,8 +24,6 @@ export function WeeklyCompare({ txns }: { txns: Transaction[] }) {
     for (const t of txns) if (t.amount < 0 && !NON_SPEND.has(t.category)) spendByDay.set(t.date.slice(0, 10), (spendByDay.get(t.date.slice(0, 10)) ?? 0) - t.amount);
     const today = new Date();
     const start = mondayOf(today);
-    let a = 0;
-    let b = 0;
     const rows = DAYS.map((day, i) => {
       const cur = new Date(start);
       cur.setDate(start.getDate() + i);
@@ -34,10 +32,10 @@ export function WeeklyCompare({ txns }: { txns: Transaction[] }) {
       const future = cur > today;
       const thisWeek = future ? null : Math.round(spendByDay.get(key(cur)) ?? 0);
       const lastWeek = Math.round(spendByDay.get(key(prev)) ?? 0);
-      if (thisWeek !== null) a += thisWeek;
-      b += lastWeek;
       return { day, thisWeek, lastWeek };
     });
+    const a = rows.reduce((s, r) => s + (r.thisWeek ?? 0), 0);
+    const b = rows.reduce((s, r) => s + r.lastWeek, 0);
     return { rows, thisTotal: a, lastTotal: b };
   }, [txns]);
   const up = thisTotal > lastTotal;

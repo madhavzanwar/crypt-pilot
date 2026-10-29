@@ -49,7 +49,7 @@ export function ConfettiCanvas() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    let particles: Particle[] = [];
+    const particles: Particle[] = [];
     let animationId: number;
 
     const handleResize = () => {

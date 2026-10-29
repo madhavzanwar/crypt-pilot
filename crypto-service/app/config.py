@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field, SecretStr, field_validator
+from pydantic import AliasChoices, BaseModel, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -45,6 +45,14 @@ class Settings(BaseSettings):
     max_request_bytes: int = 6 * 1024 * 1024
     # Only true when the app is reachable ONLY through Fly's proxy, which overwrites Fly-Client-IP
     trust_fly_client_ip: bool = False
+    # Only true when the app is reachable ONLY through the FinPilot bridge (or another proxy you control) that sets
+    # X-Forwarded-For itself. The RIGHTMOST `trusted_proxy_hops`-th entry is then the client; never the first.
+    trust_proxy: bool = Field(default=False, validation_alias=AliasChoices("CRYPTO_TRUST_PROXY", "TRUST_PROXY"))
+    trusted_proxy_hops: int = Field(default=1, ge=1)
+    # Free starting credits are granted to at most this many NEW sessions per client IP per UTC day (0 = unlimited).
+    # Beyond it a new session still works but starts with 0 credits (buy a pack). Dropping the cookie no longer
+    # mints fresh credits without bound.
+    free_sessions_per_ip_per_day: int = Field(default=25, ge=0)
 
     graph_engine: Literal["tigergraph", "networkx"] = "tigergraph"
     tg_host: str = ""

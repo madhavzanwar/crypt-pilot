@@ -5,14 +5,19 @@ import re
 from typing import Literal
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app import telemetry
 from app.core.config import get_settings
-from app.core.ratelimit import RateLimiter
+from app.core.guard import require_caller, web_limiter
+from app.core.ratelimit import RateLimiter, client_ip
 
-router = APIRouter(prefix="/api/web", tags=["web"])
+async def _guard(request: Request, _: None = Depends(require_caller)) -> None:
+    web_limiter.check(client_ip(request))
+
+
+router = APIRouter(prefix="/api/web", tags=["web"], dependencies=[Depends(_guard)])
 BASE = "https://api.tavily.com"
 _limit = RateLimiter(30, 60)  # one shared key: cap total calls per minute
 

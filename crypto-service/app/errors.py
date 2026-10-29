@@ -44,11 +44,20 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(StarletteHTTPException)
     async def _http(_: Request, exc: StarletteHTTPException) -> JSONResponse:
-        return _json(exc.status_code, str(exc.detail) if exc.detail else "error")
+        resp = _json(exc.status_code, str(exc.detail) if exc.detail else "error")
+        if exc.status_code == 429 and "retry-after" not in {k.lower() for k in (exc.headers or {})}:
+            resp.headers["retry-after"] = "60"
+        return resp
 
     @app.exception_handler(RateLimitExceeded)
     async def _rate(_: Request, exc: RateLimitExceeded) -> JSONResponse:
-        return _json(429, "rate_limited")
+        resp = _json(429, "rate_limited")
+        try:
+            retry = int(exc.limit.limit.get_expiry())
+        except Exception:  # noqa: BLE001 - fall back to a window-sized hint
+            retry = 60
+        resp.headers["retry-after"] = str(max(1, min(retry, 3600)))
+        return resp
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception) -> JSONResponse:

@@ -42,7 +42,7 @@ export default function MerchantQrPage() {
         ))}
       </div>
       <div className="rounded-3xl border border-[#dadce0] p-5 shadow-sm">
-        <div aria-label={`QR code for ${m.name}`} dangerouslySetInnerHTML={{ __html: svg }} />
+        <div role="img" aria-label={`QR code for ${m.name}`} dangerouslySetInnerHTML={{ __html: svg }} />
       </div>
       <div className="text-center">
         <p className="text-lg font-medium">{m.name}</p>

@@ -128,10 +128,24 @@ def _sheet_csv_url(url: str) -> str:
     return f"https://docs.google.com/spreadsheets/d/{m.group(1)}/export?format=csv&gid={gid.group(1) if gid else 0}"
 
 
+def _fetch_sheet(url: str, hops: int = 4) -> httpx.Response:
+    """GET following redirects manually, only to Google hosts (https), so a redirect can't point at an internal host."""
+    for _ in range(hops + 1):
+        r = httpx.get(url, follow_redirects=False, timeout=20)
+        if not getattr(r, "is_redirect", False):
+            return r
+        nxt = str(r.next_request.url) if getattr(r, "next_request", None) else ""
+        host = httpx.URL(nxt).host if nxt else ""
+        if not nxt.startswith("https://") or not (host == "google.com" or host.endswith(".google.com") or host.endswith(".googleusercontent.com")):
+            raise HTTPException(502, "The sheet link redirected somewhere that isn't allowed.")
+        url = nxt
+    raise HTTPException(502, "Too many redirects reading the sheet.")
+
+
 def _sync_sheet(user_id: str, csv_url: str, last_hash: str | None = None) -> tuple[bool, str, int]:
     """Fetch the sheet, and replace the user's ledger with it when it changed. Returns (changed, hash, rows)."""
     try:
-        r = httpx.get(csv_url, follow_redirects=True, timeout=20)
+        r = _fetch_sheet(csv_url)
         r.raise_for_status()
     except httpx.HTTPError as exc:
         raise HTTPException(502, "Couldn't read the sheet. In Google Sheets choose Share, then 'Anyone with the link' can view.") from exc
@@ -237,12 +251,15 @@ def disconnect(connector: str, user_id: str = Depends(resolve_user_id)) -> None:
         raise HTTPException(404, "Unknown connector")
     if connector in RAILS:
         return  # payment rails hold no user data: nothing to remove, and the ledger must stay untouched
-    if user_id not in DEMO_USER_IDS:
-        _clear_user(user_id)
-    elif connector == "google_sheets":
-        _clear_sheet(user_id)
-    elif connector == "plaid":
+    if store.get(ConnectionRow, f"{user_id}:{connector}") is None:
+        raise HTTPException(404, f"{_label(connector)} isn't connected")
+    # Only connectors that own ledger rows remove data; dataset-only ones (bank, invoices, investments) just unlink.
+    if connector == "plaid":
         from app.api.plaid_router import clear_plaid
         clear_plaid(user_id)
+    elif connector == "google_sheets":
+        _clear_sheet(user_id) if user_id in DEMO_USER_IDS else _clear_user(user_id)
+    elif connector == "google_pay" and user_id not in DEMO_USER_IDS:
+        _clear_user(user_id)
     store.delete_where(InsightsSnapshotRow, user_id=user_id)
     store.delete(ConnectionRow, f"{user_id}:{connector}")

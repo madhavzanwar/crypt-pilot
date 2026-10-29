@@ -152,7 +152,6 @@ def detect_anomalies(df: pd.DataFrame) -> list[Fact]:
             if is_same_day or is_tight_bill or is_tight_hours:
                 # Amounts identical or within 0.5% tolerance (e.g. gateway surcharge)
                 if abs(amount - prev_amt) <= max(1.0, 0.005 * prev_amt):
-                    pair_key = (prev_id, txn_id)
                     if prev_id not in flagged_duplicate_ids and txn_id not in flagged_duplicate_ids:
                         if prev_id:
                             flagged_duplicate_ids.add(prev_id)

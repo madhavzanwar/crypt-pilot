@@ -10,7 +10,11 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   devIndicators: false, // hides the dev-mode "N" badge that overlaps the phone pay app
   async rewrites() {
-    const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL;
+    // Dev default matches lib/apiBase.ts so /api/crypto/* works on a fresh checkout with no .env.local.
+    const backendUrl =
+      process.env.BACKEND_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      (process.env.NODE_ENV !== "production" ? "http://127.0.0.1:8000" : "");
     if (!backendUrl) return [];
     return [
       {

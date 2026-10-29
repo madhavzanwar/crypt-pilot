@@ -146,7 +146,7 @@ Names only. Never commit values. `.env.example` files list the names.
 
 | Name | Service | Required? | Purpose |
 |---|---|---|---|
-| `CRYPTO_SERVICE_URL` | FinPilot API | Required for any crypto feature | Base URL of the crypto service (server-side only, never sent to the browser). Defaults to `http://127.0.0.1:8200` if unset; an empty string disables the bridge. |
+| `CRYPTO_SERVICE_URL` | FinPilot API | Required for any crypto feature | Base URL of the crypto service (server-side only, never sent to the browser). Code default is `http://127.0.0.1:8200` if unset, but the documented standard is `http://127.0.0.1:8132` (set it explicitly); an empty string disables the bridge. |
 | `CRYPTO_TRUST_PROXY` | FinPilot API | Optional | `true` only behind a proxy you control: then `X-Forwarded-For` / `X-Forwarded-Proto` are believed (per-visitor rate limiting, Secure-cookie handling). Leave unset locally. |
 | `FINPILOT_DEMO_MODE` | FinPilot API | Optional (default `true`) | Demo personas and seeded data. |
 | `NEXT_PUBLIC_API_URL` | Frontend (build time) | Local dev: effectively required | Where the browser and the Next.js rewrite send `/api/*`. Local: `http://127.0.0.1:8000`. Do not set on Vercel (same origin). |

@@ -1,5 +1,6 @@
 "use client";
 
+import { safeHref, isInternalHref } from "@/components/safeHref";
 import { onOpenAssistant } from "@/lib/copilotBus";
 import { getLang, getSimpleNow } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "react";
@@ -116,14 +117,21 @@ export function ChatPopup() {
     return () => clearTimeout(t);
   }, [caption]);
 
+  // keep the latest voice/startVoice/pathname in a ref so the subscription below is made once
+  const latestRef = useRef({ voice, startVoice, pathname });
+  useEffect(() => {
+    latestRef.current = { voice, startVoice, pathname };
+  });
   useEffect(
     () =>
       onOpenAssistant(() => {
+        const { voice: v, startVoice: start, pathname: p } = latestRef.current;
+        if (p.startsWith("/copilot")) return; // the popup renders nothing on the full Copilot page
         setOpen(true);
         stopSpeaking();
-        if (voice.supported && !voice.listening) startVoice();
+        if (v.supported && !v.listening) start();
       }),
-    [voice],
+    [],
   );
 
   if (pathname.startsWith("/copilot")) return null;
@@ -210,6 +218,7 @@ export function ChatPopup() {
         patch({ answer: reply.text.replace(/\*\*/g, ""), over: true });
       }
     } catch {
+      if (spoken) patch({ over: true });
       reply = { role: "assistant", text: "Sorry, I couldn't answer right now. Please try again in a minute." };
     }
     setMsgs((m) => [...m, reply]);
@@ -284,10 +293,10 @@ export function ChatPopup() {
                       <p key={k} className="mt-1.5 text-xs text-olive">
                         →{" "}
                         {s.link ? (
-                          s.link.startsWith("/") ? (
+                          isInternalHref(s.link) ? (
                             <Link href={s.link} className="font-medium underline">{s.title}</Link>
                           ) : (
-                            <a href={s.link} target="_blank" rel="noreferrer" className="font-medium underline">{s.title}</a>
+                            <a href={safeHref(s.link)} target="_blank" rel="noreferrer" className="font-medium underline">{s.title}</a>
                           )
                         ) : (
                           <span className="font-medium">{s.title}</span>

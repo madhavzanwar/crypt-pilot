@@ -48,6 +48,6 @@ def verify(secret: str, headers: Mapping[str, str], body: bytes, now: float | No
     expected = sign(secret, msg_id, ts, body).split(",", 1)[1]
     for part in sigs.split():
         version, _, sig = part.partition(",")
-        if version == "v1" and hmac.compare_digest(sig, expected):
+        if version == "v1" and hmac.compare_digest(sig.encode("utf-8", "replace"), expected.encode()):
             return msg_id
     raise WebhookVerificationError("signature mismatch")

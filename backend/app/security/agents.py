@@ -22,7 +22,6 @@ from app.analytics.anomalies import detect_anomalies
 from app.analytics.recurring import detect_recurring, find_redundant_subscriptions, normalize_merchant
 from app import telemetry
 from app.core import store
-from app.core.config import get_settings
 from app.security import ai_agents, chain_analyst
 from app.models import AccountRow, InvestigationRow, TransactionRow
 

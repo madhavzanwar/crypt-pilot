@@ -9,12 +9,12 @@ import hashlib
 from datetime import date
 
 from fastapi.concurrency import run_in_threadpool
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from app.core import store
 from app.core.auth import resolve_user_id
-from app.core.ratelimit import upload_limiter
+from app.core.ratelimit import scoped_key, upload_limiter
 from app.ingest.categorize import categorize
 from app.aa.mapper import _merchant
 from app.models import AccountRow, TransactionRow
@@ -39,8 +39,8 @@ class ImportBody(BaseModel):
 
 
 @router.post("/api/ocr/extract/{user_id}")
-async def extract(file: UploadFile, user_id: str = Depends(resolve_user_id)) -> dict:
-    upload_limiter.check(user_id)
+async def extract(file: UploadFile, request: Request, user_id: str = Depends(resolve_user_id)) -> dict:
+    upload_limiter.check(scoped_key(request, user_id))
     name = (file.filename or "").lower()
     if not name.endswith(_EXTS):
         raise HTTPException(400, f"Upload a photo or scan ({', '.join(_IMAGES)}) or a .txt/.csv statement")

@@ -27,7 +27,9 @@ async def dodo_webhook(request: Request, state: AppState = Depends(get_state)) -
         return JSONResponse(status_code=401, content={"error": "invalid_signature"})
     try:
         event = json.loads(body)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
+        return JSONResponse(status_code=400, content={"error": "invalid_json"})
+    if not isinstance(event, dict):
         return JSONResponse(status_code=400, content={"error": "invalid_json"})
     etype = str(event.get("type", ""))
     with state.db.session() as s:

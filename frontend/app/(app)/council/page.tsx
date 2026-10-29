@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Users } from "lucide-react";
 import { api } from "@/lib/api";
 import { useUserId } from "@/lib/hooks";
@@ -28,6 +28,8 @@ function Badge({ level, children }: { level: string; children: React.ReactNode }
 export default function CouncilPage() {
   const userId = useUserId();
   const [wallets, setWallets] = useWalletList(userId);
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
   const [votes, setVotes] = useState<(CouncilVote | ChainVote)[]>([]);
   const [debate, setDebate] = useState<string[] | null>(null);
   const [verdict, setVerdict] = useState<CouncilVerdict | null>(null);
@@ -51,8 +53,9 @@ export default function CouncilPage() {
       };
       // With no wallets this is the original request; with wallets the Chain Analyst joins as an extra specialist.
       if (wallets.length === 0) await api.convene(userId, onEvent);
-      else await postNdjson<CouncilEvent>(`/api/security/${userId}/council`, { wallets, lang: "en" }, onEvent, "Council failed");
+      else await postNdjson<CouncilEvent>(`/api/security/${userId}/council`, { wallets, lang: "en" }, onEvent, "Council failed", (abortRef.current = new AbortController()).signal);
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "The council could not convene");
     } finally {
       setRunning(false);

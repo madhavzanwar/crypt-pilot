@@ -9,4 +9,4 @@ pinned: false
 ---
 
 Cryptiq backend (FastAPI). A risk signal from a research dataset, not an accusation.
-Configuration comes from this Space's Secrets and Variables; see `docs/DEPLOY_NOTES.md` in the source repo.
+Configuration comes from this Space's Secrets and Variables. Variable names are listed in `crypto-service/.env.example`.

@@ -75,7 +75,7 @@ class CryptoInvoices:
                       amount=amount, uri=uri, status="waiting", created_at=now,
                       expires_at=now + timedelta(minutes=self.s.invoice_ttl_minutes))
         with self.db.session() as s:
-            ledger.ensure_session(s, session_id, self.s.starting_credits)
+            ledger.ensure_for_request(s, self.s, session_id)
             # free amounts held by invoices that ran out of time without ever being polled
             for stale in s.query(Invoice).filter(Invoice.status == "waiting", Invoice.expires_at < now):
                 stale.status = "expired"

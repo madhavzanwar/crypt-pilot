@@ -77,5 +77,5 @@ def test_additive_migration(tmp_path: Path) -> None:
 def test_cookie_secure_when_samesite_none(settings: Settings) -> None:
     s = Settings(_env_file=None, **{**settings.model_dump(), "cookie_samesite": "none"})
     with TestClient(create_app(s, build_state(s)), base_url="https://testserver") as c:
-        cookie = c.get("/api/health").headers["set-cookie"]
+        cookie = c.get("/api/credits").headers["set-cookie"]
     assert "Secure" in cookie and "SameSite=none" in cookie and "HttpOnly" in cookie

@@ -10,7 +10,7 @@ from app.state import AppState
 router = APIRouter()
 
 
-@router.get("/api/health", response_model=HealthResponse, response_model_exclude_none=True)
+@router.api_route("/api/health", methods=["GET", "HEAD"], response_model=HealthResponse, response_model_exclude_none=True)
 async def health(state: AppState = Depends(get_state)) -> HealthResponse:
     s = state.settings
     resp = HealthResponse(ok=True, voice_provider=configured_voice_provider(s),

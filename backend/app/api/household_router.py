@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.core.auth import resolve_user_id
+from app.api.pay_router import user_lock
 from app.core import store
 from app.ingest.personas import FAMILY_MEMBERS
 from app.api.transactions_router import _row_to_transaction
@@ -26,7 +27,6 @@ from app.schemas import (
     MonthlyMemberSpend,
     AddManagedTransactionRequest,
     MemberLedger,
-    Transaction,
     AcceptInviteRequest,
     CreateHouseholdRequest,
     CreateInviteRequest,
@@ -208,7 +208,7 @@ def create_household(
         raise HTTPException(400, "User is already a member of a household")
 
     household = HouseholdRow(
-        name=req.name.strip() or f"{user_id.capitalize()}'s Household",
+        name=req.name.strip() or f"{user_id[:1].upper()}{user_id[1:]}'s Household",
         owner_user_id=user_id,
     )
     member = HouseholdMemberRow(
@@ -231,6 +231,8 @@ def create_invite(
     household, member = membership
     if member.role not in ["owner", "editor"]:
         raise HTTPException(403, "Viewer role cannot invite new members")
+    if req.role == HouseholdRole.owner and member.role != "owner":
+        raise HTTPException(403, "Only an owner can invite someone as owner")
 
     raw_token = secrets.token_urlsafe(24)
     token_hash = _hash_token(raw_token)
@@ -334,6 +336,9 @@ def remove_member(
     if user_id != member_user_id and member.role != "owner":
         raise HTTPException(403, "Only the household owner can remove other members")
 
+    if member_user_id == household.owner_user_id and user_id != member_user_id:
+        raise HTTPException(403, "The household's original owner cannot be removed by another member")
+
     if member_user_id == household.owner_user_id and user_id == member_user_id:
         # Check if other members exist
         other_members = [
@@ -349,6 +354,11 @@ def remove_member(
 
     if not target_member:
         raise HTTPException(404, "Member not found in household")
+
+    if target_member.role == "owner":
+        owners = [m for m in store.query(HouseholdMemberRow, household_id=household.id) if m.role == "owner"]
+        if len(owners) <= 1:
+            raise HTTPException(400, "Cannot remove the last owner of a household")
 
     if target_member.is_managed:
         store.delete_where(TransactionRow, user_id=member_user_id)
@@ -441,21 +451,22 @@ def add_managed_transaction(
     managed = _managed_member(household.id, member_user_id)
     if not req.merchant.strip() or req.amount == 0:
         raise HTTPException(400, "Description and a non-zero amount are required")
-    account = store.first(AccountRow, user_id=managed.user_id)
-    if not account:
-        account = AccountRow(user_id=managed.user_id, name=f"{managed.display_name}'s Wallet", type="savings", balance=0.0)
-    account.balance += req.amount
-    txn = TransactionRow(
-        user_id=managed.user_id,
-        account_id=account.id,
-        date=req.date or date_cls.today(),
-        amount=req.amount,
-        merchant=req.merchant.strip()[:80],
-        category=req.category.value,
-        description=req.description,
-        review_status="reviewed",
-    )
-    store.put(account, txn)
+    with user_lock(managed.user_id):  # read-modify-write of the wallet balance must not interleave
+        account = store.first(AccountRow, user_id=managed.user_id)
+        if not account:
+            account = AccountRow(user_id=managed.user_id, name=f"{managed.display_name}'s Wallet", type="savings", balance=0.0)
+        account.balance = round(account.balance + req.amount, 2)
+        txn = TransactionRow(
+            user_id=managed.user_id,
+            account_id=account.id,
+            date=req.date or date_cls.today(),
+            amount=req.amount,
+            merchant=req.merchant.strip()[:80],
+            category=req.category.value,
+            description=req.description,
+            review_status="reviewed",
+        )
+        store.put(account, txn)
     return member_ledger(member_user_id, user_id)
 
 
@@ -551,7 +562,7 @@ class SpendTxn(BaseModel):
     amount: float  # positive rupees spent
 
 
-class CategorySpend(BaseModel):
+class SpendCategory(BaseModel):
     category: str
     amount: float
 
@@ -578,7 +589,7 @@ class MemberSpending(BaseModel):
     share_pct: float  # of the household's total spend in the period
     txn_count: int
     monthly_income: float
-    by_category: list[CategorySpend]
+    by_category: list[SpendCategory]
     top_merchants: list[MerchantSpend]
     recent: list[SpendTxn]
     monthly_trend: list[MonthSpend]
@@ -613,19 +624,30 @@ def _member_spending(m: HouseholdMemberRow, days: int, today: date) -> MemberSpe
         by_cat[t.category] += -t.amount
         by_merchant[t.merchant or "Unknown"] += -t.amount
 
-    months = [(today.replace(day=1) - timedelta(days=31 * i)).strftime("%Y-%m") for i in range(5, -1, -1)]
+    months: list[str] = []
+    y, mo_ = today.year, today.month
+    for _ in range(6):
+        months.append(f"{y:04d}-{mo_:02d}")
+        mo_ -= 1
+        if mo_ == 0:
+            y, mo_ = y - 1, 12
+    months.reverse()
     by_month: dict[str, float] = defaultdict(float)
     for t in rows:
         if _is_spend(t):
             by_month[t.date.strftime("%Y-%m")] += -t.amount
 
     income = sum(t.amount for t in rows if t.amount > 0 and t.category == "income" and start < t.date <= today)
-    name = _PERSONA_NAMES.get(m.user_id) or FAMILY_MEMBERS.get(m.user_id, (m.user_id,))[0].replace("demo-", "").capitalize()
+    if m.is_managed:
+        name = m.display_name or "Member"
+    else:
+        name = _PERSONA_NAMES.get(m.user_id) or FAMILY_MEMBERS.get(m.user_id, (m.user_id,))[0].replace("demo-", "").capitalize()
+    relation = m.relationship if m.is_managed else FAMILY_MEMBERS.get(m.user_id, (None, None))[1]
     return MemberSpending(
         user_id=m.user_id,
         display_name=name,
         avatar_letter=name[:1].upper(),
-        relation=FAMILY_MEMBERS.get(m.user_id, (None, None))[1],
+        relation=relation,
         role=m.role,
         total_spend=round(total, 2),
         previous_spend=round(prev_total, 2),
@@ -633,7 +655,7 @@ def _member_spending(m: HouseholdMemberRow, days: int, today: date) -> MemberSpe
         share_pct=0.0,
         txn_count=len(cur),
         monthly_income=round(income * 30 / days, 2),
-        by_category=[CategorySpend(category=c, amount=round(a, 2)) for c, a in sorted(by_cat.items(), key=lambda kv: -kv[1])],
+        by_category=[SpendCategory(category=c, amount=round(a, 2)) for c, a in sorted(by_cat.items(), key=lambda kv: -kv[1])],
         top_merchants=[MerchantSpend(merchant=k, amount=round(a, 2)) for k, a in sorted(by_merchant.items(), key=lambda kv: -kv[1])[:5]],
         recent=[SpendTxn(id=t.id, date=t.date, merchant=t.merchant or "Unknown", category=t.category, amount=round(-t.amount, 2))
                 for t in sorted(cur, key=lambda t: (t.date, t.id), reverse=True)[:12]],

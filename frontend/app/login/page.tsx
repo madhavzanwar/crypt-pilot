@@ -134,15 +134,7 @@ export default function LoginPage() {
           <p className="mt-3 text-ink/70">FinPilot forecasts your cash flow and checks Bitcoin wallets with graph evidence before you pay.</p>
         </div>
         <div className="relative min-h-0 flex-1 overflow-hidden rounded-3xl">
-          <video
-            className="pointer-events-none size-full object-cover"
-            src="/media/moov.mp4"
-            autoPlay
-            loop
-            muted
-            playsInline
-            aria-hidden
-          />
+          <div className="size-full bg-gradient-to-br from-[#e8f0c8] via-[#f3f6e4] to-[#dfe9b8]" aria-hidden />
         </div>
         <p className="relative text-xs text-ink/60">Demo build. Sample data and testnet only.</p>
       </div>

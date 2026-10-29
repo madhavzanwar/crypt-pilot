@@ -194,12 +194,14 @@ export function ProfileQuestionnaire() {
     };
     const unsubscribe = onAuthChange(checkUser);
     if (isDemoMode()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- initial auth/demo state read on mount
       setUserId(getUserId() || "demo-user");
     }
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset form state when the user changes
     setMatches(null);
     if (!userId) {
       setOpen(false);

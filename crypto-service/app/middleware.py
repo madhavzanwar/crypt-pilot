@@ -12,7 +12,12 @@ from starlette.responses import JSONResponse, Response
 
 from app.config import Settings
 from app.logging_setup import log
+from app.ratelimit import client_ip_var, resolve_client_ip
 from app.session import new_session_id, read_session_id, set_session_cookie
+
+
+# Stateless public endpoints: no anonymous session (and no Set-Cookie) is minted for them.
+NO_COOKIE_PATHS = frozenset({"/api/health", "/api/demo-wallets"})
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
@@ -27,6 +32,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         if length and length.isdigit() and int(length) > self.settings.max_request_bytes:
             return JSONResponse(status_code=413, content={"error": "request_too_large"})
 
+        client_ip_var.set(resolve_client_ip(request, self.settings))
         sid = read_session_id(request, self.settings)
         is_new = sid is None
         request.state.sid = sid or new_session_id()
@@ -40,7 +46,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             response = JSONResponse(status_code=500, content={"error": "internal_error"})
         finally:
             structlog.contextvars.unbind_contextvars("request_id")
-        if is_new:
+        if is_new and request.url.path not in NO_COOKIE_PATHS:
             set_session_cookie(response, request.state.sid, self.settings)
         response.headers["x-request-id"] = request_id
         log.info("request", method=request.method, path=request.url.path, status=response.status_code,

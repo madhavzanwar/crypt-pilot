@@ -21,6 +21,14 @@ class SessionRow(Base):
     dodo_customer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
+class FreeGrant(Base):
+    """Count of free starting grants given to new sessions per (hashed client IP, UTC day)."""
+    __tablename__ = "free_grants"
+    ip_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    day: Mapped[str] = mapped_column(String(10), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class CreditLedger(Base):
     __tablename__ = "credit_ledger"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

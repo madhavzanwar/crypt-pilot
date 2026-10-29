@@ -11,7 +11,7 @@ from app.state import AppState
 router = APIRouter()
 
 
-@router.get("/api/demo-wallets", response_model=DemoWalletsResponse)
+@router.api_route("/api/demo-wallets", methods=["GET", "HEAD"], response_model=DemoWalletsResponse)
 async def demo_wallets(state: AppState = Depends(get_state)) -> DemoWalletsResponse:
     """Held-out test-split wallets picked by scripts/export_demo_wallets.py (empty until trained)."""
     path = state.settings.artifacts_dir / "demo_wallets.json"

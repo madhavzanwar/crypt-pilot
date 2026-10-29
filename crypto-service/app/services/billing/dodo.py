@@ -62,7 +62,14 @@ class DodoClient:
 
 def payment_fields(event: dict[str, Any]) -> tuple[str | None, str | None, str | None, str | None]:
     """(payment_id, session_id, pack_id, customer_id) from a payment.succeeded payload."""
-    data = event.get("data") or {}
-    meta = data.get("metadata") or {}
-    customer = data.get("customer") or {}
-    return (data.get("payment_id"), meta.get("session_id"), meta.get("pack_id"), customer.get("customer_id"))
+    def obj(v: Any) -> dict[str, Any]:
+        return v if isinstance(v, dict) else {}
+
+    def text(v: Any) -> str | None:
+        return v if isinstance(v, str) else None
+
+    data = obj(event.get("data"))
+    meta = obj(data.get("metadata"))
+    customer = obj(data.get("customer"))
+    return (text(data.get("payment_id")), text(meta.get("session_id")), text(meta.get("pack_id")),
+            text(customer.get("customer_id")))

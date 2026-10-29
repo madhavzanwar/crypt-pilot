@@ -324,6 +324,8 @@ Start the FastAPI server:
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
+To use the crypto features, also set `CRYPTO_SERVICE_URL=http://127.0.0.1:8132` for this process and run the crypto service with `--port 8132` (see "Run the merged demo"; the code default is 8200).
+
 *API docs will be live at `http://localhost:8000/docs`.*
 
 ### 3. Frontend Setup
@@ -338,9 +340,9 @@ Open **`http://localhost:3000`** in your browser.
 
 ## ☁️ Deploying (Vercel)
 
-One Vercel project, two services (see `vercel.json`): the Next.js **frontend** (`frontend/`) serves every path, and the FastAPI **backend** (`backend/`) serves `/api/*` on the same domain -- so no CORS setup or `NEXT_PUBLIC_API_URL` is needed in production (the frontend calls relative `/api/...` URLs).
+One Vercel project, two builds (see `vercel.json`, which uses `builds`/`routes`): the Next.js **frontend** (`frontend/`) serves every path, and the FastAPI **backend** (`backend/`) serves `/api/*` on the same domain -- so no CORS setup or `NEXT_PUBLIC_API_URL` is needed in production (the frontend calls relative `/api/...` URLs).
 
-1. Import the repo into Vercel; it picks up the services from `vercel.json`.
+1. Import the repo into Vercel; it picks up the builds from `vercel.json`.
 2. Add environment variables (they are shared by both services): the `NEXT_PUBLIC_FIREBASE_*` web config, `FIREBASE_PROJECT_ID`, `FIREBASE_SERVICE_ACCOUNT_JSON` (full service-account JSON), `GEMINI_API_KEY` (optional -- the offline copilot works without it), and `RESEND_API_KEY` / `EMAIL_FROM` / `HR_ALERT_EMAIL` if you want alert emails. `NEXT_PUBLIC_*` values are inlined at build time, so redeploy after changing them.
 3. Firebase console -> Authentication -> Settings -> Authorized domains: add `<your-domain>`.
 

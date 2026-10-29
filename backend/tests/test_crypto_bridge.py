@@ -189,7 +189,60 @@ def test_x_forwarded_for_carries_visitor_ip(monkeypatch):
     assert up.requests[0].headers["x-forwarded-for"] == "testclient"  # spoofed value ignored without CRYPTO_TRUST_PROXY
     monkeypatch.setenv("CRYPTO_TRUST_PROXY", "true")
     c.get("/api/crypto/health", headers={"X-Forwarded-For": "203.0.113.9"})
-    assert up.requests[1].headers["x-forwarded-for"] == "203.0.113.9, testclient"
+    assert up.requests[1].headers["x-forwarded-for"] == "203.0.113.9"
+    c.get("/api/crypto/health", headers={"X-Forwarded-For": "6.6.6.6, 203.0.113.9"})  # spoofed first hop ignored
+    assert up.requests[2].headers["x-forwarded-for"] == "203.0.113.9"
+
+
+def test_rate_limit_keys_on_last_hop_not_spoofed_first(monkeypatch):
+    monkeypatch.setenv("CRYPTO_TRUST_PROXY", "true")
+    c, up = make(monkeypatch)
+    codes = [c.post("/api/crypto/check", json={"address": "x", "lang": "en"},
+                    headers={"X-Forwarded-For": f"9.9.9.{i}, 203.0.113.9"}).status_code for i in range(31)]
+    assert codes[30] == 429
+    r = c.post("/api/crypto/check", json={}, headers={"X-Forwarded-For": "203.0.113.10"})
+    assert r.status_code == 200  # a different real client is unaffected
+
+
+def test_429_has_retry_after(monkeypatch):
+    c, _ = make(monkeypatch)
+    for _ in range(30):
+        c.post("/api/crypto/check", json={})
+    r = c.post("/api/crypto/check", json={})
+    assert r.status_code == 429 and int(r.headers["retry-after"]) >= 1
+
+
+def test_audio_range_and_conditional_headers_round_trip(monkeypatch):
+    def h(req):
+        assert req.headers["range"] == "bytes=0-9" and req.headers["if-none-match"] == '"e1"'
+        return httpx.Response(206, content=b"0123456789", headers={
+            "content-range": "bytes 0-9/200", "accept-ranges": "bytes", "etag": '"e1"', "content-type": "audio/mpeg"})
+    c, _ = make(monkeypatch, h)
+    r = c.get("/api/crypto/audio/" + "a" * 32 + ".mp3", headers={"Range": "bytes=0-9", "If-None-Match": '"e1"'})
+    assert r.status_code == 206 and r.headers["content-range"] == "bytes 0-9/200"
+    assert r.headers["accept-ranges"] == "bytes" and r.headers["etag"] == '"e1"' and r.content == b"0123456789"
+
+
+def test_head_is_allowed_on_get_routes(monkeypatch):
+    c, up = make(monkeypatch)
+    assert c.head("/api/crypto/health").status_code == 200
+    assert up.requests[0].method == "GET"
+    assert c.head("/api/crypto/check").status_code == 404
+
+
+def test_transcribe_timeout_45s_default_and_configurable(monkeypatch):
+    c, up = make(monkeypatch)
+    c.post("/api/crypto/transcribe", content=b"x")
+    monkeypatch.setenv("CRYPTO_TRANSCRIBE_TIMEOUT", "70")
+    c.post("/api/crypto/transcribe", content=b"x")
+    assert [q.extensions["timeout"]["read"] for q in up.requests] == [45.0, 70.0]
+
+
+def test_no_session_cookie_on_health_and_demo_wallets(monkeypatch):
+    c, _ = make(monkeypatch, lambda req: httpx.Response(200, json={}, headers={"set-cookie": "cryptiq_sid=a.b; Path=/"}))
+    assert "set-cookie" not in c.get("/api/crypto/health").headers
+    assert "set-cookie" not in c.get("/api/crypto/demo-wallets").headers
+    assert "set-cookie" in c.get("/api/crypto/credits").headers
 
 
 # ---- webhook --------------------------------------------------------------------------------------------------------

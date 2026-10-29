@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from app.core.ratelimit import RateLimiter
 from app.crypto_bridge import upstream
-from app.crypto_bridge.upstream import CHECK_TIMEOUT, DEFAULT_TIMEOUT, log
+from app.crypto_bridge.upstream import CHECK_TIMEOUT, DEFAULT_TIMEOUT, TRANSCRIBE_TIMEOUT, log
 
 router = APIRouter(prefix="/api/crypto", tags=["crypto"])
 
@@ -38,6 +38,7 @@ class Route:
     method: str
     pattern: re.Pattern[str]
     timeout: float = DEFAULT_TIMEOUT
+    timeout_env: str = ""       # optional env var (seconds) overriding `timeout`
     limited: bool = False       # counts against crypto_check_limiter
     cookies: bool = True        # forward the visitor's session cookie / return Set-Cookie
     webhook: bool = False       # forward the signature headers byte-for-byte
@@ -49,15 +50,15 @@ def _r(method: str, regex: str, **kw: Any) -> Route:
 
 # The ONLY thing that can be proxied. Paths are matched with fullmatch relative to /api/crypto/.
 ALLOWLIST: tuple[Route, ...] = (
-    _r("GET", r"health"),
-    _r("GET", r"demo-wallets"),
+    _r("GET", r"health", cookies=False),
+    _r("GET", r"demo-wallets", cookies=False),
     _r("POST", r"check", timeout=CHECK_TIMEOUT, limited=True),
     _r("POST", r"check/stream", timeout=CHECK_TIMEOUT, limited=True),
     _r("GET", r"credits"),
     _r("POST", r"checkout", limited=True),
     _r("POST", r"crypto-invoice", limited=True),
     _r("GET", rf"crypto-invoice/{_ID}"),
-    _r("POST", r"transcribe", limited=True),
+    _r("POST", r"transcribe", timeout=TRANSCRIBE_TIMEOUT, timeout_env="CRYPTO_TRANSCRIBE_TIMEOUT", limited=True),
     _r("GET", r"audio/[0-9a-f]{32}\.mp3"),
     _r("GET", r"benchmark"),
     _r("GET", rf"benchmark/job/{_ID}"),
@@ -65,10 +66,12 @@ ALLOWLIST: tuple[Route, ...] = (
 )
 
 # Request headers copied to the service (everything else, incl. Authorization and FinPilot cookies, is dropped).
-_FORWARD_REQUEST_HEADERS = ("content-type", "accept", "accept-language", "user-agent", "x-request-id")
+_FORWARD_REQUEST_HEADERS = ("content-type", "accept", "accept-language", "user-agent", "x-request-id",
+                            "range", "if-range", "if-none-match", "if-modified-since")
 _WEBHOOK_HEADERS = ("webhook-id", "webhook-signature", "webhook-timestamp")
 # Response headers copied back to the browser (plus a rewritten Set-Cookie). Anything else stays internal.
-_FORWARD_RESPONSE_HEADERS = ("content-type", "cache-control", "content-disposition", "retry-after", "x-request-id", "etag", "last-modified")
+_FORWARD_RESPONSE_HEADERS = ("content-type", "cache-control", "content-disposition", "retry-after", "x-request-id", "etag", "last-modified",
+                             "accept-ranges", "content-range")
 _HOP_BY_HOP = {
     "connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer",
     "transfer-encoding", "upgrade", "content-length", "content-encoding",
@@ -77,6 +80,13 @@ _HOP_BY_HOP = {
 
 def _err(status: int, code: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": code})
+
+
+def _rate_limited(exc: Exception) -> JSONResponse:
+    m = re.search(r"~(\d+)s", str(getattr(exc, "detail", "")))
+    resp = _err(429, "rate_limited")
+    resp.headers["retry-after"] = m.group(1) if m else "60"
+    return resp
 
 
 def _trust_proxy() -> bool:
@@ -89,19 +99,31 @@ def _peer(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def _trusted_hops() -> int:
+    try:
+        return max(1, int(os.environ.get("CRYPTO_TRUSTED_HOPS", "1")))
+    except ValueError:
+        return 1
+
+
 def _client_ip(request: Request) -> str:
-    """Visitor IP used for rate limiting. X-Forwarded-For is only believed behind a trusted proxy."""
+    """Visitor IP used for rate limiting and forwarded to the service.
+
+    X-Forwarded-For is only believed behind a trusted proxy (CRYPTO_TRUST_PROXY), and then we take the entry the
+    trusted proxy(ies) appended (counted from the RIGHT, CRYPTO_TRUSTED_HOPS, default 1), never the client-supplied
+    first entry, which anyone can spoof.
+    """
     if _trust_proxy():
-        first = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-        if first:
-            return first
+        chain = [p.strip() for p in request.headers.get("x-forwarded-for", "").split(",") if p.strip()]
+        hops = _trusted_hops()
+        if chain:
+            return chain[-hops] if len(chain) >= hops else chain[0]
     return _peer(request)
 
 
 def _forwarded_for(request: Request) -> str:
-    chain = request.headers.get("x-forwarded-for", "").strip() if _trust_proxy() else ""
-    peer = _peer(request)
-    return f"{chain}, {peer}" if chain else peer
+    """Single value, set by the bridge itself: the service must never see a client-supplied chain."""
+    return _client_ip(request)
 
 
 def _is_plain_http(request: Request) -> bool:
@@ -137,7 +159,20 @@ def rewrite_set_cookie(value: str, plain_http: bool) -> str:
     return "; ".join(out)
 
 
+def _route_timeout(route: Route) -> float:
+    if route.timeout_env:
+        try:
+            v = float(os.environ.get(route.timeout_env, ""))
+            if v > 0:
+                return v
+        except ValueError:
+            pass
+    return route.timeout
+
+
 def _match(method: str, path: str) -> Route | None:
+    if method == "HEAD":
+        method = "GET"
     for route in ALLOWLIST:
         if route.method == method and route.pattern.fullmatch(path):
             return route
@@ -180,10 +215,11 @@ async def _proxy(request: Request, path: str) -> Response:
     if route.limited:
         try:
             crypto_check_limiter.check(_client_ip(request))
-        except Exception:  # HTTPException(429) from the shared limiter -> the {"error": ...} shape the frontend parses
-            return _err(429, "rate_limited")
+        except Exception as exc:  # HTTPException(429) from the shared limiter -> the {"error": ...} shape the frontend parses
+            return _rate_limited(exc)
 
     body: bytes | None = None
+    method = "GET" if request.method == "HEAD" else request.method
     if request.method == "POST":
         declared = request.headers.get("content-length", "")
         if declared.isdigit() and int(declared) > MAX_BODY_BYTES:
@@ -210,7 +246,7 @@ async def _proxy(request: Request, path: str) -> Response:
 
     client = upstream.shared_client()
     upstream_req = client.build_request(
-        request.method, f"/api/{path}", headers=headers, content=body, timeout=upstream.timeout_for(route.timeout)
+        method, f"/api/{path}", headers=headers, content=body, timeout=upstream.timeout_for(_route_timeout(route))
     )
     started = time.perf_counter()
     try:
@@ -302,7 +338,7 @@ async def crypto_status() -> JSONResponse:
 
 # ---- everything else: allowlisted proxy ------------------------------------------------------------------------------
 
-@router.api_route("/{path:path}", methods=["GET", "POST"], include_in_schema=False)
+@router.api_route("/{path:path}", methods=["GET", "HEAD", "POST"], include_in_schema=False)
 async def crypto_proxy(path: str, request: Request) -> Response:
     try:
         return await _proxy(request, path)

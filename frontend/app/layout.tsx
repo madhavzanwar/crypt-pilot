@@ -37,16 +37,20 @@ export const viewport: Viewport = {
 };
 
 import { CurrencyProvider } from "@/lib/currency";
+import { ThemeProvider } from "next-themes";
 import { AutoTranslate } from "@/components/AutoTranslate";
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col bg-paper text-ink">
-        <CurrencyProvider>{children}</CurrencyProvider>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+          <CurrencyProvider>{children}</CurrencyProvider>
+        </ThemeProvider>
         <AutoTranslate />
       </body>
     </html>

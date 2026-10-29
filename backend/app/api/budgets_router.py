@@ -208,7 +208,7 @@ def budget_status(user_id: str = Depends(resolve_user_id)) -> list[BudgetStatus]
         total_available = effective_limit - spent
         percent_used = (spent / effective_limit * 100.0) if effective_limit > 0 else (100.0 if spent > 0 else 0.0)
 
-        if percent_used > 100.0:
+        if spent > effective_limit + 1e-9:  # also true for a zero limit with any spend
             health = "over"
         elif percent_used >= _NEAR_THRESHOLD * 100.0:
             health = "near"

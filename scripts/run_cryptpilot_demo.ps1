@@ -153,7 +153,7 @@ function Start-All {
   $py = if (Test-Path $venvPy) { $venvPy } else { 'python' }
   $depsOk = $false
   try { $ErrorActionPreference = 'Continue'; & $py -c 'import fastapi, uvicorn' 2>$null; $depsOk = ($LASTEXITCODE -eq 0) } catch { $depsOk = $false } finally { $ErrorActionPreference = 'Stop' }
-  if (-not $depsOk) { Warn "$py cannot import fastapi/uvicorn. Install the backend first: cd backend; python -m venv .venv; .venv\Scripts\pip install -r requirements.txt" }
+  if (-not $depsOk) { Warn "$py cannot import fastapi/uvicorn. Install the backend first: cd backend; python -m venv .venv; .venv\Scripts\pip install -r requirements-local.txt" }
   $env:CRYPTO_SERVICE_URL = "http://127.0.0.1:$CryptoPort"
   $env:FINPILOT_DEMO_MODE = 'true'
   Start-Bg 'finpilot-api' (Join-Path $Root 'backend') $py @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', "$ApiPort")

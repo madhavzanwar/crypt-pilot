@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 from fastapi.concurrency import run_in_threadpool
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 
 from app.core import store
 from app.core.auth import resolve_user_id
-from app.core.ratelimit import upload_limiter
+from app.core.ratelimit import scoped_key, upload_limiter
 from app.models import DocumentRow
 from app.ocr import read_text
 from app.rag.compress import compact
@@ -21,8 +21,8 @@ _MAX_CHARS = 200_000
 
 
 @router.post("/api/documents/{user_id}")
-async def upload_document(file: UploadFile, user_id: str = Depends(resolve_user_id)) -> dict:
-    upload_limiter.check(user_id)
+async def upload_document(file: UploadFile, request: Request, user_id: str = Depends(resolve_user_id)) -> dict:
+    upload_limiter.check(scoped_key(request, user_id))
     name = file.filename or "document.txt"
     if not name.lower().endswith(_EXTS):
         raise HTTPException(400, f"Only {', '.join(_EXTS)} files are supported")

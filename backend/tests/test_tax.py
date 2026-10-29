@@ -39,35 +39,50 @@ client = TestClient(app)
 
 
 def test_new_regime_zero_tax_under_rebate_threshold():
-    # Income ₹7,50,000 - ₹75,000 std deduction = ₹6,75,000 taxable
-    # Taxable is <= ₹7,00,000 -> full 87A rebate -> ₹0 tax payable
-    calc = compute_new_regime_tax(750_000.0)
+    # FY 2025-26: salaried income up to ₹12,75,000 -> taxable <= ₹12,00,000 -> full 87A rebate
+    calc = compute_new_regime_tax(1_275_000.0)
     assert calc.regime == "new"
     assert calc.total_deductions == 75_000.0
-    assert calc.taxable_income == 675_000.0
-    assert calc.rebate_87a > 0
+    assert calc.taxable_income == 1_200_000.0
+    assert calc.tax_before_rebate == 60_000.0
+    assert calc.rebate_87a == 60_000.0
     assert calc.net_tax_payable == 0.0
     assert calc.effective_tax_rate_pct == 0.0
-    assert calc.monthly_take_home == round(750_000.0 / 12, 2)
+    assert calc.monthly_take_home == round(1_275_000.0 / 12, 2)
+
+
+def test_new_regime_12_lakh_gross_is_tax_free():
+    calc = compute_new_regime_tax(1_200_000.0)
+    assert calc.taxable_income == 1_125_000.0
+    assert calc.net_tax_payable == 0.0
+
+
+def test_new_regime_marginal_relief_just_above_rebate():
+    # Taxable ₹12,05,000: slab tax ₹60,750 but relief caps it at the ₹5,000 above ₹12L (+4% cess)
+    calc = compute_new_regime_tax(1_280_000.0)
+    assert calc.taxable_income == 1_205_000.0
+    assert calc.tax_after_rebate == 5_000.0
+    assert calc.net_tax_payable == 5_200.0
 
 
 def test_new_regime_slabs_above_threshold():
-    # Income ₹12,00,000 -> Std deduction ₹75,000 -> Taxable ₹11,25,000
-    # Slabs:
-    # 0 - 3L: 0
-    # 3L - 7L (4L @ 5%): ₹20,000
-    # 7L - 10L (3L @ 10%): ₹30,000
-    # 10L - 11.25L (1.25L @ 15%): ₹18,750
-    # Total tax before cess: ₹68,750
-    # Cess 4%: ₹2,750
-    # Net tax: ₹71,500
-    calc = compute_new_regime_tax(1_200_000.0)
+    # Income ₹20,00,000 -> Std deduction ₹75,000 -> Taxable ₹19,25,000
+    # 0-4L nil; 4-8L @5% = 20,000; 8-12L @10% = 40,000; 12-16L @15% = 60,000; 16L-19.25L @20% = 65,000
+    # Tax before cess ₹1,85,000; cess 4% ₹7,400; net ₹1,92,400
+    calc = compute_new_regime_tax(2_000_000.0)
     assert calc.total_deductions == 75_000.0
-    assert calc.taxable_income == 1_125_000.0
-    assert calc.tax_before_rebate == 68_750.0
-    assert calc.cess_4pct == 2_750.0
-    assert calc.net_tax_payable == 71_500.0
-    assert calc.effective_tax_rate_pct == round(71_500.0 / 1_200_000.0 * 100, 2)
+    assert calc.taxable_income == 1_925_000.0
+    assert calc.tax_before_rebate == 185_000.0
+    assert calc.cess_4pct == 7_400.0
+    assert calc.net_tax_payable == 192_400.0
+    assert calc.effective_tax_rate_pct == round(192_400.0 / 2_000_000.0 * 100, 2)
+
+
+def test_new_regime_top_slab():
+    # Taxable ₹30L: 20k + 40k + 60k + 80k + 100k + 6L*30%=1.8L -> 4.8L (+ cess)
+    calc = compute_new_regime_tax(3_075_000.0)
+    assert calc.tax_before_rebate == 480_000.0
+    assert calc.net_tax_payable == 499_200.0
 
 
 def test_old_regime_zero_tax_under_rebate_threshold():

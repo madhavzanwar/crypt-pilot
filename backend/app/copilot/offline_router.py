@@ -38,10 +38,29 @@ _MULTIPLIERS = {
 }
 
 
+_BARE_RE = re.compile(r"(?<![\w.])(\d[\d,]*(?:\.\d+)?)\s*(k|lakhs?|l|cr|crore)?(?![\w])", re.IGNORECASE)
+
+
+def _bare_amount(message: str) -> float | None:
+    """A number with no currency marker ("afford a 50000 phone", "afford 50,000"): the first one worth at least 1,000.
+    Bare 4-digit years (1900-2100) and small counts ("6 months") are ignored."""
+    for m in _BARE_RE.finditer(message):
+        raw, suffix = m.group(1), (m.group(2) or "").lower()
+        try:
+            value = float(raw.replace(",", "")) * _MULTIPLIERS.get(suffix, 1)
+        except ValueError:
+            continue
+        if not suffix and "," not in raw and 1900 <= value <= 2100:
+            continue
+        if value >= 1000:
+            return value
+    return None
+
+
 def _extract_amount(message: str) -> float | None:
     match = _AMOUNT_RE.search(message)
     if not match:
-        return None
+        return _bare_amount(message)
     raw = match.group(1) or match.group(3)
     suffix = (match.group(2) or match.group(4) or "").lower()
     if not raw:

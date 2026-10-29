@@ -6,7 +6,7 @@ if not exist "%ROOT%backend\.venv\Scripts\activate.bat" (
   echo Creating backend venv and installing requirements...
   python -m venv "%ROOT%backend\.venv" || goto :fail
   call "%ROOT%backend\.venv\Scripts\activate.bat"
-  pip install -r "%ROOT%backend\requirements.txt" || goto :fail
+  pip install -r "%ROOT%backend\requirements-local.txt" || goto :fail
 )
 if not exist "%ROOT%frontend\node_modules" (
   echo Installing frontend dependencies...

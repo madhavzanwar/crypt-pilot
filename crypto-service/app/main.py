@@ -97,9 +97,9 @@ def create_app(settings: Settings | None = None, state: AppState | None = None) 
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["content-type", "x-request-id"],
-        expose_headers=["x-request-id"],
+        allow_methods=["GET", "HEAD", "POST", "OPTIONS"],
+        allow_headers=["content-type", "x-request-id", "range"],
+        expose_headers=["x-request-id", "retry-after", "content-range", "accept-ranges"],
     )
     for r in (health.router, demo.router, check.router, transcribe.router, audio.router, credits.router,
               crypto.router, webhooks.router, benchmark.router):
