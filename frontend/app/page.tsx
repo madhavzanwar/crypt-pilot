@@ -19,6 +19,7 @@ import { LandingHeader } from "@/components/landing/LandingHeader";
 import { Reveal } from "@/components/landing/Reveal";
 import { ShieldCheck, TrendingUp, Sparkles, CheckCircle2, Network } from "lucide-react";
 import type { ReactNode } from "react";
+import { useServiceStatus, voiceProviderLabel } from "@/lib/useServiceStatus";
 
 const PREVIEW_ANSWER: AnswerContract = {
   query: "Can I afford to increase my SIP by ₹3,000/month?",
@@ -97,6 +98,7 @@ const PERSONAS = [
 ];
 
 export default function Home() {
+  const status = useServiceStatus();
   return (
     <div className="flex flex-1 flex-col overflow-x-clip">
       <LandingHeader />
@@ -267,11 +269,10 @@ export default function Home() {
             <p className="text-center text-xs font-semibold uppercase tracking-wider text-pewter">Built with</p>
             <ul className="mt-5 flex flex-wrap items-center justify-center gap-2.5 text-xs font-medium text-graphite">
               {[
-                "TigerGraph · graph evidence",
+                status?.engine === "tigergraph" ? "TigerGraph · graph evidence" : "Graph evidence",
                 "Dodo Payments · test mode",
                 "Cake Wallet · testnet invoices",
-                "Sarvam · voice",
-                "Wispr Flow · voice",
+                voiceProviderLabel(status) === "voice" ? "Voice input" : `${voiceProviderLabel(status)} · voice`,
                 "EAS on Base Sepolia · attestations",
               ].map((item) => (
                 <li key={item} className="rounded-full border border-black/[0.06] bg-white/70 px-3.5 py-1.5 backdrop-blur">
