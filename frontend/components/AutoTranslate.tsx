@@ -5,9 +5,24 @@ import { api } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 
 const ATTRS = ["placeholder", "aria-label", "title"] as const;
-const SKIP = "script,style,code,pre,textarea,input,select,option,svg,[data-no-translate],[contenteditable='true']";
-const SKIP_DIGITS = "script,style,code,pre,textarea,input,select,option,[data-no-translate],[contenteditable='true']"; // svg chart labels get Indic digits too
-const toDev = (v: string) => v.replace(/[0-9]/g, (d) => String.fromCharCode(0x966 + +d)); // Hindi and Marathi share the Devanagari numerals
+const SKIP = "script,style,code,pre,textarea,input,select,option,svg,[data-no-translate],[translate=no],[contenteditable='true']";
+const SKIP_DIGITS = "script,style,code,pre,textarea,input,select,option,[data-no-translate],[translate=no],[contenteditable='true']"; // svg chart labels get Indic digits too
+/**
+ * Identifier-like tokens whose characters must never change (BUG-003): 0x hex, UUIDs, bc1/tb1/base58-style addresses,
+ * long mixed letter+digit runs (PAN, hashes), long hex runs and truncated forms such as "0x2e58…a1b2".
+ */
+export const PROTECTED_TOKEN =
+  /\b[A-Za-z0-9]{3,}(?:…|\.\.\.)[A-Za-z0-9]{3,}\b|0[xX][0-9a-fA-F]+|\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b|\b(?:bc1|tb1)[a-zA-HJ-NP-Z0-9]+|\b(?=[A-Za-z0-9]*\d)(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]{8,}\b|\b[0-9a-fA-F]{16,}\b/g;
+const DEV_DIGITS = (v: string) => v.replace(/[0-9]/g, (d) => String.fromCharCode(0x966 + +d)); // Hindi and Marathi share the Devanagari numerals
+/** Convert digits to Devanagari except inside protected identifier tokens. */
+export const toDev = (v: string) => {
+  let out = "", last = 0;
+  for (const m of v.matchAll(PROTECTED_TOKEN)) {
+    out += DEV_DIGITS(v.slice(last, m.index)) + m[0];
+    last = m.index! + m[0].length;
+  }
+  return out + DEV_DIGITS(v.slice(last));
+};
 const toAscii = (v: string) => v.replace(/[०-९]/g, (d) => String(d.charCodeAt(0) - 0x966));
 const NEEDS_TRANSLATION = /[A-Za-z]{2}/;
 
@@ -50,8 +65,9 @@ export function AutoTranslate() {
       const ascii = toAscii(raw);
       const en = ascii.trim();
       if (!en) return;
+      if (/^[^\s]+$/.test(en) && new RegExp(`^(?:${PROTECTED_TOKEN.source})$`).test(en)) return; // a bare hash/address: leave untouched
       const el = s.attr ? (s.el as Element) : (s.el as Text).parentElement;
-      const wantsWords = NEEDS_TRANSLATION.test(en) && !el?.closest(SKIP);
+      const wantsWords = NEEDS_TRANSLATION.test(en) && !el?.closest(SKIP) && en.replace(PROTECTED_TOKEN, "").trim().length > 0;
       const hit = wantsWords ? cache[en] : undefined;
       if (hit) {
         const lead = ascii.slice(0, ascii.indexOf(en)), trail = ascii.slice(ascii.indexOf(en) + en.length);
