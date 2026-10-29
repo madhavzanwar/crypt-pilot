@@ -852,6 +852,8 @@ export interface SecurityReport {
   verdict_source: string | null;
   verdict_error: string | null;
   demo_threats_present: boolean;
+  /** Present only when wallets were sent: how many came back unverified. */
+  wallets_screened?: string[]; wallets_unverified?: number;
 }
 export type SecurityEvent =
   | ({ type: "agent"; agent: string; status: "running" | "done" } & Partial<AgentSummary>)
@@ -881,6 +883,8 @@ export type CouncilVote = { agent: string; name: string; score: number; level: s
 export type CouncilVerdict = {
   type: "verdict"; cached: boolean; score: number; level: string; counts: Record<string, number>; votes: CouncilVote[];
   dissent: { agent: string; name: string; level: string; why: string }[]; actions: string[]; anchor: number; tokens: number; debated: boolean;
+  /** Set when screened wallets came back unverified (backend council.py). */
+  unverified?: number; caveat?: string;
 };
 export type CouncilEvent =
   | { type: "facts"; facts: Record<string, unknown>; approx_tokens: number }

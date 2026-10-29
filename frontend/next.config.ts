@@ -2,7 +2,12 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-// Content-Security-Policy. Next injects inline bootstrap scripts, so without per-request nonces
+// Content-Security-Policy (REPORT-ONLY, deliberately). This policy with 'unsafe-inline' was never
+// exercised against wallet connect, Plaid Link, the Dodo checkout redirect or Google sign-in, and
+// breaking those is worse than not enforcing. Before switching the header key back to
+// "Content-Security-Policy", run each of those flows in a production build with the browser console
+// open, fix every reported violation, then enforce. Other security headers below stay enforced.
+// Next injects inline bootstrap scripts, so without per-request nonces
 // script-src needs 'unsafe-inline' (dev also needs 'unsafe-eval' for React refresh). Everything
 // else is locked down: no plugins, no foreign framing, same-origin base/forms (plus https form
 // targets for hosted checkout). img/connect/frame stay https-wide because merchant favicons,
@@ -24,7 +29,7 @@ const csp = [
 ].join("; ");
 
 const securityHeaders = [
-  { key: "Content-Security-Policy", value: csp },
+  { key: "Content-Security-Policy-Report-Only", value: csp },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

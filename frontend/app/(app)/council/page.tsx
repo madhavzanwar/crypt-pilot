@@ -9,7 +9,7 @@ import type { CouncilEvent, CouncilVerdict, CouncilVote } from "@/lib/types";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import WalletsInput from "@/components/crypto/council/WalletsInput";
-import { AddWalletInvite, GraphEvidence, WalletList, firstScreened } from "@/components/crypto/council/ChainParts";
+import { AddWalletInvite, GraphEvidence, UnverifiedCaveat, WalletList, firstScreened } from "@/components/crypto/council/ChainParts";
 import { postNdjson } from "@/components/crypto/council/stream";
 import { useWalletList } from "@/components/crypto/council/useWallets";
 import { isChainVote, type ChainVote } from "@/components/crypto/council/types";
@@ -97,6 +97,7 @@ export default function CouncilPage() {
                 {verdict.cached ? " · cached" : verdict.tokens ? ` · ${verdict.tokens} tokens` : " · rule-based, no model used"}
               </span>
             </div>
+            <UnverifiedCaveat count={verdict.unverified} caveat={verdict.caveat} />
             {verdict.actions.length > 0 && (
               <ul className="list-disc pl-5 text-sm text-ink">
                 {verdict.actions.map((a) => <li key={a}>{a}</li>)}

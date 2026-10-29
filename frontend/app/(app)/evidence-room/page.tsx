@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/shadcn/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
 import WalletsInput from "@/components/crypto/council/WalletsInput";
-import { AddWalletInvite, ChainChips, GraphEvidence } from "@/components/crypto/council/ChainParts";
+import { AddWalletInvite, ChainChips, GraphEvidence, UnverifiedCaveat } from "@/components/crypto/council/ChainParts";
 import { postNdjson } from "@/components/crypto/council/stream";
 import { useWalletList } from "@/components/crypto/council/useWallets";
 import { CHAIN_AGENT, toWallet, type ChainFinding } from "@/components/crypto/council/types";
@@ -383,6 +383,7 @@ export default function EvidenceRoomPage() {
           <motion.div key="result" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} className="grid gap-5">
             <Card>
               <CardContent className="grid gap-3">
+                <UnverifiedCaveat count={report.wallets_unverified} />
                 {report.verdict ? (
                   <>
                     <p className="font-display text-lg font-semibold text-ink">{report.verdict.headline}</p>
@@ -403,7 +404,7 @@ export default function EvidenceRoomPage() {
                     <p className="flex items-center gap-2 font-display text-lg font-semibold text-ink">
                       <AlertTriangle className="size-5 text-amber-500" /> {report.findings.length} problem(s) found
                     </p>
-                    <p className="text-sm text-graphite">The AI explanation is not available right now. {report.verdict_error}</p>
+                    <p className="text-sm text-graphite">The AI explanation is not available right now.{report.verdict_error ? ` ${report.verdict_error.replace(/\.+\s*$/, "")}.` : ""}</p>
                   </>
                 )}
               </CardContent>
