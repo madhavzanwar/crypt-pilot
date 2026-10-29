@@ -151,3 +151,121 @@ def test_bug013_image_defaults_to_prod_and_prod_refuses_placeholder_secrets() ->
     placeholder = Settings(_env_file=None, app_env="prod", cors_origins="https://x.test")  # type: ignore[call-arg]
     with pytest.raises(RuntimeError, match="SESSION_SECRET"):
         check_production_settings(placeholder)
+
+
+# ------------------------------------------------------------------------------------------------ pipeline fixtures
+
+from tests.test_api_check import demo, make_client  # noqa: E402,F401  (pytest fixtures)
+
+
+def _chk(c: TestClient, addr: str, lang: str = "en") -> Any:
+    return c.post("/api/check", json={"address": addr, "lang": lang})
+
+
+# ------------------------------------------------------------------------------------------------ BUG-006 (server half)
+
+
+def test_bug006_language_switch_is_not_a_second_paid_check(make_client: Any, demo: dict[str, str]) -> None:
+    c = make_client(starting_credits=3)
+    a = _chk(c, demo["BLOCK"], "en").json()
+    assert a["creditsRemaining"] == 2 and a["cached"] is False
+    b = _chk(c, demo["BLOCK"], "hi").json()
+    assert b["creditsRemaining"] == 2, "switching the UI language must not spend another credit"
+    assert b["verdict"] == a["verdict"] and b["explanation"] == a["explanation"]
+    # the Hindi result is cached too; both languages are now free
+    assert _chk(c, demo["BLOCK"], "hi").json()["cached"] is True
+    assert _chk(c, demo["BLOCK"], "en").json()["cached"] is True
+    assert c.get("/api/credits").json()["balance"] == 2
+
+
+def test_bug006_run1_double_effect_charges_once(tmp_path: Any, trained: Any, demo: dict[str, str]) -> None:
+    """`?address=..&run=1` auto-run fires twice (StrictMode / lang change): concurrent requests charge once."""
+    import asyncio
+
+    import httpx
+
+    from app.main import build_state, create_app
+    from tests.test_api_check import make_settings
+
+    s = make_settings(tmp_path, trained, starting_credits=3)
+    app = create_app(s, build_state(s))
+
+    async def run() -> tuple[list[int], int]:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+            await c.get("/api/credits")
+            rs = await asyncio.gather(*[c.post("/api/check", json={"address": demo["BLOCK"], "lang": lang})
+                                        for lang in ("en", "hi", "en", "hi")])
+            bal = (await c.get("/api/credits")).json()["balance"]
+            return sorted(r.status_code for r in rs), bal
+
+    codes, bal = asyncio.run(run())
+    assert codes == [200] * 4 and bal == 2
+
+
+# ------------------------------------------------------------------------------------------------ BUG-048
+
+
+def test_bug048_replay_fallback_is_cached_and_charged_once(make_client: Any, demo: dict[str, str],
+                                                           trained: Any, tmp_path: Any) -> None:
+    from app.services.graph.base import GraphEngineError
+    from app.services.graph.replay import ReplayStore
+
+    c = make_client(artifacts_dir=trained[1], starting_credits=3)
+    p = c.app.state.cryptiq.pipeline
+    real = _chk(c, demo["BLOCK"]).json()
+    store = ReplayStore(tmp_path / "replay")
+    store.put(demo["BLOCK"], "en", "2026-10-28T00:00:00+00:00", {k: v for k, v in real.items() if k != "creditsRemaining"})
+    p.replay = store
+    p.cache = type(p.cache)(600)
+
+    def boom(*_: Any) -> None:
+        raise GraphEngineError("down")
+
+    p.engine.khop_exposure = boom
+    first = _chk(c, demo["BLOCK"]).json()
+    assert first["engine"] == "replay" and first["creditsRemaining"] == 1
+    for _ in range(2):
+        again = _chk(c, demo["BLOCK"]).json()
+        assert again["cached"] is True and again["creditsRemaining"] == 1
+    assert c.get("/api/credits").json()["balance"] == 1
+
+
+# ------------------------------------------------------------------------------------------------ BUG-087
+
+
+def test_bug087_zero_credits_still_serves_cached_and_unknown(make_client: Any, demo: dict[str, str]) -> None:
+    c = make_client(starting_credits=1)
+    assert _chk(c, demo["BLOCK"]).status_code == 200  # spends the only credit
+    assert _chk(c, demo["WARN"]).status_code == 402   # an uncached, chargeable wallet still needs a credit
+    cached = _chk(c, demo["BLOCK"])
+    assert cached.status_code == 200 and cached.json()["cached"] is True and cached.json()["creditsRemaining"] == 0
+    other_lang = _chk(c, demo["BLOCK"], "hi")
+    assert other_lang.status_code == 200 and other_lang.json()["creditsRemaining"] == 0
+    unknown = _chk(c, demo["UNKNOWN"])
+    assert unknown.status_code == 200 and unknown.json()["status"] == "not_in_dataset"
+    stream = c.post("/api/check/stream", json={"address": demo["WARN"], "lang": "en"})
+    assert stream.status_code == 402
+
+
+# ------------------------------------------------------------------------------------------------ BUG-089
+
+
+def test_bug089_lost_credit_race_is_not_cached(make_client: Any, demo: dict[str, str]) -> None:
+    from app.services.billing import ledger
+
+    c = make_client(starting_credits=1)
+    p = c.app.state.cryptiq.pipeline
+    real_try_charge = ledger.try_charge
+
+    def lose(*_a: Any, **_k: Any) -> None:  # another request spent the last credit while this one ran
+        return None
+
+    ledger.try_charge = lose  # type: ignore[assignment]
+    try:
+        r = _chk(c, demo["BLOCK"])
+    finally:
+        ledger.try_charge = real_try_charge  # type: ignore[assignment]
+    assert r.status_code == 402
+    assert p.cache.get(demo["BLOCK"]) is None, "the loser's result must not be served to others for free"
+    ok = _chk(c, demo["BLOCK"])
+    assert ok.status_code == 200 and ok.json()["cached"] is False and ok.json()["creditsRemaining"] == 0
