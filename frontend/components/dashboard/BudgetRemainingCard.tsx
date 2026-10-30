@@ -7,24 +7,21 @@ import { api } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
 import { CATEGORY_META, type SpendSummary } from "@/lib/spend";
 import { formatCurrency } from "@/components/ui/money";
+import { budgetTotals } from "./budgetMath";
 import { cn } from "@/lib/utils";
 
 const BAR_TONES = ["bg-[#3f7d5c] text-white", "bg-lime text-ink", "bg-[#4fe0b0] text-ink"];
 
 /** "Remaining monthly": share of the monthly budgets still unspent, with the three biggest budgets as bars. */
-export function BudgetRemainingCard({ userId, spend }: { userId: string; spend: SpendSummary }) {
+export function BudgetRemainingCard({ userId }: { userId: string; spend?: SpendSummary }) {
   const { t } = useT();
-  const { data: budgets } = useAsync(() => api.budgets(userId), [userId]);
-  const rows = (budgets ?? [])
-    .map((b) => {
-      const used = spend.categories.find((c) => c.category === b.category)?.total ?? 0;
-      return { b, used, pct: b.monthly_limit > 0 ? used / b.monthly_limit : 0 };
-    })
-    .sort((a, b) => b.b.monthly_limit - a.b.monthly_limit)
-    .slice(0, 3);
-  const limit = rows.reduce((s, r) => s + r.b.monthly_limit, 0);
-  const used = rows.reduce((s, r) => s + r.used, 0);
-  const remaining = limit > 0 ? Math.max(0, Math.round((1 - used / limit) * 100)) : null;
+  const { data: statuses } = useAsync(() => api.budgetStatus(userId), [userId]);
+  const all = statuses ?? [];
+  const rows = [...all]
+    .sort((a, b) => b.monthly_limit - a.monthly_limit)
+    .slice(0, 3)
+    .map((b) => ({ b, used: b.spent_so_far, pct: b.percent_used / 100 }));
+  const { remainingPct: remaining } = budgetTotals(all);
   const message =
     remaining === null
       ? t("b.empty")
@@ -53,7 +50,7 @@ export function BudgetRemainingCard({ userId, spend }: { userId: string; spend: 
         <div className="mt-auto grid min-w-0 grid-cols-3 items-end gap-2">
           {rows.map((r, i) => (
             <div
-              key={r.b.id}
+              key={r.b.category}
               className={cn("flex min-w-0 flex-col justify-between overflow-hidden rounded-2xl p-2.5 2xl:p-3", BAR_TONES[i])}
               style={{ height: `${Math.max(96, Math.min(180, 60 + r.pct * 110))}px` }}
               title={`${formatCurrency(r.used)} of ${formatCurrency(r.b.monthly_limit)}`}

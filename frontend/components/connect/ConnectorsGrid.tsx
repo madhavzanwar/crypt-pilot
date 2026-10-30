@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/shadcn/skeleton";
 import { LinkSheetDialog } from "@/components/connect/LinkSheetDialog";
 import { AddCardDialog } from "@/components/connect/AddCardDialog";
 import { WalletCardsIcon } from "@animateicons/react/lucide";
+import { useT } from "@/components/i18nMoney";
 import { LoopIcon } from "@/components/ui/LoopIcon";
 import { openCreditsDrawer } from "@/components/crypto/credits/openCredits";
 
@@ -40,7 +41,15 @@ const RAILS: Connector[] = [
   { id: "cake_wallet", name: "Cake Wallet", description: "Bitcoin testnet / Monero demo invoices that open as a bitcoin: or monero: link. No real money.", available: true, connected: true, detail: "Testnet", connected_at: null },
 ];
 
+const CATALOG_KEYS: Record<string, [string, string]> = {
+  bank: ["mc.bank", "mc.bank_d"],
+  google_sheets: ["mc.sheets", "mc.sheets_d"],
+  invoices: ["mc.invoices", "mc.invoices_d"],
+  investments: ["mc.invest", "mc.invest_d"],
+};
+
 function RailCard({ c }: { c: Connector }) {
+  const { t } = useT();
   const meta = ICONS[c.id];
   return (
     <Card className="relative gap-4 overflow-hidden py-5">
@@ -50,36 +59,46 @@ function RailCard({ c }: { c: Connector }) {
           <div className="flex h-12 min-w-12 items-center justify-center rounded-2xl bg-fog px-3">
             {meta && <meta.icon className={`size-6 ${meta.tone.split(" ")[1]}`} />}
           </div>
-          <Badge className="bg-leaf/15 text-leaf hover:bg-leaf/15">Available</Badge>
+          <Badge className="bg-leaf/15 text-leaf hover:bg-leaf/15">{t("mc.available")}</Badge>
         </div>
         <div>
-          <p className="text-xs font-medium tracking-wide text-pewter uppercase">Payment rail</p>
+          <p className="text-xs font-medium tracking-wide text-pewter uppercase">{t("mc.rail")}</p>
           <h3 className="font-display text-lg font-semibold text-ink">{c.name}</h3>
           <p className="text-sm text-graphite">{c.description}</p>
           <p className="mt-1 text-xs text-pewter">{c.detail} · always available</p>
         </div>
         <Button onClick={openCreditsDrawer} className="rounded-full bg-lime text-ink hover:bg-lime/85">
-          <Link2 /> Open credits
+          <Link2 /> {t("mc.open_credits")}
         </Button>
       </CardContent>
     </Card>
   );
 }
 
+/** Optional fields the backend may add to a connector or a connect response (code defensively: older backends omit them). */
+type HonestInfo = { has_data?: boolean; message?: string | null };
+
 function ConnectorCard({
   c,
+  note,
   checking,
   onLink,
   onUnlink,
   onExport,
 }: {
   c: Connector;
+  /** Backend message from the last connect, shown when the link brought no data. */
+  note?: string;
   checking: boolean;
   onLink: () => void;
   onUnlink: () => void;
   onExport: () => void;
 }) {
+  const { t } = useT();
   const meta = ICONS[c.id];
+  const keys = CATALOG_KEYS[c.id];
+  const noData = c.connected && ((c as Connector & HonestInfo).has_data === false || Boolean(note));
+  const honest = (c as Connector & HonestInfo).message || note;
   return (
     <Card className="relative gap-4 overflow-hidden py-5">
       {c.connected && <div className="absolute inset-x-0 top-0 h-1 bg-lime" />}
@@ -91,16 +110,19 @@ function ConnectorCard({
           {checking ? (
             <Skeleton className="h-5 w-16 rounded-full" />
           ) : c.connected ? (
-            <Badge className="bg-leaf/15 text-leaf hover:bg-leaf/15">Connected</Badge>
+            <Badge className={noData ? "bg-amber-100 text-amber-800 hover:bg-amber-100" : "bg-leaf/15 text-leaf hover:bg-leaf/15"}>
+              {noData ? t("mc.connected_nodata") : t("mc.connected")}
+            </Badge>
           ) : c.available ? (
-            <Badge variant="outline">Ready</Badge>
+            <Badge variant="outline">{t("mc.ready")}</Badge>
           ) : (
-            <Badge variant="secondary">Coming soon</Badge>
+            <Badge variant="secondary">{t("mc.soon")}</Badge>
           )}
         </div>
         <div>
-          <h3 className="font-display text-lg font-semibold text-ink">{c.name}</h3>
-          <p className="text-sm text-graphite">{c.description}</p>
+          <h3 className="font-display text-lg font-semibold text-ink">{keys ? t(keys[0]) : c.name}</h3>
+          <p className="text-sm text-graphite">{keys ? t(keys[1]) : c.description}</p>
+          {noData && <p className="mt-1 text-xs text-amber-800">{honest || t("mc.nodata_msg")}</p>}
           {c.connected && c.connected_at && (
             <p className="mt-1 text-xs text-pewter">
               {c.detail ? `${c.detail} · ` : ""}linked {formatDate(c.connected_at)}
@@ -110,10 +132,10 @@ function ConnectorCard({
         {c.connected ? (
           <div className="flex gap-2">
             <Button variant="outline" className="flex-1 rounded-full" onClick={onExport}>
-              <Download /> Export
+              <Download /> {t("mc.export")}
             </Button>
             <Button variant="outline" className="flex-1 rounded-full" onClick={onUnlink}>
-              <Unlink /> Disconnect
+              <Unlink /> {t("mc.disconnect")}
             </Button>
           </div>
         ) : (
@@ -122,7 +144,7 @@ function ConnectorCard({
             onClick={onLink}
             className="rounded-full bg-lime text-ink hover:bg-lime/85 disabled:bg-fog disabled:text-pewter"
           >
-            <Link2 /> {c.available ? "Connect" : "Coming soon"}
+            <Link2 /> {c.available ? t("mc.connect") : t("mc.soon")}
           </Button>
         )}
       </CardContent>
@@ -132,8 +154,10 @@ function ConnectorCard({
 
 export function ConnectorsGrid() {
   const { data, loading, error, userId } = useConnectors();
+  const { t } = useT();
   const [cardDialog, setCardDialog] = useState(false);
   const [sheetDialog, setSheetDialog] = useState(false);
+  const [notes, setNotes] = useState<Record<string, string>>({});
 
   async function unlink(c: Connector) {
     try {
@@ -147,8 +171,15 @@ export function ConnectorsGrid() {
   async function link(c: Connector) {
     if (c.id === "google_sheets") return setSheetDialog(true);
     try {
-      await api.connectConnector(userId, c.id, "priya");
-      toast(`${c.name} connected.`);
+      const res: HonestInfo & { transactions?: number } = await api.connectConnector(userId, c.id, "priya");
+      const empty = res.has_data === false || (res.has_data === undefined && res.transactions === 0);
+      if (empty) {
+        const msg = res.message || "Linked, but no transactions have arrived yet.";
+        setNotes((n) => ({ ...n, [c.id]: msg }));
+        toast(`${c.name} connected, no transactions yet. ${msg}`);
+      } else {
+        toast(res.message || `${c.name} connected.`);
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not connect");
     }
@@ -170,7 +201,7 @@ export function ConnectorsGrid() {
       {error && <p className="mb-3 text-sm text-rose-badge">Could not check which sources are linked: {error}</p>}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {items.map((c) => (
-          <ConnectorCard key={c.id} c={c} checking={checking} onLink={() => link(c)} onUnlink={() => unlink(c)} onExport={() => exportData(c)} />
+          <ConnectorCard key={c.id} c={c} note={notes[c.id]} checking={checking} onLink={() => link(c)} onUnlink={() => unlink(c)} onExport={() => exportData(c)} />
         ))}
         {RAILS.map((c) => (
           <RailCard key={c.id} c={c} />
@@ -183,8 +214,8 @@ export function ConnectorsGrid() {
           <span className="flex size-14 items-center justify-center rounded-full bg-lime">
             <LoopIcon icon={WalletCardsIcon} size={28} />
           </span>
-          <span className="font-display text-lg font-semibold">Add a card</span>
-          <span className="text-xs text-graphite">Credit or debit, demo only</span>
+          <span className="font-display text-lg font-semibold">{t("mc.add_card")}</span>
+          <span className="text-xs text-graphite">{t("mc.add_card_sub")}</span>
         </button>
       </div>
       <AddCardDialog open={cardDialog} onOpenChange={setCardDialog} />
