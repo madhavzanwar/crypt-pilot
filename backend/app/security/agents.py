@@ -265,7 +265,8 @@ def write_verdict(findings: list[dict], score: int, run: str | None = None) -> t
             return _Verdict.model_validate(data).model_dump(), model, None
         except Exception as exc:  # noqa: BLE001
             errors.append(f"AI: {'busy' if '429' in str(exc) or '529' in str(exc) else 'unavailable'}")
-    return None, None, "; ".join(errors) + ". The findings above are real; only the written explanation is missing."
+    lead = "; ".join(errors) + ". " if errors else ""  # no AI key = no errors: do not start the sentence with a bare "."
+    return None, None, lead + "The findings above are real; only the written explanation is missing."
 
 
 def verdict_for(findings: list[dict], score: int, run: str | None = None, unverified: int = 0) -> tuple[dict | None, str | None, str | None]:
@@ -326,7 +327,7 @@ def investigate(user_id: str, pace: float = 0.35, wallets: list[str] | None = No
         elif key == "risk_scorer":
             cross_check(all_findings)
             score, extra = ai_agents.calibrate(risk_score(scored(all_findings)), scored(all_findings), run)
-            res, extra = [], {**extra, "score": score}
+            res, extra = [], {**extra, "score": score, "level": risk_level(score)}
         elif key == chain_analyst.AGENT_ID:
             res, extra = chain_analyst.evidence_step(wallets, lang)
             all_findings += res

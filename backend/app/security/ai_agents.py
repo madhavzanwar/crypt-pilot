@@ -128,11 +128,16 @@ def _safety(model: str, text: str, run: str | None) -> bool:
     return False
 
 
+def _rules_only(extra: dict) -> dict:
+    """A rule-based run names no model: showing one would claim an AI looked at it."""
+    return {**{k: v for k, v in extra.items() if k != "model"}, "mode": "rules"}
+
+
 def review(agent: str, findings: list[dict], rows, board: list[dict] = (), run: str | None = None) -> tuple[list[dict], dict]:
     """(findings with an `ai` note, summary fields). Never raises: any failure keeps the rule result."""
     extra = {"model": MODELS[agent], "ai": "off"}
     if not _key()[0]:
-        return findings, extra
+        return findings, _rules_only(extra)
     try:
         if agent == "merchant_verifier":
             return _merchant_safety(findings, rows, run, extra)
@@ -196,7 +201,7 @@ def web_evidence(findings: list[dict], run: str | None = None) -> tuple[list[dic
     from app.api.web_router import _call
     extra = {"model": MODELS["web_checker"], "ai": "off"}
     if not get_settings().tavily_api_key:
-        return findings, extra
+        return findings, _rules_only(extra)
     merchants = list(dict.fromkeys(f["merchant"] for f in sorted(findings, key=lambda f: (f["severity"] != "high", not f.get("corroborated_by"))) if f["merchant"] and f["severity"] != "low"))[:3]
     extra["ai"] = "ok"
 
@@ -234,7 +239,7 @@ def calibrate(base: int, findings: list[dict], run: str | None = None) -> tuple[
     """Risk Scorer's AI job: nudge the rule score by at most +-10 from corroboration, AI doubts and web verdicts."""
     extra = {"model": MODELS["risk_scorer"], "ai": "off", "base": base}
     if not findings or not _key()[0]:
-        return base, extra
+        return base, _rules_only(extra)
     sev = Counter(f["severity"] for f in findings)
     payload = {"base": base, "h": sev["high"], "m": sev["medium"], "l": sev["low"], "corr": sum(bool(f.get("corroborated_by")) for f in findings),
                "doubt": sum(f.get("ai", {}).get("verdict") == "doubt" for f in findings),

@@ -243,6 +243,9 @@ async def convene(user_id: str, wallets: list[str] | None = None, lang: str = "e
                            "unverified": unverified}
         if unverified:  # UNKNOWN / unscreened is not safe: say so in the verdict itself, never leave a bare "low"
             result["caveat"] = chain_analyst.unverified_caveat(unverified)
+            if not (chain_vote and not chain_vote.get("abstain")):
+                # nothing about the wallets was actually checked: the headline must not read as a plain "Low Risk"
+                result["level_label"] = f"{result['level'].title()} risk (wallets unchecked)"
             if chain_analyst.UNVERIFIED_ACTION.lower() not in (a.lower() for a in result["actions"]):
                 result["actions"] = [*result["actions"][:2], chain_analyst.UNVERIFIED_ACTION]
     if rejected:

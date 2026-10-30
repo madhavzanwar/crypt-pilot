@@ -9,7 +9,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from typing import Annotated
 
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, field_validator
+
+from app.core.validate import check_amount
 
 from app.api.connectors_router import CATALOG, DATASET_FILES, _dataset
 from app.api.jobs_router import enqueue_evidence
@@ -137,9 +139,24 @@ def graph(request: Request, months: int = 6, user_id: str = Depends(resolve_user
 
 
 class FraudSim(BaseModel):
-    merchant: str
-    amount: float
-    wallet: str | None = None  # optional: a crypto wallet the payment would go to, screened by the Chain Analyst
+    merchant: str = Field(max_length=200)
+    amount: float = Field(allow_inf_nan=False)
+    wallet: str | None = Field(default=None, max_length=300)  # optional: a crypto wallet the payment would go to, screened by the Chain Analyst
+
+    @field_validator("merchant")
+    @classmethod
+    def _merchant_required(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Enter the merchant or shop name to simulate a payment to")
+        return v
+
+    @field_validator("amount")
+    @classmethod
+    def _amount_positive(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("Enter an amount above zero: the simulated payment is money going out")
+        return check_amount(v)
 
 
 @router.post("/{user_id}/simulate-fraud")
@@ -148,8 +165,8 @@ def simulate_fraud(body: FraudSim, user_id: str = Depends(resolve_user_id)) -> d
     rows, accounts = agents.security_rows(user_id), store.query(AccountRow, user_id=user_id)
     if not accounts:
         raise HTTPException(409, "Connect a data source first")
-    sim = [TransactionRow(id="sim", user_id=user_id, account_id=accounts[0].id, date=date.today(), amount=-abs(body.amount),
-                          merchant=body.merchant.strip() or "Unknown", category="shopping")]
+    sim = [TransactionRow(id="sim", user_id=user_id, account_id=accounts[0].id, date=date.today(), amount=-body.amount,
+                          merchant=body.merchant, category="shopping")]
     before = {f["title"] for fs in agents.run_checks(rows, accounts).values() for f in fs}
     caught = [f for fs in agents.run_checks(rows + sim, accounts).values() for f in fs if "sim" in f["txn_ids"] or f["title"] not in before]
     out: dict = {}
@@ -162,7 +179,9 @@ def simulate_fraud(body: FraudSim, user_id: str = Depends(resolve_user_id)) -> d
         if finding and not finding["info"]:
             caught.append(finding)
         out["wallet"] = {**result, "finding": finding}
-    return {"caught": bool(caught), "findings": caught, **out}
+    unverified = bool(out.get("wallet")) and out["wallet"].get("status") != "ok"  # UNKNOWN / not screened is never "looks normal"
+    outcome = "caught" if caught else ("unverified" if unverified else "not_flagged")
+    return {"caught": bool(caught), "outcome": outcome, "findings": caught, **out}
 
 
 def _preview(connector: str, rows: list[TransactionRow]) -> tuple[int, list]:
