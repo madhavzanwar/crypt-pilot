@@ -60,3 +60,83 @@ test("BUG-103: every address in a message is found (cap 3, the rest counted)", a
   const typo = scanAddresses(`${OLD.slice(0, -1)}b`);
   assert.deepEqual(typo.scans.map((s) => s.checksumValid), [false]);
 });
+
+const { findSplitSecret, cleanHistory, REDACTED } = await import("@/lib/crypto/secretGuard");
+
+test("QA3-2: key split over two messages is blocked and flagged", () => {
+  assert.equal(findSplitSecret([], HEX), 0);
+  assert.equal(findSplitSecret([HEX.slice(0, 32)], HEX.slice(32)), 1);
+  assert.equal(findSplitSecret(["hello", HEX.slice(0, 20), HEX.slice(20, 40)], HEX.slice(40)), 2);
+  assert.equal(findSplitSecret([WIF.slice(0, 25)], WIF.slice(25)), 1);
+  assert.equal(findSplitSecret(["is it safe?", "what about taxes", "thanks"], "ok 1000"), -1);
+  assert.equal(findSplitSecret(["I paid 1000"], "2000 rupees"), -1);
+});
+
+test("QA3-2: the chat popup source runs the guard before any request (text, voice and history)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../components/copilot/ChatPopup.tsx", import.meta.url), "utf8");
+  const send = src.slice(src.indexOf("async function send("));
+  assert.ok(send.indexOf("findSplitSecret") > 0 && send.indexOf("findSplitSecret") < send.indexOf("api.voiceAct"));
+  assert.ok(send.indexOf("findSplitSecret") < send.indexOf("answer(message"));
+  assert.match(src, /cleanHistory\(/);
+  assert.match(src, /messageHasSecret\(text\)/); // voice transcript is never displayed
+});
+
+test("QA3-2: history never re-sends a blocked or split secret", () => {
+  const h = [
+    { role: "user", content: HEX.slice(0, 32) },
+    { role: "assistant", content: "ok" },
+    { role: "user", content: HEX.slice(32) },
+    { role: "user", content: "what is my balance" },
+    { role: "user", content: REDACTED },
+  ];
+  const out = cleanHistory(h);
+  assert.deepEqual(out.map((x) => x.content), ["ok", "what is my balance"]);
+});
+
+const { showAnswerBubble, isGenericFallbackAnswer } = await import("@/lib/crypto/walletFirst");
+
+test("QA3-5: a wallet question hides the generic snapshot but keeps real answers", async () => {
+  const generic = "I didn't quite catch that. I'm in basic mode, so I only understand questions about spending";
+  assert.equal(isGenericFallbackAnswer(generic), true);
+  assert.equal(showAnswerBubble(1, generic), false);
+  assert.equal(showAnswerBubble(0, generic), true);
+  assert.equal(showAnswerBubble(2, "Your net worth is 5,000."), true);
+  const { scanAddresses } = await import("@/lib/crypto/extractAddress");
+  assert.equal(scanAddresses(`Is ${ADDR} safe to pay?`).scans.length, 1);
+});
+
+test("QA3-7/8: council summary lists every BLOCK wallet, flags unverified, fixes double period", async () => {
+  const { actionsWithBlocked, summariseWallets, tidyText } = await import("@/components/crypto/council/summary");
+  const w = (address, verdict, status = "ok") => ({ address, verdict, status });
+  const s = summariseWallets([w("A", "BLOCK"), w("B", "BLOCK"), w("C", "UNKNOWN", "not_in_dataset")]);
+  assert.deepEqual(s.blocked, ["A", "B"]);
+  assert.deepEqual(s.unchecked, ["C"]);
+  assert.equal(s.allUnchecked, false);
+  assert.equal(summariseWallets([w("C", "UNKNOWN", "not_in_dataset")]).allUnchecked, true);
+  assert.equal(summariseWallets([]).allUnchecked, false);
+  assert.deepEqual(actionsWithBlocked(["Do not send funds to A"], ["A", "B"]), ["Do not send funds to A", "Do not send funds to B."]);
+  assert.equal(tidyText("is not available right now. . The findings"), "is not available right now. The findings");
+  assert.equal(tidyText("Wait..."), "Wait...");
+});
+
+test("QA4-12: /credits/success never waits forever", async () => {
+  const { returnView } = await import("@/lib/crypto/creditsReturn");
+  assert.equal(returnView("", 0), "none");
+  assert.equal(returnView("", 99), "none");
+  assert.equal(returnView("succeeded", 0), "confirmed");
+  assert.equal(returnView("pending", 3), "checking");
+  assert.equal(returnView("pending", 10), "unconfirmed");
+});
+
+test("QA4-3: Marathi Wallet Guard strings exist for every key and are not English", async () => {
+  const { readFileSync } = await import("node:fs");
+  const c = readFileSync(new URL("../components/crypto/guard/copy.ts", import.meta.url), "utf8");
+  const { MR } = await import("@/components/crypto/guard/copy.mr");
+  const keys = [...c.matchAll(/^ {2}"(wg\.[^"]+)":/gm)].map((x) => x[1]);
+  assert.ok(keys.length > 100);
+  for (const k of keys) {
+    assert.ok(MR[k], `missing mr: ${k}`);
+    if (k !== "wg.explain.tab.en" && !/GSQL|Ransomwhere|OFAC|NetworkX|TigerGraph/.test(MR[k])) assert.match(MR[k], /[ऀ-ॿ]/, k);
+  }
+});

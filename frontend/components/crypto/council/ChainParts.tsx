@@ -73,7 +73,7 @@ export function GraphEvidence({ address }: { address: string | null }) {
       </button>
       {open && (
         <div className="grid gap-2 px-4 pb-4">
-          <p className="text-xs text-graphite">The full check for the first screened wallet. Opening this runs a fresh check (a repeat within 10 minutes is served from cache).</p>
+          <p className="text-xs text-graphite">The full check for the first screened wallet. Opening this runs the check and uses a credit, unless this wallet was checked in the last 10 minutes: then you see that earlier result, marked as served from cache.</p>
           <WalletVerdictCard address={address} />
         </div>
       )}

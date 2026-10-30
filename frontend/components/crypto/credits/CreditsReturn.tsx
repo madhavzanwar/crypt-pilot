@@ -8,10 +8,10 @@ import { FinPilotLogo } from "@/components/FinPilotLogo";
 import { Button } from "@/components/shadcn/button";
 import { Skeleton } from "@/components/shadcn/skeleton";
 import { useCredits } from "@/lib/crypto/useCredits";
+import { POLL_TIMES, returnView } from "@/lib/crypto/creditsReturn";
 import { TestModeBanner } from "./TestModeBanner";
 
 const POLL_MS = 3000;
-const POLL_TIMES = 10;
 
 function Frame({ children }: { children: React.ReactNode }) {
   return (
@@ -51,12 +51,16 @@ export function CreditsCancelled({ failed = false }: { failed?: boolean }) {
 export function CreditsSuccess() {
   const status = (useSearchParams().get("status") ?? "").toLowerCase();
   const failed = status === "failed" || status === "cancelled" || status === "canceled";
-  const confirmed = ["succeeded", "success", "paid", "completed"].includes(status);
+  const view = returnView(status, 0);
   const { balance, unavailable, refetch } = useCredits();
   const [tries, setTries] = useState(0);
 
   useEffect(() => {
-    if (failed) return;
+    // opened directly (no payment status): one balance read, no waiting for a payment that does not exist
+    if (failed || view === "none") {
+      if (view === "none") void refetch();
+      return;
+    }
     let n = 0;
     const id = window.setInterval(() => {
       n += 1;
@@ -65,10 +69,12 @@ export function CreditsSuccess() {
       if (n >= POLL_TIMES) window.clearInterval(id);
     }, POLL_MS);
     return () => window.clearInterval(id);
-  }, [failed, refetch]);
+  }, [failed, view, refetch]);
 
   if (failed) return <CreditsCancelled failed />;
-  const waiting = tries < POLL_TIMES;
+  const now = returnView(status, tries);
+  const confirmed = now === "confirmed";
+  const waiting = now === "checking";
   return (
     <Frame>
       <div className="flex items-start gap-3">
@@ -76,11 +82,15 @@ export function CreditsSuccess() {
           <CircleCheck className="size-5" aria-hidden />
         </span>
         <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">{confirmed ? "Thank you" : "Checking your payment"}</h1>
+          <h1 className="font-display text-2xl font-semibold text-ink">{confirmed ? "Thank you" : now === "none" ? "No payment to confirm" : now === "checking" ? "Checking your payment" : "Payment not confirmed yet"}</h1>
           <p className="mt-1 text-sm text-graphite">
             {confirmed
               ? "Your test-mode payment came back from Dodo. Credits are added when Dodo confirms it, which can take a few seconds. No real charge was made."
-              : "We have not had a confirmed payment status from Dodo yet. Credits are added only once it confirms, which can take a few seconds. No real charge was made."}
+              : now === "none"
+                ? "This page opens after a checkout. No payment came with it, so there is nothing to confirm. Your current balance is shown below."
+                : now === "unconfirmed"
+                  ? "Dodo has not confirmed this payment. If you paid, the credits appear once it does; check the balance below or go back to Credits. No real charge was made."
+                  : "We have not had a confirmed payment status from Dodo yet. Credits are added only once it confirms, which can take a few seconds. No real charge was made."}
           </p>
         </div>
       </div>
@@ -95,13 +105,13 @@ export function CreditsSuccess() {
           </p>
         )}
         <p className="mt-2 text-xs text-pewter">
-          {unavailable ? "The credits service is not reachable right now. Try refresh in a moment." : waiting ? "Checking for confirmation..." : "If the balance has not changed, refresh in a minute."}
+          {unavailable ? "The credits service is not reachable right now. Try refresh in a moment." : waiting ? "Checking for confirmation..." : now === "none" ? "" : "If the balance has not changed, refresh in a minute."}
         </p>
       </div>
       <TestModeBanner />
       <div className="flex flex-wrap gap-2">
         <Button asChild variant="lime" size="lg" className="flex-1">
-          <Link href="/dashboard">Continue to FinPilot</Link>
+          <Link href={now === "confirmed" ? "/dashboard" : "/credits"}>{now === "confirmed" ? "Continue to FinPilot" : "Back to credits"}</Link>
         </Button>
         <Button variant="outline" size="lg" onClick={() => void refetch()}>
           Refresh balance

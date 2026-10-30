@@ -11,6 +11,7 @@ import WalletsInput from "@/components/crypto/council/WalletsInput";
 import { AddWalletInvite, GraphEvidence, WalletList, firstScreened } from "@/components/crypto/council/ChainParts";
 import { postNdjson } from "@/components/crypto/council/stream";
 import { useWalletList } from "@/components/crypto/council/useWallets";
+import { actionsWithBlocked, summariseWallets, tidyText } from "@/components/crypto/council/summary";
 import { isChainVote, type ChainVote } from "@/components/crypto/council/types";
 
 const tone: Record<string, string> = {
@@ -35,6 +36,10 @@ export default function CouncilPage() {
   const [verdict, setVerdict] = useState<CouncilVerdict | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const chainWallets = votes.find(isChainVote)?.chain.wallets;
+  const ws = summariseWallets(chainWallets);
+  const actions = verdict ? actionsWithBlocked(verdict.actions, ws.blocked) : [];
 
   async function convene() {
     setVotes([]);
@@ -89,15 +94,22 @@ export default function CouncilPage() {
           <div className="flex flex-col gap-3 p-5 pt-0">
             <div className="flex flex-wrap items-center gap-3">
               <span className="tnum font-display text-4xl text-ink">{verdict.score}</span>
-              <Badge level={verdict.level}>{verdict.level} risk</Badge>
+              <Badge level={ws.allUnchecked ? "abstain" : verdict.level}>
+                {verdict.level} risk{ws.allUnchecked ? " (listed wallets unchecked)" : ""}
+              </Badge>
               <span className="text-xs text-pewter">
                 {Object.entries(verdict.counts).map(([l, n]) => `${n} ${l}`).join(" · ")}
                 {verdict.cached ? " · cached" : verdict.tokens ? ` · ${verdict.tokens} tokens` : " · rule-based, no model used"}
               </span>
             </div>
-            {verdict.actions.length > 0 && (
+            {ws.unchecked.length > 0 && (
+              <p role="note" className="rounded-xl bg-amber-50 p-2.5 text-xs text-amber-800">
+                {ws.unchecked.length === 1 ? "1 listed wallet is" : `${ws.unchecked.length} listed wallets are`} not verified (not in the dataset or the graph service did not answer). This score does not cover {ws.unchecked.length === 1 ? "it" : "them"}; treat {ws.unchecked.length === 1 ? "it" : "them"} as unsafe until checked.
+              </p>
+            )}
+            {actions.length > 0 && (
               <ul className="list-disc pl-5 text-sm text-ink">
-                {verdict.actions.map((a) => <li key={a}>{a}</li>)}
+                {actions.map((a) => <li key={a}>{a}</li>)}
               </ul>
             )}
             {verdict.dissent.length > 0 && (
@@ -119,9 +131,9 @@ export default function CouncilPage() {
                 <span className="text-sm font-medium text-ink">{v.name}</span>
                 <Badge level={v.level}>{v.abstain ? "Abstains" : v.score}</Badge>
               </div>
-              <p className="text-sm text-graphite">{v.why}</p>
+              <p className="text-sm text-graphite">{tidyText(v.why)}</p>
               {v.chain.wallets.length > 0 && <WalletList wallets={v.chain.wallets} />}
-              {v.do && <p className="text-xs text-ink">Do: {v.do}</p>}
+              {v.do && <p className="text-xs text-ink">Do: {tidyText(v.do)}</p>}
               <p className="text-xs text-pewter">Graph evidence, no model{v.abstain ? " · not counted in the vote" : ""}</p>
             </div>
           </Card>
@@ -132,8 +144,8 @@ export default function CouncilPage() {
                 <span className="text-sm font-medium text-ink">{v.name}</span>
                 <Badge level={v.level}>{v.score}</Badge>
               </div>
-              <p className="text-sm text-graphite">{v.why}</p>
-              {v.do && <p className="text-xs text-ink">Do: {v.do}</p>}
+              <p className="text-sm text-graphite">{tidyText(v.why)}</p>
+              {v.do && <p className="text-xs text-ink">Do: {tidyText(v.do)}</p>}
               <p className="text-xs text-pewter">
                 {v.source === "model" ? "Nemotron" : "Rule-based"}
                 {v.round === 2 ? " · changed after debate" : ""}
