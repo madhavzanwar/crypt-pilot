@@ -4,7 +4,9 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from app.api.budgets_router import router as budgets_router
@@ -105,6 +107,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+    """FastAPI's default 422 echoes the offending input and its `ctx`; NaN/Infinity/1e999 (and exception objects in `ctx`) cannot be
+    serialised, which turned a bad request into a bare 500. Same {"detail": [...]} shape, without `input`/`ctx`, so it is also
+    safe for secrets that were typed into the wrong field."""
+    errors = [{"type": str(e.get("type", "value_error")), "loc": [p if isinstance(p, int) else str(p) for p in e.get("loc", ())],
+               "msg": str(e.get("msg", "Invalid value"))} for e in exc.errors()]
+    return JSONResponse(status_code=422, content={"detail": errors})
+
 
 app.include_router(router, prefix="/api")
 app.include_router(transactions_router, prefix="/api")
