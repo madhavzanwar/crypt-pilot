@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCurrency, formatSignedCurrency } from "@/components/ui/money";
 import { useRef, useCallback } from "react";
 import { motion, useMotionValue, useSpring, useTransform, useReducedMotion } from "framer-motion";
 import { Sparkles, CheckCircle2, Shield, ArrowUpRight } from "lucide-react";
@@ -116,15 +117,15 @@ export function DeviceMockupSection({
               <div className="grid grid-cols-4 gap-2">
                 <div className="p-2 rounded-lg bg-white border border-black/[0.06] shadow-2xs">
                   <span className="text-[9px] uppercase tracking-wider text-pewter block">Net Worth</span>
-                  <span className="text-xs font-bold text-ink tnum">₹14,80,000</span>
+                  <span className="text-xs font-bold text-ink tnum">{formatCurrency(1480000)}</span>
                 </div>
                 <div className="p-2 rounded-lg bg-white border border-black/[0.06] shadow-2xs">
                   <span className="text-[9px] uppercase tracking-wider text-pewter block">Monthly In</span>
-                  <span className="text-xs font-bold text-emerald-700 tnum">+₹95,000</span>
+                  <span className="text-xs font-bold text-emerald-700 tnum">{formatSignedCurrency(95000)}</span>
                 </div>
                 <div className="p-2 rounded-lg bg-white border border-black/[0.06] shadow-2xs">
                   <span className="text-[9px] uppercase tracking-wider text-pewter block">Monthly Out</span>
-                  <span className="text-xs font-bold text-ink tnum">-₹62,600</span>
+                  <span className="text-xs font-bold text-ink tnum">{formatSignedCurrency(-62600)}</span>
                 </div>
                 <div className="p-2 rounded-lg bg-white border border-black/[0.06] shadow-2xs">
                   <span className="text-[9px] uppercase tracking-wider text-pewter block">Health Index</span>
@@ -186,9 +187,7 @@ export function DeviceMockupSection({
                 <span className="text-[9px] uppercase tracking-wider text-pewter font-semibold block">
                   Safe To Spend
                 </span>
-                <span className="text-sm font-bold text-ink tnum mt-0.5 block">
-                  ₹32,400
-                </span>
+                <span className="text-sm font-bold text-ink tnum mt-0.5 block">{formatCurrency(32400)}</span>
                 <span className="text-[8px] text-emerald-600 font-semibold block mt-0.5">
                   No Shortfall (90d)
                 </span>
@@ -201,11 +200,11 @@ export function DeviceMockupSection({
                 </span>
                 <div className="flex items-center justify-between p-1.5 rounded-lg bg-fog text-[9px]">
                   <span className="font-semibold text-ink">Netflix</span>
-                  <span className="font-bold text-ink tnum">-₹649</span>
+                  <span className="font-bold text-ink tnum">{formatSignedCurrency(-649)}</span>
                 </div>
                 <div className="flex items-center justify-between p-1.5 rounded-lg bg-fog text-[9px]">
                   <span className="font-semibold text-ink">SIP Index</span>
-                  <span className="font-bold text-emerald-700 tnum">+₹15,000</span>
+                  <span className="font-bold text-emerald-700 tnum">{formatSignedCurrency(15000)}</span>
                 </div>
               </div>
             </div>

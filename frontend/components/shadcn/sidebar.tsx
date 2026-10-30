@@ -534,7 +534,9 @@ function SidebarMenuButton({
     />
   )
 
-  if (!tooltip) {
+  // The tooltip only shows on the collapsed desktop rail. Mounting it otherwise (even hidden) leaves a Radix
+  // DismissableLayer that eats the first Escape, so Escape could not close the mobile drawer from the logo link.
+  if (!tooltip || isMobile || state !== "collapsed") {
     return button
   }
 

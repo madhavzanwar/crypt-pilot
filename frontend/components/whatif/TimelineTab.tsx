@@ -1,5 +1,6 @@
 "use client";
 
+import { currencySymbol, fromDisplayAmount, toDisplayAmount } from "@/components/ui/money";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
@@ -82,8 +83,17 @@ export function TimelineTab() {
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Amount (₹)" error={show("amount")}>
-              <Input required type="number" min={1} aria-invalid={!!show("amount")} value={amount} onChange={(e) => setAmount(e.target.value)} className="tnum" />
+            <Field label={`Amount (${currencySymbol()})`} error={show("amount")}>
+              <Input
+                required
+                type="number"
+                min={0}
+                step="any"
+                aria-invalid={!!show("amount")}
+                value={amount === "" ? "" : String(toDisplayAmount(Number(amount)))}
+                onChange={(e) => setAmount(e.target.value === "" ? "" : String(fromDisplayAmount(Number(e.target.value))))}
+                className="tnum"
+              />
             </Field>
             <Field label={kind === "transaction" ? "Date" : "First due date"} error={show("date")}>
               <Input required type="date" aria-invalid={!!show("date")} value={date} onChange={(e) => setDate(e.target.value)} />

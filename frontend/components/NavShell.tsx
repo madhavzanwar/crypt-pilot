@@ -29,6 +29,7 @@ import {
 } from "@/components/shadcn/breadcrumb";
 import { useUserId } from "@/lib/hooks";
 import { prefetchCore } from "@/lib/api";
+import { useT } from "@/components/i18nLocal";
 import { DEMO_PERSONAS, isDemoUserId, setUserId } from "@/lib/user";
 
 // Credits pill + drawer (and the QR code library behind it) load after the shell instead of shipping in every route's first load.
@@ -100,24 +101,13 @@ export function NavShell({ children }: { children: ReactNode }) {
   const isDashboard = pathname?.startsWith("/dashboard") ?? false;
   const [hidden, setHidden] = useState(false);
   const { currency } = useCurrency();
+  const { t } = useT();
   const current = NAV_GROUPS.flatMap((g) => g.links).find((l) => pathname?.startsWith(l.href));
   useEffect(() => prefetchCore(userId), [userId]);
 
   return (
     <TooltipProvider delayDuration={0}>
       <SidebarProvider>
-        <a
-          href="#main-content"
-          onClick={(e) => {
-            e.preventDefault();
-            const main = document.getElementById("main-content");
-            main?.focus();
-            main?.scrollIntoView({ block: "start" });
-          }}
-          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-full focus:bg-ink focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-lime"
-        >
-          Skip to main content
-        </a>
         <AppSidebar
           footer={
             <div className="flex flex-col gap-2">
@@ -138,7 +128,7 @@ export function NavShell({ children }: { children: ReactNode }) {
             <Breadcrumb className="min-w-0 flex-1 md:flex-none md:shrink-0">
               <BreadcrumbList className="flex-nowrap">
                 <BreadcrumbItem className="min-w-0">
-                  <BreadcrumbPage className={cn("block truncate font-display font-semibold text-ink", isDashboard ? "text-xl sm:text-3xl lg:text-4xl" : "text-lg sm:text-xl lg:text-2xl")}>{current?.label ?? "FinPilot"}</BreadcrumbPage>
+                  <BreadcrumbPage className={cn("block truncate font-display font-semibold text-ink", isDashboard ? "text-xl sm:text-3xl lg:text-4xl" : "text-lg sm:text-xl lg:text-2xl")}>{current ? t(`nav.${current.label}`, current.label) : "FinPilot"}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
@@ -148,23 +138,23 @@ export function NavShell({ children }: { children: ReactNode }) {
                 type="button"
                 onClick={() => window.dispatchEvent(new CustomEvent("finpilot:open-command-palette"))}
                 className="hidden h-9 w-56 items-center gap-2 rounded-xl bg-white px-3 text-sm text-muted-foreground shadow-sm xl:flex"
-                title="Search"
-                aria-label="Open search"
+                title={t("bar.search")}
+                aria-label={t("bar.search")}
               >
                 <Search className="size-4" aria-hidden />
-                <span>Search...</span>
+                <span>{t("bar.search")}</span>
                 <ShortcutBadge />
               </button>
-              <Button variant="outline" size="icon" className="xl:hidden" onClick={() => window.dispatchEvent(new CustomEvent("finpilot:open-command-palette"))} aria-label="Open search">
+              <Button variant="outline" size="icon" className="xl:hidden" onClick={() => window.dispatchEvent(new CustomEvent("finpilot:open-command-palette"))} aria-label={t("bar.search")}>
                 <Search className="size-4" />
               </Button>
               <Button
                 variant="outline"
                 size="icon"
                 onClick={() => setHidden((h) => !h)}
-                aria-label={hidden ? "Show amounts" : "Hide amounts"}
+                aria-label={hidden ? t("bar.privacy.show") : t("bar.privacy.hide")}
                 aria-pressed={hidden}
-                title={hidden ? "Show amounts" : "Hide amounts"}
+                title={hidden ? t("bar.privacy.show") : t("bar.privacy.hide")}
               >
                 {hidden ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
               </Button>
