@@ -119,3 +119,12 @@ test("QA3-7/8: council summary lists every BLOCK wallet, flags unverified, fixes
   assert.equal(tidyText("is not available right now. . The findings"), "is not available right now. The findings");
   assert.equal(tidyText("Wait..."), "Wait...");
 });
+
+test("QA4-12: /credits/success never waits forever", async () => {
+  const { returnView } = await import("@/lib/crypto/creditsReturn");
+  assert.equal(returnView("", 0), "none");
+  assert.equal(returnView("", 99), "none");
+  assert.equal(returnView("succeeded", 0), "confirmed");
+  assert.equal(returnView("pending", 3), "checking");
+  assert.equal(returnView("pending", 10), "unconfirmed");
+});
