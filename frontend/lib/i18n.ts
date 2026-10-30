@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
+import { EXTRA } from "@/lib/i18nExtra";
 
 export const LANGS = [
   { code: "en", native: "English" },
@@ -347,7 +348,7 @@ const S: Record<string, string[]> = {
 
 /** Translate a key into the current language; falls back to English, then `fallback`, then the key. */
 export function translate(lang: Lang, key: string, fallback?: string): string {
-  const row = S[key];
+  const row = EXTRA[key] ?? S[key];
   return row?.[LANGS.findIndex((l) => l.code === lang)] || row?.[0] || fallback || key;
 }
 
