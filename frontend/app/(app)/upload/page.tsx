@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Camera, CheckCircle2, ScanText, ShieldCheck, Upload, X } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, ExtractError } from "@/lib/api";
 import { useUserId } from "@/lib/hooks";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { OcrPreview } from "@/lib/types";
@@ -43,6 +43,17 @@ export default function UploadPage() {
     try {
       setPreview(await api.extractStatement(userId, file));
     } catch (e) {
+      // A CSV the extract step rejects (older backend): fall back to the CSV importer rather than show a photo-specific message.
+      if (/\.csv$/i.test(file.name) && e instanceof ExtractError && (e.status === 422 || e.status === 400 || e.status === 415)) {
+        try {
+          await api.upload(userId, file);
+          setDone(-1);
+          return;
+        } catch (e2) {
+          setError(e2 instanceof Error ? e2.message : "Could not import that CSV");
+          return;
+        }
+      }
       setError(e instanceof Error ? e.message : "Could not read that file");
     } finally {
       setBusy(false);
@@ -143,7 +154,7 @@ export default function UploadPage() {
           {error && <p role="alert" className="text-sm text-rose-600">{error}</p>}
           {done !== null && (
             <p className="flex items-center gap-2 text-sm text-emerald-700">
-              <CheckCircle2 className="size-4" /> Saved {done} transactions. They now appear in Transactions and your dashboard.
+              <CheckCircle2 className="size-4" /> {done < 0 ? "Statement imported." : `Saved ${done} transactions.`} {done < 0 ? "It now appears" : "They now appear"} in Transactions and your dashboard.
             </p>
           )}
         </div>

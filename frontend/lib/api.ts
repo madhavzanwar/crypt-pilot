@@ -1,4 +1,4 @@
-import { formatApiError, SecretInputError, secretInputDetail } from "@/lib/apiError";
+import { extractErrorMessage, formatApiError, SecretInputError, secretInputDetail } from "@/lib/apiError";
 import { TranslateCache } from "@/lib/translateCache";
 import { getLang, getSimpleNow } from "@/lib/i18n";
 
@@ -156,6 +156,18 @@ const translations = new TranslateCache(
   async (lang, texts) => (await request<{ translations: Record<string, string> }>("/api/translate", { method: "POST", body: JSON.stringify({ lang, texts }) })).translations,
   () => (typeof window === "undefined" ? null : window.localStorage),
 );
+
+/** Failed /api/ocr/extract call: keeps the HTTP status so the UI can pick a friendly message or fall back to the CSV importer. */
+export class ExtractError extends Error {
+  status: number;
+  detail: string;
+  constructor(status: number, detail: string) {
+    super(extractErrorMessage(status, detail));
+    this.name = "ExtractError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
 
 export const api = {
   health: () => apiFetch<{ status: string }>("/api/health"),
@@ -368,7 +380,10 @@ export const api = {
     const body = new FormData();
     body.append("file", file);
     const res = await fetch(`${API_URL}/api/ocr/extract/${userId}`, { method: "POST", headers: await authHeader(), body });
-    if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `Upload failed: ${res.status}`);
+    if (!res.ok) {
+      const detail = (await res.json().catch(() => null))?.detail;
+      throw new ExtractError(res.status, typeof detail === "string" ? detail : "");
+    }
     return res.json();
   },
   importOcr: (userId: string, transactions: OcrTxn[]) =>

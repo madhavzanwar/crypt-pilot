@@ -71,3 +71,13 @@ export function secretInputDetail(status: number, text: string): string | null {
     return null;
   }
 }
+
+/** Message for a failed statement/photo extract call: the backend's own detail when it has one, friendly text for rate limits and outages. */
+export function extractErrorMessage(status: number, detail: string): string {
+  if (status === 429) return "You have uploaded a lot in a short time. Please wait a minute and try again.";
+  if (status === 503) return "Reading documents is unavailable right now. Please try again in a few minutes.";
+  if (status >= 500) return "Something went wrong on our side. Please try again in a moment.";
+  if (detail.trim()) return detail.trim();
+  if (status === 413) return "That file is too large. Please use a file under 5 MB.";
+  return "We could not read that file. Try a clearer photo or a .csv / .txt statement.";
+}
