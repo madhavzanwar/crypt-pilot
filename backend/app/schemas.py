@@ -674,6 +674,15 @@ class TaxCalculationRequest(BaseModel):
     hra_exemption: Optional[float] = Field(default=None, ge=0, le=1e11, allow_inf_nan=False)
     other_deductions: Optional[float] = Field(default=None, ge=0, le=1e11, allow_inf_nan=False)
 
+    @field_validator("gross_annual_income", "section_80c", "section_80d", "section_80ccd_1b_nps", "section_24b_home_loan",
+                     "hra_exemption", "other_deductions", mode="before")
+    @classmethod
+    def _non_negative_amount(cls, v, info):
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and v < 0:
+            label = "Gross annual income" if info.field_name == "gross_annual_income" else info.field_name.replace("_", " ")
+            raise ValueError(f"{label} cannot be negative. Enter 0 or more.")
+        return v
+
 
 # ---------------------------------------------------------------------------
 # Household & Co-Piloting Collaboration (Pillar 5D)
