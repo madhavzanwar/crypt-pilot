@@ -17,6 +17,8 @@ import { ReplanPanel } from "@/components/plan/ReplanPanel";
 import { ForecastTable } from "@/components/plan/ForecastTable";
 import { BacktestTable } from "@/components/plan/BacktestTable";
 import { OutcomeTable } from "@/components/plan/OutcomeTable";
+import { PlanPrintView, usePrintPlan } from "@/components/plan/PlanPrintView";
+import { Printer } from "lucide-react";
 import { NotReadyCard } from "@/components/plan/NotReadyCard";
 import { PlanSummaryCard } from "@/components/plan/PlanSummaryCard";
 import { formatCurrency } from "@/components/ui/money";
@@ -112,6 +114,8 @@ function ParamsForm({ value, onApply, method }: { value: PlanParams; onApply: (p
 
 export default function PlanPage() {
   const userId = useUserId();
+  const { t } = useT();
+  const printPlan = usePrintPlan();
   const [source, setSource] = useState(MY_DATA);
   const [params, setParams] = useState<PlanParams>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -144,12 +148,21 @@ export default function PlanPage() {
   const active = plan && (plan.sequences.find((s) => s.id === selectedId) ?? (plan.risk_adjusted?.id === selectedId ? plan.risk_adjusted : null) ?? plan.sequences.find((s) => s.id === plan.recommended_id) ?? plan.sequences[0]);
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-8 pb-16">
-      <div className="border-b border-black/[0.04] pb-4">
-        <h1 className="font-display text-2xl font-medium text-ink sm:text-3xl">Financial Plan</h1>
-        <p className="mt-1 text-xs text-graphite sm:text-sm">
-          A 6-month constrained action plan driven by a probabilistic monthly forecast. Uncertainty sets the reserve and the order of actions.
-        </p>
+    <>
+    <div className="plan-screen mx-auto flex max-w-5xl flex-col gap-8 pb-16">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-black/[0.04] pb-4">
+        <div className="min-w-0 flex-1 basis-64">
+          <h1 className="font-display text-2xl font-medium text-ink sm:text-3xl">Financial Plan</h1>
+          <p className="mt-1 text-xs text-graphite sm:text-sm">
+            A 6-month constrained action plan driven by a probabilistic monthly forecast. Uncertainty sets the reserve and the order of actions.
+          </p>
+        </div>
+        {plan && (
+          <Button variant="secondary" onClick={printPlan} data-testid="plan-pdf">
+            <Printer className="size-4" aria-hidden />
+            {t("pl.pdf.btn")}
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2.5">
@@ -254,5 +267,7 @@ export default function PlanPage() {
         </>
       )}
     </div>
+    {plan && <PlanPrintView plan={plan} userId={userId} />}
+    </>
   );
 }
