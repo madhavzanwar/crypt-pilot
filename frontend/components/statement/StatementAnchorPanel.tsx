@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { statementSubject } from "@/lib/crypto/eas/statement";
 import { StatementVerify } from "./StatementVerify";
-import { useT } from "@/lib/i18n";
+import { useT } from "@/components/i18nLocal";
 import { Anchor } from "lucide-react";
 import { useMemo, useState } from "react";
 import { statementDigest, statementPeriod, type StatementData } from "./auditHash";

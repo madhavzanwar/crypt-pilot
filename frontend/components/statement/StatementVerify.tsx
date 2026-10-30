@@ -2,7 +2,7 @@
 
 import { HashLine } from "@/components/crypto/web3/Bits";
 import { Button } from "@/components/ui/Button";
-import { useT } from "@/lib/i18n";
+import { useT } from "@/components/i18nLocal";
 import { cn } from "@/lib/utils";
 import { useId, useState } from "react";
 import { compareStatementHash, type HashVerdict } from "./auditHashVerify";
