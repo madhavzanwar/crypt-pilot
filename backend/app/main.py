@@ -51,6 +51,13 @@ async def lifespan(_: FastAPI):
             from app.ingest.seed import ensure_demo_seeded
 
             ensure_demo_seeded()
+            if not os.getenv("VERCEL"):
+                # Build each demo persona's dashboard once now so the first visitor does not wait for the (multi-second) computation.
+                from app.core.auth import DEMO_USER_IDS
+                from app.ingest.snapshot import build_dashboard_snapshot
+
+                for uid in sorted(DEMO_USER_IDS):
+                    build_dashboard_snapshot(uid)
         except Exception as exc:
             import logging
             logging.getLogger(__name__).warning("Demo persona seeding skipped: %s", exc)

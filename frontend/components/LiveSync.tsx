@@ -33,7 +33,7 @@ export function LiveSync() {
         // offline or signed out: try again next tick
       }
     };
-    const id = setInterval(tick, 3000);
+    const id = setInterval(tick, 12_000); // 3 s polling alone kept the small API server busy; 12 s still feels live for the phone demo
     void tick();
     return () => clearInterval(id);
   }, [userId]);
