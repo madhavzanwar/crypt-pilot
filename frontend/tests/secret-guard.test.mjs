@@ -128,3 +128,15 @@ test("QA4-12: /credits/success never waits forever", async () => {
   assert.equal(returnView("pending", 3), "checking");
   assert.equal(returnView("pending", 10), "unconfirmed");
 });
+
+test("QA4-3: Marathi Wallet Guard strings exist for every key and are not English", async () => {
+  const { readFileSync } = await import("node:fs");
+  const c = readFileSync(new URL("../components/crypto/guard/copy.ts", import.meta.url), "utf8");
+  const { MR } = await import("@/components/crypto/guard/copy.mr");
+  const keys = [...c.matchAll(/^ {2}"(wg\.[^"]+)":/gm)].map((x) => x[1]);
+  assert.ok(keys.length > 100);
+  for (const k of keys) {
+    assert.ok(MR[k], `missing mr: ${k}`);
+    if (k !== "wg.explain.tab.en" && !/GSQL|Ransomwhere|OFAC|NetworkX|TigerGraph/.test(MR[k])) assert.match(MR[k], /[ऀ-ॿ]/, k);
+  }
+});
