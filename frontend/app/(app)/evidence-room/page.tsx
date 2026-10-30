@@ -47,6 +47,15 @@ const SEV = {
   low: { label: "Minor", cls: "bg-fog text-graphite", bar: "bg-pewter" },
 } as const;
 
+/** The node sub-label of a finished agent. The Risk Scorer reports a level, never a green "All clear" over a high score. */
+const LEVEL_NOTE = { high: "High risk", medium: "Medium risk", low: "Low risk" } as const;
+function doneLabel(agent: string, info: Partial<AgentSummary> | undefined, found: number): string {
+  if (agent === "risk_scorer" && info?.level) return LEVEL_NOTE[info.level] ?? "Scored";
+  if (found) return `${found} found`;
+  if (info?.error) return "no AI text";
+  return "All clear";
+}
+
 const R = 39; // ring radius, % of the stage
 const pos = (i: number) => {
   const a = ((-90 + i * (360 / ALL.length)) * Math.PI) / 180;
@@ -92,7 +101,7 @@ function Stage({ state, report, running, checked, walletsListed }: { state: Agen
         {ALL.map((a, i) => {
           const { x, y } = pos(i);
           const st = state[a.id]?.status ?? "idle";
-          const found = (state[a.id]?.info?.findings ?? 0) > 0;
+          const found = (state[a.id]?.info?.findings ?? 0) > 0 || (a.id === "risk_scorer" && ["high", "medium"].includes(state[a.id]?.info?.level ?? ""));
           return (
             <g key={a.id}>
               <motion.line
@@ -151,6 +160,7 @@ function Stage({ state, report, running, checked, walletsListed }: { state: Agen
         const st = state[a.id]?.status ?? "idle";
         const info = state[a.id]?.info;
         const found = info?.findings ?? 0;
+        const alarm = found > 0 || (a.id === "risk_scorer" && (info?.level === "high" || info?.level === "medium"));
         const Icon = a.icon;
         const chain = a.id === CHAIN_AGENT.id;
         const note = chain && st === "done" ? chainNote(report, info as ChainInfo) : null;
@@ -171,7 +181,7 @@ function Stage({ state, report, running, checked, walletsListed }: { state: Agen
                     "relative flex size-12 items-center justify-center rounded-full shadow-md ring-2 transition-colors duration-500 sm:size-14",
                     st === "idle" && "bg-white text-pewter ring-white",
                     st === "running" && "bg-lime text-ink ring-lime-dark",
-                    st === "done" && (found ? "bg-rose-500 text-white ring-rose-200" : note?.tone === "grey" ? "bg-slate-400 text-white ring-slate-200" : "bg-leaf text-white ring-lime/60"),
+                    st === "done" && (alarm ? "bg-rose-500 text-white ring-rose-200" : note?.tone === "grey" ? "bg-slate-400 text-white ring-slate-200" : "bg-leaf text-white ring-lime/60"),
                   )}
                 >
                   {st === "running" ? <Loader2 className="size-5 animate-spin" /> : <Icon className="size-5" />}
@@ -185,9 +195,9 @@ function Stage({ state, report, running, checked, walletsListed }: { state: Agen
                 </AnimatePresence>
               </div>
               <span className="text-[10px] font-semibold leading-tight text-ink sm:text-xs">{a.name}</span>
-              <span className="hidden text-[10px] leading-tight text-graphite sm:block">{note ? note.label : st === "running" ? "Checking..." : st === "done" ? (found ? `${found} found` : info?.error ? "no AI text" : "All clear") : chain ? (walletsListed === 0 ? "Add a wallet to screen" : "Waiting") : "Waiting"}</span>
+              <span className="hidden text-[10px] leading-tight text-graphite sm:block">{note ? note.label : st === "running" ? "Checking..." : st === "done" ? doneLabel(a.id, info, found) : chain ? (walletsListed === 0 ? "Add a wallet to screen" : "Waiting") : "Waiting"}</span>
               {note && ci?.screened ? <span className="hidden max-w-full truncate text-[9px] leading-tight text-pewter sm:block">{ci.tigergraph ? "TigerGraph" : ci.engine ?? "graph"}{ci.graph_ms != null ? ` · ${ci.graph_ms} ms` : ""}</span> : null}
-              {st === "done" && info?.model && <span className="hidden max-w-full truncate text-[9px] leading-tight text-pewter sm:block" title={`${info.model} (${info.ai})`}>{info.model.split("/").pop()}{info.backup ? " · backup" : ""}{info.ai === "error" ? " · offline" : ""}</span>}
+              {st === "done" && info?.model && info.mode !== "rules" && <span className="hidden max-w-full truncate text-[9px] leading-tight text-pewter sm:block" title={`${info.model} (${info.ai})`}>{info.model.split("/").pop()}{info.backup ? " · backup" : ""}{info.ai === "error" ? " · offline" : ""}</span>}
             </div>
           </motion.div>
         );
@@ -392,7 +402,7 @@ export default function EvidenceRoomPage() {
                     <p className="flex items-center gap-2 font-display text-lg font-semibold text-ink">
                       <AlertTriangle className="size-5 text-amber-500" /> {report.findings.length} problem(s) found
                     </p>
-                    <p className="text-sm text-graphite">The AI explanation is not available right now. {report.verdict_error}</p>
+                    <p className="text-sm text-graphite">The AI explanation is not available right now.{report.verdict_error ? ` ${report.verdict_error.replace(/^[.\s]+/, "")}` : ""}</p>
                   </>
                 )}
               </CardContent>
