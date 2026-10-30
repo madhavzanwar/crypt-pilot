@@ -737,7 +737,7 @@ function CoverGoalCard({
               disabled={saving}
               className="hidden sm:inline-flex rounded-full px-2 py-1 text-[11px] font-medium text-graphite bg-fog hover:bg-white border border-mist cursor-pointer tnum"
             >
-              +₹5k
+              +{formatCurrency(5000)}
             </button>
           </div>
 

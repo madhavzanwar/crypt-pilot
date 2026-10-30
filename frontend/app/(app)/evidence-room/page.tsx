@@ -11,7 +11,7 @@ import {
 import { api } from "@/lib/api";
 import { useUserId } from "@/lib/hooks";
 import type { AgentSummary, SecurityEvent, SecurityFinding, SecurityReport } from "@/lib/types";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, localizeMoneyText } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/shadcn/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
@@ -212,8 +212,8 @@ function Finding({ f, label, i }: { f: Finding; label: string; i: number }) {
         <span className="text-[11px] text-pewter">Found by {label}</span>
         {f.amount > 0 && <span className="ml-auto text-sm font-semibold tnum text-ink">{formatCurrency(f.amount)}</span>}
       </div>
-      <p className="mt-2 text-sm font-semibold text-ink">{f.title}</p>
-      <p className="mt-0.5 text-xs text-graphite">{f.detail}</p>
+      <p className="mt-2 text-sm font-semibold text-ink">{localizeMoneyText(f.title, { absolute: true })}</p>
+      <p className="mt-0.5 text-xs text-graphite">{localizeMoneyText(f.detail, { absolute: true })}</p>
       {w && <div className="mt-2"><ChainChips w={w} /></div>}
       {f.corroborated_by && <p className="mt-1.5 text-[11px] font-semibold text-rose-700">Also flagged by {f.corroborated_by.map((id) => AGENTS.find((a) => a.id === id)?.name ?? id).join(", ")}</p>}
       {f.web?.answer && (

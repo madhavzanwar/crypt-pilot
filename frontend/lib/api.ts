@@ -1,4 +1,5 @@
 import { formatApiError } from "@/lib/apiError";
+import { TranslateCache } from "@/lib/translateCache";
 import { getLang, getSimpleNow } from "@/lib/i18n";
 
 import type {
@@ -148,11 +149,18 @@ function planQuery(p: object): string {
   return s ? `?${s}` : "";
 }
 
+// One cache per tab: never ask the server for the same string twice, and back off after a failure (see lib/translateCache.ts).
+const translations = new TranslateCache(
+  async (lang, texts) => (await request<{ translations: Record<string, string> }>("/api/translate", { method: "POST", body: JSON.stringify({ lang, texts }) })).translations,
+  () => (typeof window === "undefined" ? null : window.localStorage),
+);
+
 export const api = {
   health: () => apiFetch<{ status: string }>("/api/health"),
   /** English UI text -> Hindi/Marathi (server caches; used only for text nobody hand-translated). */
-  translateTexts: (lang: string, texts: string[]) =>
-    apiFetch<{ translations: Record<string, string> }>("/api/translate", { method: "POST", body: JSON.stringify({ lang, texts }) }),
+  translateTexts: async (lang: string, texts: string[]) => ({
+    translations: await translations.translate(lang, texts),
+  }),
   voiceAct: (text: string, path: string, lang: string, screen: unknown, history: string[], userId = "") =>
     apiFetch<{ thinking?: string; say: string; ask_copilot: boolean; actions: import("@/lib/voiceAgent").VoiceAction[] }>("/api/voice/act", { method: "POST", body: JSON.stringify({ text, path, lang, screen, history, user_id: userId }) }),
   schemeAnalyst: (scheme: string, question: string) =>
