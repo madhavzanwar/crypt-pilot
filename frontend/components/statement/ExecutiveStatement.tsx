@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import type { DashboardSnapshot, Account, Transaction } from "@/lib/types";
 import { formatPercent, formatDate } from "@/lib/format";
-import { formatCurrency, formatImpactValue, formatSignedCurrency, formatSignedImpact } from "@/components/ui/money";
+import { activeCurrency, formatCurrency, formatImpactValue, formatSignedCurrency, formatSignedImpact } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 import { ShieldCheck, CheckCircle2, Activity } from "lucide-react";
 import { FinPilotLogo } from "@/components/FinPilotLogo";
@@ -202,7 +202,9 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
             <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 block">
               Base Currency & FY
             </span>
-            <span className="font-medium text-black">Indian Rupee (INR ₹)</span>
+            <span className="font-medium text-black">
+              {activeCurrency().code === "INR" ? "Indian Rupee (INR ₹)" : `Indian Rupee (INR); figures shown in ${activeCurrency().code}`}
+            </span>
             <span className="text-[11px] text-neutral-500 block">FY 2026–27 (Apr–Mar)</span>
           </div>
           <div>

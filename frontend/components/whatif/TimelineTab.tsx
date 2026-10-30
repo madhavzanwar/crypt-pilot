@@ -1,5 +1,6 @@
 "use client";
 
+import { currencySymbol, formatCurrency, fromDisplayAmount, toDisplayAmount } from "@/components/ui/money";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
@@ -32,7 +33,7 @@ export function TimelineTab() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!Number.isFinite(amount) || amount < 1) return setError("Enter an amount of at least ₹1");
+    if (!Number.isFinite(amount) || amount < 1) return setError(`Enter an amount of at least ${formatCurrency(1)}`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return setError("Pick a valid date");
     setSubmitting(true);
     setError(null);
@@ -73,8 +74,8 @@ export function TimelineTab() {
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Amount (₹)">
-              <Input required type="number" min={1} value={amount} onChange={(e) => setAmount(Number(e.target.value))} className="tnum" />
+            <Field label={`Amount (${currencySymbol()})`}>
+              <Input required type="number" min={0} step="any" value={toDisplayAmount(amount)} onChange={(e) => setAmount(fromDisplayAmount(Number(e.target.value)))} className="tnum" />
             </Field>
             <Field label={kind === "transaction" ? "Date" : "First due date"}>
               <Input required type="date" value={date} onChange={(e) => setDate(e.target.value)} />

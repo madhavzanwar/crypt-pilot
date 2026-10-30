@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCurrency } from "@/components/ui/money";
 import { useEffect, useState, type ReactNode } from "react";
 import type { User } from "firebase/auth";
 import { Check, ExternalLink } from "lucide-react";
@@ -349,11 +350,11 @@ export function ProfileQuestionnaire() {
                 aria-label="Monthly household income"
               >
                 <option value="">Prefer not to say</option>
-                <option value="under15000">Under ₹15,000</option>
-                <option value="15000-30000">₹15,000–₹30,000</option>
-                <option value="30001-75000">₹30,001–₹75,000</option>
-                <option value="75001-150000">₹75,001–₹1,50,000</option>
-                <option value="over150000">Above ₹1,50,000</option>
+                <option value="under15000">Under {formatCurrency(15000)}</option>
+                <option value="15000-30000">{formatCurrency(15000)}–{formatCurrency(30000)}</option>
+                <option value="30001-75000">{formatCurrency(30001)}–{formatCurrency(75000)}</option>
+                <option value="75001-150000">{formatCurrency(75001)}–{formatCurrency(150000)}</option>
+                <option value="over150000">Above {formatCurrency(150000)}</option>
               </select>
             </Question>
 
