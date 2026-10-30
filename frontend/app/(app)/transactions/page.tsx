@@ -106,7 +106,7 @@ interface QuickFilter {
 }
 
 /** Filter label; the high-value threshold is shown in the selected currency. */
-const quickLabel = (qf: { id: string; label: string }): string => (qf.id === "high_value" ? `${quickLabel(qf)} (> ${formatCurrency(5000)})` : qf.label);
+const quickLabel = (qf: { id: string; label: string }): string => (qf.id === "high_value" ? `${qf.label} (> ${formatCurrency(5000)})` : qf.label);
 
 const QUICK_FILTERS: QuickFilter[] = [
   { id: "all", label: "All Transactions" },
