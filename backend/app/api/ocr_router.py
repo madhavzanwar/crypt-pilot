@@ -10,10 +10,11 @@ from datetime import date
 
 from fastapi.concurrency import run_in_threadpool
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.core import store
 from app.core.auth import resolve_user_id
+from app.core.validate import check_amount, check_date
 from app.core.ratelimit import scoped_key, upload_limiter
 from app.ingest.categorize import categorize
 from app.aa.mapper import _merchant
@@ -31,7 +32,17 @@ _MAX_BYTES = 5 * 1024 * 1024
 class ExtractedTxn(BaseModel):
     date: date
     description: str = Field(max_length=160)
-    amount: float = Field(gt=-10_000_000, lt=10_000_000)  # negative = money out
+    amount: float = Field(gt=-10_000_000, lt=10_000_000, allow_inf_nan=False)  # negative = money out
+
+    @field_validator("date")
+    @classmethod
+    def _sane_date(cls, v):
+        return check_date(v)
+
+    @field_validator("amount")
+    @classmethod
+    def _sane_amount(cls, v: float) -> float:
+        return check_amount(v)
 
 
 class ImportBody(BaseModel):

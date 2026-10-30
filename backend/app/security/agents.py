@@ -26,6 +26,18 @@ from app.security import ai_agents, chain_analyst
 from app.models import AccountRow, InvestigationRow, TransactionRow
 
 DEMO_TAG = "demo-threat"
+# Demo threats live in their own bucket (not in the user's ledger), so the shared demo personas' dashboard, statement,
+# forecast and budgets never see them. Only the security agents read ledger + bucket (see `security_rows`).
+THREAT_BUCKET = "threat::{}"
+
+
+def threat_user(user_id: str) -> str:
+    return THREAT_BUCKET.format(user_id)
+
+
+def security_rows(user_id: str) -> list:
+    """The ledger plus any planted demo threats: what the security agents investigate."""
+    return [*store.query(TransactionRow, user_id=user_id), *store.query(TransactionRow, user_id=threat_user(user_id))]
 NON_SPEND = {"transfer", "credit_card_payment", "income"}
 LOOKBACK_DAYS = 120
 _BRANDS = ["amazon", "netflix", "swiggy", "zomato", "uber", "flipkart", "paytm", "phonepe", "spotify", "hotstar", "google", "myntra"]
@@ -293,7 +305,7 @@ def investigate(user_id: str, pace: float = 0.35, wallets: list[str] | None = No
 
     With `wallets` (cleaned by chain_analyst.clean_wallets) the Chain Analyst joins as a tenth stage, just before the Risk
     Scorer. Without wallets it does not run and the nine agents behave exactly as before."""
-    rows, accounts = store.query(TransactionRow, user_id=user_id), store.query(AccountRow, user_id=user_id)
+    rows, accounts = security_rows(user_id), store.query(AccountRow, user_id=user_id)
     all_findings, summaries = [], {}
     run, score = uuid.uuid4().hex[:8], 0
     wallets = list(wallets or [])
@@ -339,7 +351,10 @@ def latest_report(user_id: str) -> dict | None:
 
 
 def plant_demo_threats(user_id: str) -> int:
-    """Add clearly tagged fake suspicious transactions so the agents have something to find."""
+    """Add clearly tagged fake suspicious transactions so the agents have something to find.
+
+    Idempotent (fixed row ids: planting twice still leaves 9 rows), tagged `demo-threat`, kept in a separate bucket so
+    no ledger-based number changes, and removed by `clear_demo_threats`."""
     accounts = store.query(AccountRow, user_id=user_id)
     if not accounts:
         raise ValueError("Connect a data source first")
@@ -350,14 +365,15 @@ def plant_demo_threats(user_id: str) -> int:
         (9, -45000, "Quickcash Global Ltd", "shopping"),
         *[(4, -199, "PixelGift Store", "shopping")] * 5,
     ]
-    rows = [TransactionRow(id=f"{DEMO_TAG}-{user_id}-{i}", user_id=user_id, account_id=acc, date=today - timedelta(days=d), amount=a, merchant=m,
+    rows = [TransactionRow(id=f"{DEMO_TAG}-{user_id}-{i}", user_id=threat_user(user_id), account_id=acc, date=today - timedelta(days=d), amount=a, merchant=m,
                            category=c, tags=json.dumps([DEMO_TAG]), description="Demo suspicious activity") for i, (d, a, m, c) in enumerate(spec)]
     store.put(*rows)
     return len(rows)
 
 
 def clear_demo_threats(user_id: str) -> int:
-    rows = [r for r in store.query(TransactionRow, user_id=user_id) if DEMO_TAG in (r.tags or "")]
+    # also sweeps rows planted into the ledger itself by older versions
+    rows = [r for r in security_rows(user_id) if DEMO_TAG in (r.tags or "")]
     for r in rows:
         store.delete(TransactionRow, r.id)
     return len(rows)

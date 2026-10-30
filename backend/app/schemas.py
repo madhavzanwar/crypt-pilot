@@ -10,7 +10,9 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.core.validate import check_amount, check_date
 
 _Date = date  # alias: model fields named `date` shadow the type inside class bodies
 
@@ -372,6 +374,7 @@ class RecomputeDiff(BaseModel):
     removed_recommendation_actions: list[ActionType] = Field(default_factory=list)
     narrative: str
     insights: list[CopilotInsight] = Field(default_factory=list)
+    simulated: bool = False  # True: a what-if, nothing was written to the ledger
 
 
 # ---------------------------------------------------------------------------
@@ -738,11 +741,21 @@ class AddManagedMemberRequest(BaseModel):
 
 
 class AddManagedTransactionRequest(BaseModel):
-    merchant: str
-    amount: float  # positive = money in, negative = money out
+    merchant: str = Field(max_length=200)
+    amount: float = Field(allow_inf_nan=False)  # positive = money in, negative = money out
     category: TxnCategory = TxnCategory.other
     date: Optional[_Date] = None
-    description: Optional[str] = None
+    description: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("amount")
+    @classmethod
+    def _sane_amount(cls, v: float) -> float:
+        return check_amount(v, allow_zero=True)
+
+    @field_validator("date")
+    @classmethod
+    def _sane_date(cls, v):
+        return check_date(v)
 
 
 class MemberLedger(BaseModel):

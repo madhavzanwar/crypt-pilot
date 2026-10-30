@@ -45,7 +45,7 @@ _SEV = {"high": 3, "medium": 2, "low": 1}
 
 
 def compact_facts(user_id: str) -> dict:
-    rows, accounts = store.query(TransactionRow, user_id=user_id), store.query(AccountRow, user_id=user_id)
+    rows, accounts = agents.security_rows(user_id), store.query(AccountRow, user_id=user_id)
     checks = agents.run_checks(rows, accounts)
     findings = sorted((f for v in checks.values() for f in v), key=lambda f: -_SEV[f["severity"]])
     snap = build_dashboard_snapshot(user_id)

@@ -52,6 +52,7 @@ from typing import Optional
 import pandas as pd
 from app.core import store
 
+from app.analytics.basis import through_today
 from app.analytics.anomalies import detect_anomalies
 from app.analytics.benchmarks import benchmark_context
 from app.analytics.debt import compute_dti, credit_utilization as _credit_utilization
@@ -93,7 +94,7 @@ def _transactions_df(rows: list[TransactionRow]) -> pd.DataFrame:
         )
     df = pd.DataFrame([r.model_dump() for r in rows])
     df["date"] = pd.to_datetime(df["date"])
-    return df.sort_values("date").reset_index(drop=True)
+    return through_today(df.sort_values("date").reset_index(drop=True))
 
 
 def _debts_schema(rows: list[DebtRow], user_id: str, accounts: Optional[list[AccountRow]] = None) -> list[Debt]:
@@ -228,7 +229,7 @@ def empty_dashboard_snapshot(user_id: str) -> DashboardSnapshot:
     )
 
 
-def _build_dashboard_snapshot(user_id: str) -> DashboardSnapshot:
+def _build_dashboard_snapshot(user_id: str, extra_txns: Optional[list[TransactionRow]] = None) -> DashboardSnapshot:
     """Build (and cache) a real DashboardSnapshot for `user_id` from the DB.
 
     A demo persona id with no accounts falls back to the Phase-0 fixture
@@ -242,7 +243,7 @@ def _build_dashboard_snapshot(user_id: str) -> DashboardSnapshot:
             return demo_dashboard_snapshot(user_id)
         return empty_dashboard_snapshot(user_id)
 
-    txn_rows = store.query(TransactionRow, user_id=user_id)
+    txn_rows = [*store.query(TransactionRow, user_id=user_id), *(extra_txns or [])]
     debt_rows = store.query(DebtRow, user_id=user_id)
     # IncomeRow is queried for completeness/future use (e.g. irregular income
     # sources not visible as transactions yet); the recurring-detection path
@@ -362,8 +363,14 @@ def _build_dashboard_snapshot(user_id: str) -> DashboardSnapshot:
         generated_at=datetime.now(timezone.utc),
     )
 
-    _cache_snapshot(snapshot)
+    if not extra_txns:  # a what-if build must never replace the cached real snapshot (it is the "before" of the next diff)
+        _cache_snapshot(snapshot)
     return snapshot
+
+
+def simulate_dashboard_snapshot(user_id: str, extra_txns: list[TransactionRow]) -> DashboardSnapshot:
+    """The snapshot as it would look with `extra_txns` added. Nothing is stored or cached."""
+    return _build_dashboard_snapshot(user_id, extra_txns)
 
 
 _snapshots: dict[str, tuple[int, float, DashboardSnapshot]] = {}

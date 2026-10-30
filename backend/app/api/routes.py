@@ -21,11 +21,12 @@ from app.copilot.engine import answer as copilot_answer
 from app.core.auth import DEMO_USER_IDS, is_public_user, resolve_user_id, verify_token
 from app.core.config import get_settings
 from app.core import store
+from app.core.validate import FUTURE_SLACK_DAYS, SIMULATION_HORIZON_DAYS, check_amount, check_date
 from app.core.ratelimit import RateLimiter, chat_limiter, scoped_key, upload_limiter
-from app.copilot.watcher import watch
+from app.copilot.watcher import review_new_transactions, watch
 from app.forecast.alerts import maybe_send_gap_alert
 from app.ingest.categorize import categorize
-from app.ingest.snapshot import build_dashboard_snapshot, get_last_snapshot
+from app.ingest.snapshot import build_dashboard_snapshot, get_last_snapshot, simulate_dashboard_snapshot
 from app.ingest.upload import parse_transaction_csv
 from app.models import AccountRow, EventRow, TransactionRow
 from app.schemas import (
@@ -255,6 +256,7 @@ class EventPayload(BaseModel):
     model_config = ConfigDict(extra="allow")
     kind: str = "transaction"
     amount: Optional[float] = Field(default=None, allow_inf_nan=False)
+    simulate: Optional[bool] = None  # None = what-if for the shared demo personas, saved for private accounts
     merchant: str = Field(default="Manual entry", min_length=1, max_length=200)
     category: Optional[TxnCategory] = None
     date: Optional[date_type] = None
@@ -264,6 +266,22 @@ class EventPayload(BaseModel):
     description: Optional[str] = Field(default=None, max_length=500)
     is_recurring: bool = False
     recurring_group_id: Optional[str] = Field(default=None, max_length=200)
+
+    @field_validator("amount")
+    @classmethod
+    def _sane_amount(cls, v):
+        return None if v is None else check_amount(v)
+
+    @field_validator("date")
+    @classmethod
+    def _sane_date(cls, v):
+        # What-if events may look ahead (a premium due in 3 months); saved entries are checked again in the handler.
+        return check_date(v, max_ahead_days=SIMULATION_HORIZON_DAYS)
+
+    @field_validator("next_expected_date")
+    @classmethod
+    def _sane_due_date(cls, v):
+        return check_date(v, field="next_expected_date", max_ahead_days=SIMULATION_HORIZON_DAYS)
 
     @field_validator("merchant", mode="before")
     @classmethod
@@ -302,9 +320,19 @@ def add_event(payload: dict, user_id: str = Depends(resolve_user_id)) -> Recompu
     try:
         ev = EventPayload.model_validate(payload)
     except ValidationError as exc:
-        raise HTTPException(422, "; ".join(f"{'.'.join(map(str, e['loc']))}: {e['msg']}" for e in exc.errors())) from exc
+        raise HTTPException(422, "; ".join(_event_error(e) for e in exc.errors())) from exc
+    # The shared demo personas are public: their ledger is never written by what-if events (a single entry would change
+    # every visitor's dashboard). Private accounts keep the original behaviour unless they ask for a what-if.
+    simulated = True if user_id in DEMO_USER_IDS else bool(ev.simulate)
+    if not simulated:
+        try:  # a saved entry is a real ledger row: stricter than a what-if
+            check_date(ev.date, max_ahead_days=FUTURE_SLACK_DAYS)
+            check_date(ev.next_expected_date, field="next_expected_date", max_ahead_days=FUTURE_SLACK_DAYS)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
     _check_account(user_id, ev.account_id)
     new_txns: list[TransactionRow] = []
+    today_ = datetime.now(timezone.utc).date()
 
     def _default_checking_account(account_id: str | None) -> str:
         if account_id:
@@ -320,17 +348,21 @@ def add_event(payload: dict, user_id: str = Depends(resolve_user_id)) -> Recompu
         # Real user adding their first transaction without any account yet:
         # create a default one so the snapshot stops being the empty
         # placeholder (it keys off the user having >= 1 AccountRow).
+        if simulated:
+            return f"acc-events-{user_id}"
         default = AccountRow(user_id=user_id, name="Main account", type="checking", balance=0)
         store.put(default)
         return default.id
 
-    before = get_last_snapshot(user_id) or build_dashboard_snapshot(user_id)
+    before = build_dashboard_snapshot(user_id) if simulated else (get_last_snapshot(user_id) or build_dashboard_snapshot(user_id))
 
     if kind == "transaction":
         amount = ev.amount
         merchant = ev.merchant
         category_value = ev.category.value if ev.category else categorize(merchant, amount).value
-        txn_date = ev.date or datetime.now(timezone.utc).date()
+        txn_date = ev.date or today_
+        if simulated:
+            txn_date = min(txn_date, today_)  # a what-if lands in the current window so its effect is visible
         account_id = _default_checking_account(ev.account_id)
 
         new_txns.append(
@@ -346,7 +378,6 @@ def add_event(payload: dict, user_id: str = Depends(resolve_user_id)) -> Recompu
                 recurring_group_id=ev.recurring_group_id,
             )
         )
-        store.put(*new_txns)
     elif kind == "recurring":
         # The frontend's "New recurring obligation" form (Timeline page)
         # posts {merchant, amount, frequency, next_expected_date} -- this
@@ -360,7 +391,9 @@ def add_event(payload: dict, user_id: str = Depends(resolve_user_id)) -> Recompu
         merchant = ev.merchant
         frequency = ev.frequency
         interval_days = _FREQUENCY_INTERVAL_DAYS.get(frequency, 30)
-        anchor = ev.next_expected_date or datetime.now(timezone.utc).date()
+        anchor = ev.next_expected_date or today_
+        if simulated:
+            anchor = min(anchor, today_)
         # A recurring "obligation" is a commitment (rent, EMI,
         # subscription, ...) -- always an outflow, regardless of the sign
         # the caller passed in.
@@ -376,7 +409,7 @@ def add_event(payload: dict, user_id: str = Depends(resolve_user_id)) -> Recompu
         # trailing numeric IDs differently).
         group_id = f"rg-{normalize_merchant(merchant).replace(' ', '-')}"
         for i in range(3, 0, -1):
-            store.put(
+            new_txns.append(
                 TransactionRow(
                     user_id=user_id,
                     account_id=account_id,
@@ -390,6 +423,17 @@ def add_event(payload: dict, user_id: str = Depends(resolve_user_id)) -> Recompu
                 )
             )
 
+    if simulated:
+        after = simulate_dashboard_snapshot(user_id, new_txns)
+        diff = _build_recompute_diff(
+            trigger=kind, before=before, after=after,
+            extra_narrative="What-if only: nothing was saved to your ledger.",
+        )
+        diff.simulated = True
+        diff.insights = review_new_transactions(user_id, new_txns, new_gap=_new_gap(before, after))  # shown, not stored
+        return diff
+
+    store.put(*new_txns)
     store.put(EventRow(user_id=user_id, kind=kind, payload_json=json.dumps(raw_payload, default=str)))
 
     after = build_dashboard_snapshot(user_id)
@@ -397,6 +441,12 @@ def add_event(payload: dict, user_id: str = Depends(resolve_user_id)) -> Recompu
     diff = _build_recompute_diff(trigger=kind, before=before, after=after)
     diff.insights = watch(user_id, new_txns, new_gap=_new_gap(before, after))
     return diff
+
+
+def _event_error(e: dict) -> str:
+    loc = ".".join(str(p) for p in e["loc"] if p != "body")
+    msg = str(e["msg"]).removeprefix("Value error, ")
+    return f"{loc}: {msg}" if loc else msg
 
 
 @router.post("/alerts/gap/{user_id}")

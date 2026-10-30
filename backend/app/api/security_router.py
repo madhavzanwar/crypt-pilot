@@ -91,7 +91,7 @@ def clear(user_id: str = Depends(resolve_user_id)) -> dict:
 def graph(request: Request, months: int = 6, user_id: str = Depends(resolve_user_id)) -> dict:
     months = max(1, min(months, 12))
     since = date.today() - timedelta(days=30 * months)
-    all_rows, accounts = store.query(TransactionRow, user_id=user_id), store.query(AccountRow, user_id=user_id)
+    all_rows, accounts = agents.security_rows(user_id), store.query(AccountRow, user_id=user_id)
     rows = [t for t in agents._spend(all_rows) if t.date >= since]
     flagged: dict[str, list[str]] = defaultdict(list)
     for fs in agents.run_checks(all_rows, accounts).values():
@@ -145,7 +145,7 @@ class FraudSim(BaseModel):
 @router.post("/{user_id}/simulate-fraud")
 def simulate_fraud(body: FraudSim, user_id: str = Depends(resolve_user_id)) -> dict:
     """Run the agents on your ledger plus one hypothetical payment (nothing is stored)."""
-    rows, accounts = store.query(TransactionRow, user_id=user_id), store.query(AccountRow, user_id=user_id)
+    rows, accounts = agents.security_rows(user_id), store.query(AccountRow, user_id=user_id)
     if not accounts:
         raise HTTPException(409, "Connect a data source first")
     sim = [TransactionRow(id="sim", user_id=user_id, account_id=accounts[0].id, date=date.today(), amount=-abs(body.amount),

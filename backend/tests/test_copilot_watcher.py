@@ -63,6 +63,8 @@ def test_http_large_dining_event_surfaces_insight():
     assert r.status_code == 200, r.text
     ins = r.json()["insights"]
     assert len(ins) == 1 and ins[0]["severity"] in ("warning", "critical")
+    # demo personas are shared and public: the event is a what-if, so the insight is shown but never stored
+    assert r.json()["simulated"] is True
     feed = c.get("/api/copilot/insights/demo-meera").json()
-    assert ins[0]["id"] in [f["id"] for f in feed]
+    assert ins[0]["id"] not in [f["id"] for f in feed]
     assert c.get("/api/copilot/insights/demo-meera", params={"since": "2999-01-01T00:00:00Z"}).json() == []

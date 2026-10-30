@@ -13,6 +13,7 @@ import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.analytics.recurring import detect_recurring
+from app.analytics.basis import through_today
 from app.core import store
 from app.core.auth import resolve_user_id
 from app.models import BudgetRow, TransactionRow
@@ -45,7 +46,7 @@ def _transactions_df(rows: list[TransactionRow]) -> pd.DataFrame:
         )
     df = pd.DataFrame([r.model_dump() for r in rows])
     df["date"] = pd.to_datetime(df["date"])
-    return df.sort_values("date").reset_index(drop=True)
+    return through_today(df.sort_values("date").reset_index(drop=True))
 
 
 def _compute_rollover(
