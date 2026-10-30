@@ -2,10 +2,16 @@
 
 import { describeAccess } from "@/lib/accessLog";
 import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Activity, Database, Download, Eye, Unplug } from "lucide-react";
-import { api } from "@/lib/api";
+import { Activity, Database, Download, Eye, Trash2, Unplug } from "lucide-react";
+import { api, clearApiCache } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
+import { isDemoUserId } from "@/lib/user";
+import { describeDeleted, isDeleteConfirmed } from "@/lib/sharedExpenses";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
+import { Input } from "@/components/shadcn/input";
 import type { DataSource } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
 import { Button } from "@/components/shadcn/button";
@@ -20,6 +26,85 @@ function Preview({ rows }: { rows: unknown[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function DangerZone({ userId }: { userId: string }) {
+  const router = useRouter();
+  const demo = isDemoUserId(userId);
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  function close(next: boolean) {
+    if (busy) return;
+    setOpen(next);
+    if (!next) { setTyped(""); setErr(null); }
+  }
+
+  async function confirmDelete() {
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await api.deleteMyData(userId);
+      clearApiCache();
+      setOpen(false);
+      const counts = describeDeleted(res.deleted);
+      toast.success(`All your data was deleted (${res.total.toLocaleString("en-IN")} items).`, { description: counts.join(", ") || undefined });
+      router.push("/dashboard");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Deleting failed. Nothing was confirmed deleted, please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="border-red-200" data-testid="danger-zone">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base text-red-700">
+          <Trash2 className="size-4" aria-hidden /> Danger zone
+        </CardTitle>
+        <CardDescription>Delete everything FinPilot stores about you. This cannot be undone.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3 text-sm text-graphite">
+        <p><strong className="text-ink">What is deleted:</strong> all your money data (accounts, transactions, debts, income), goals, budgets, documents, and your household memberships. A household you are the only owner of is deleted with its invites, shared expenses and settlements.</p>
+        <p><strong className="text-ink">What is not deleted:</strong> your sign-in account (remove it from your Google or Firebase account), and shared household data of households you do not own.</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button size="sm" onClick={() => { void api.exportAllData(userId).catch((e) => setErr(e.message)); }} data-testid="download-first">
+            <Download className="size-4" /> Download my data first
+          </Button>
+          <Button size="sm" className="bg-red-600 text-white hover:bg-red-700" disabled={demo} onClick={() => setOpen(true)} data-testid="open-delete">
+            <Trash2 className="size-4" /> Delete all my data
+          </Button>
+        </div>
+        {demo && <p className="text-xs" data-testid="demo-note">Demo data is shared and cannot be deleted. Sign in with your own account to use this.</p>}
+        {err && !open && <p role="alert" className="text-red-700">{err}</p>}
+      </CardContent>
+
+      <Dialog open={open} onOpenChange={close}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete all your data?</DialogTitle>
+            <DialogDescription>
+              This permanently deletes your money data, goals, budgets, documents and household memberships. It cannot be undone. Type <strong>DELETE</strong> (capital letters) to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <label htmlFor="delete-confirm" className="text-xs font-medium text-graphite">Type DELETE to confirm</label>
+            <Input id="delete-confirm" value={typed} autoComplete="off" autoCapitalize="off" spellCheck={false} onChange={(e) => setTyped(e.target.value)} />
+          </div>
+          {err && <p role="alert" className="text-sm text-red-700">{err}</p>}
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => close(false)} disabled={busy}>Cancel</Button>
+            <Button className="bg-red-600 text-white hover:bg-red-700" disabled={!isDeleteConfirmed(typed) || busy} onClick={confirmDelete} data-testid="confirm-delete">
+              {busy ? "Deleting…" : "Permanently delete everything"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }
 
@@ -100,6 +185,8 @@ export default function MyDataPage() {
           </motion.div>
         ))}
       </div>
+
+      <DangerZone userId={userId} />
 
       <Card>
         <CardHeader>

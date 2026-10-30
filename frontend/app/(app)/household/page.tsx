@@ -646,7 +646,7 @@ export default function HouseholdPage() {
           {/* Family members without accounts + member transaction monitoring */}
           <ManagedMembersPanel userId={userId} members={members} canEdit={canInvite} onChanged={reloadAll} className="md:col-span-6 lg:col-span-12" />
 
-          {/* Shared expenses ("Who owes who"): the backend has no shared-expenses endpoint yet, so this is an honest empty state, not sample data */}
+          {/* Shared expenses ("Who owes who"): real balances from the shared-expenses API (sample/read-only for demo households) */}
           <div className="md:col-span-6 lg:col-span-12">
             <SharedExpensesCard />
           </div>

@@ -1077,3 +1077,25 @@ export interface PayReview {
 export interface PayReviewItem {
   id: string; payee_name: string; amount: number; status: "open" | "confirmed" | "reported" | "blocked"; created_at: string; review: PayReview;
 }
+
+// --- Delete my data ---
+export interface DeleteMyDataResult { deleted: Record<string, number>; total: number; kept: string[]; at: string }
+
+// --- Shared expenses ("Who owes who") ---
+export interface SharedMember { id: string; name: string; kind: "user" | "managed" }
+export interface SharedExpense {
+  id: string; title: string; amount: number; paid_by: string; split_among: string[];
+  category: string | null; date: string; created_by: string; created_at: string;
+}
+export interface SharedSettlement { id: string; from: string; to: string; amount: number; date: string; note: string | null }
+export interface SharedBalance { member_id: string; name: string; paid: number; owed: number; net: number }
+export interface SharedTransfer { from: string; to: string; amount: number }
+export interface SharedExpensesSummary {
+  household_id: string; sample: boolean; read_only: boolean;
+  members: SharedMember[]; former_members?: { id: string; name: string }[]; expenses: SharedExpense[]; settlements: SharedSettlement[];
+  balances: SharedBalance[]; transfers: SharedTransfer[];
+}
+export interface AddSharedExpenseRequest {
+  title: string; amount: number; paid_by: string; split_among: string[]; category: string | null; date: string | null;
+}
+export interface AddSettlementRequest { from: string; to: string; amount: number; note?: string | null; date?: string | null }
