@@ -322,3 +322,38 @@ class PairRow(SQLModel, table=True):
     user_id: str = Field(index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     claimed_at: datetime | None = None  # first time the phone app used the code
+
+
+class SharedExpenseRow(SQLModel, table=True):
+    """One shared household expense ("Who owes who"). Money is stored in integer paise so splits add up exactly.
+    Members are identified by household member user_id (real user ids and `managed-<hex>` ids). No `user_id` column:
+    the row belongs to the household and is removed with it."""
+
+    __tablename__ = "shared_expenses"
+
+    id: str = Field(default_factory=_uuid, primary_key=True)
+    household_id: str = Field(index=True)
+    title: str
+    amount_paise: int
+    paid_by: str
+    split_among_json: str = "[]"  # JSON-serialized list of member ids
+    category: str | None = None
+    date: date
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class SettlementRow(SQLModel, table=True):
+    """A payment between two household members that settles (part of) what they owe each other."""
+
+    __tablename__ = "settlements"
+
+    id: str = Field(default_factory=_uuid, primary_key=True)
+    household_id: str = Field(index=True)
+    from_member: str
+    to_member: str
+    amount_paise: int
+    date: date
+    note: str | None = None
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

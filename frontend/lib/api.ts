@@ -33,6 +33,10 @@ import type {
   ProfileLevel,
   ProfileQuestion,
   Household,
+  DeleteMyDataResult,
+  SharedExpensesSummary,
+  AddSharedExpenseRequest,
+  AddSettlementRequest,
   HouseholdInvite,
   HouseholdSummary,
   AddManagedMemberRequest,
@@ -488,6 +492,22 @@ export const api = {
 
   // Notifications
   notifications: (userId: string) => apiFetch<NotificationItem[]>(`/api/notifications/${userId}`),
+
+  // Delete my data: irreversible. The server needs the exact confirmation text; the GET cache is always cleared afterwards.
+  deleteMyData: (userId: string) =>
+    apiFetch<DeleteMyDataResult>(`/api/my-data/${encodeURIComponent(userId)}/delete`, {
+      method: "POST",
+      body: JSON.stringify({ confirm: "DELETE MY DATA" }),
+    }).finally(clearApiCache),
+
+  // Shared expenses ("Who owes who"). GET is null when the user has no household.
+  getSharedExpenses: (userId: string) => apiFetch<SharedExpensesSummary | null>(`/api/household/${encodeURIComponent(userId)}/shared-expenses`),
+  addSharedExpense: (userId: string, req: AddSharedExpenseRequest) =>
+    apiFetch<SharedExpensesSummary>(`/api/household/${encodeURIComponent(userId)}/shared-expenses`, { method: "POST", body: JSON.stringify(req) }).finally(clearApiCache),
+  deleteSharedExpense: (userId: string, expenseId: string) =>
+    apiFetch<SharedExpensesSummary>(`/api/household/${encodeURIComponent(userId)}/shared-expenses/${encodeURIComponent(expenseId)}`, { method: "DELETE" }).finally(clearApiCache),
+  addSettlement: (userId: string, req: AddSettlementRequest) =>
+    apiFetch<SharedExpensesSummary>(`/api/household/${encodeURIComponent(userId)}/settlements`, { method: "POST", body: JSON.stringify(req) }).finally(clearApiCache),
 
   // Household & Collaboration (Pillar 5D)
   household: (userId: string) => apiFetch<HouseholdSummary>(`/api/household/${userId}`),
