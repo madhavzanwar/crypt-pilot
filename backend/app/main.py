@@ -15,6 +15,7 @@ from app.api.copilot_feed_router import router as copilot_feed_router
 from app.api.documents_router import router as documents_router
 from app.api.goals_router import router as goals_router
 from app.api.household_router import router as household_router
+from app.api.household_shared_router import router as household_shared_router
 from app.api.my_data_router import router as my_data_router
 from app.api.networth_router import router as networth_router
 from app.api.notifications_router import router as notifications_router
@@ -158,6 +159,7 @@ app.include_router(ops_router)
 app.include_router(jobs_router)
 app.include_router(pay_router, prefix="/api")
 app.include_router(household_router)
+app.include_router(household_shared_router)
 app.include_router(my_data_router)
 app.include_router(networth_router)
 app.include_router(notifications_router)
