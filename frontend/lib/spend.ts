@@ -61,8 +61,18 @@ function monthLabel(month: string): string {
   return MONTH_FMT.format(new Date(`${month}-01T00:00:00`));
 }
 
-/** Aggregates raw transactions into monthly, category and merchant totals. Positive amount = inflow. */
-export function summarizeSpend(txns: Transaction[], monthsBack = 6): SpendSummary {
+/** Local calendar date as YYYY-MM-DD. */
+export function todayISO(now: Date = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Aggregates raw transactions into monthly, category and merchant totals. Positive amount = inflow.
+ * "This month" is anchored on TODAY like the backend: rows dated after today are not part of the real ledger yet,
+ * so one mis-dated future row can never move the latest month.
+ */
+export function summarizeSpend(allTxns: Transaction[], monthsBack = 6, today: string = todayISO()): SpendSummary {
+  const txns = allTxns.filter((t) => t.date.slice(0, 10) <= today);
   const byMonth = new Map<string, { income: number; spend: number }>();
   for (const t of txns) {
     const key = t.date.slice(0, 7);

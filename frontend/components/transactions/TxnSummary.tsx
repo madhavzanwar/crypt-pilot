@@ -4,7 +4,7 @@ import { useCallback, useMemo } from "react";
 import { ArrowDownToLine, ArrowUpFromLine, Equal } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
-import { summarizeSpend } from "@/lib/spend";
+import { summarizeSpend, todayISO } from "@/lib/spend";
 import type { Transaction } from "@/lib/types";
 import { formatCurrency, formatSignedCurrency } from "@/components/ui/money";
 import { WeeklyCompare } from "@/components/transactions/WeeklyCompare";
@@ -62,7 +62,7 @@ export function TxnSummary() {
   const topIncome = useMemo(() => {
     const m = new Map<string, number>();
     const latestMonth = spend.months.at(-1)?.month;
-    for (const t of txns) if (t.category === "income" && t.amount > 0 && latestMonth && t.date.startsWith(latestMonth)) m.set(t.merchant, (m.get(t.merchant) ?? 0) + t.amount);
+    for (const t of txns) if (t.category === "income" && t.amount > 0 && latestMonth && t.date.startsWith(latestMonth) && t.date.slice(0, 10) <= todayISO()) m.set(t.merchant, (m.get(t.merchant) ?? 0) + t.amount);
     return [...m].sort((a, b) => b[1] - a[1])[0];
   }, [txns, spend.months]);
   const topCat = [...spend.categories].filter((c) => c.total > 0).sort((a, b) => b.total - a.total)[0];
