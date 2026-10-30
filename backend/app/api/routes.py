@@ -14,6 +14,7 @@ from datetime import date as date_type
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, UploadFile
 
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from app.analytics.recurring import normalize_merchant
@@ -38,6 +39,7 @@ from app.schemas import (
     SimulationRequest,
     SimulationResult,
 )
+from app.security.secret_guard import SECRET_MESSAGE, message_has_secret
 from app.simulate.engine import ForecastInputs, simulate
 
 router = APIRouter()
@@ -131,6 +133,9 @@ async def _resolve_body_user_id(req: ChatRequest, authorization: str | None = He
 def chat(req: ChatRequest, request: Request, user_id: str = Depends(_resolve_body_user_id)) -> AnswerContract:
     if not req.message.strip():
         raise HTTPException(400, "message must not be empty")
+    if message_has_secret(req.message, req.history):
+        # Rejected before anything reads, logs or answers it: the text is never echoed back (not even as `query`).
+        return JSONResponse(status_code=400, content={"error": "secret_input", "detail": SECRET_MESSAGE})
     chat_limiter.check(scoped_key(request, user_id))
     return copilot_answer(user_id, req.message, force_offline=req.force_offline, model=req.model, history=req.history[-10:], language=req.language, simple=req.simple)
 
