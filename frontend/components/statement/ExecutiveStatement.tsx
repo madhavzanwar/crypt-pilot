@@ -59,6 +59,12 @@ const PERSONA_PROFILES: Record<
  * 3. Net Worth Delta & Capital Allocation Balance Sheet
  * 4. Delineated Three-Lane Verification Contract (Facts, Predictions, Strategic Interventions)
  */
+function parseStamp(raw: string): Date | null {
+  const iso = /^\d{4}-\d{2}-\d{2}T[\d:.]+$/.test(raw) ? `${raw}Z` : raw;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export function ExecutiveStatement({ dashboard, accounts, transactions, userId }: ExecutiveStatementProps) {
   const profile = PERSONA_PROFILES[userId] || {
     fullName: userId.replace("demo-", "").toUpperCase(),
@@ -105,14 +111,12 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
   );
 
   const period = statementPeriod(transactions, dashboard.generated_at);
-  const generated = new Date(dashboard.generated_at);
-  const stamp = Number.isNaN(generated.getTime()) ? null : generated;
+  // The server stamp is UTC (sometimes without a zone suffix); show it in the reader's own timezone, never a fixed one.
+  const stamp = parseStamp(dashboard.generated_at);
   const auditTimestamp = stamp
-    ? `${stamp.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })}, ${stamp.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" })} IST`
+    ? `${stamp.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}, ${stamp.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZoneName: "short" })}`
     : "n/a";
-  const certifiedOn = stamp
-    ? stamp.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })
-    : "n/a";
+  const certifiedOn = stamp ? stamp.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "n/a";
 
   const spend = summarizeSpend(transactions);
   const recent = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
