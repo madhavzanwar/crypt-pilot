@@ -1,4 +1,4 @@
-import { formatApiError, SecretInputError, secretInputDetail } from "@/lib/apiError";
+import { extractErrorMessage, formatApiError, photoErrorMessage, SecretInputError, secretInputDetail } from "@/lib/apiError";
 import { TranslateCache } from "@/lib/translateCache";
 import { getLang, getSimpleNow } from "@/lib/i18n";
 
@@ -157,6 +157,18 @@ const translations = new TranslateCache(
   () => (typeof window === "undefined" ? null : window.localStorage),
 );
 
+/** Failed /api/ocr/extract call: keeps the HTTP status so the UI can pick a friendly message or fall back to the CSV importer. */
+export class ExtractError extends Error {
+  status: number;
+  detail: string;
+  constructor(status: number, detail: string) {
+    super(extractErrorMessage(status, detail));
+    this.name = "ExtractError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
 export const api = {
   health: () => apiFetch<{ status: string }>("/api/health"),
   /** English UI text -> Hindi/Marathi (server caches; used only for text nobody hand-translated). */
@@ -253,7 +265,7 @@ export const api = {
   aaImport: (userId: string, consentId: string) =>
     apiFetch<{ accounts: number; transactions: number }>(`/api/aa/${userId}/import`, { method: "POST", body: JSON.stringify({ consent_id: consentId }) }),
   connectConnector: (userId: string, connector: string, profile: ConnectProfile, url = "") =>
-    apiFetch<{ connected: boolean; accounts: number; transactions: number }>(
+    apiFetch<{ connected: boolean; accounts: number; transactions: number; has_data?: boolean; message?: string }>(
       `/api/connectors/${userId}/${connector}/connect`,
       { method: "POST", body: JSON.stringify({ profile, url }) }
     ),
@@ -261,7 +273,7 @@ export const api = {
   syncSheet: async (userId: string): Promise<boolean> => {
     const res = await fetch(`${API_URL}/api/connectors/${userId}/google_sheets/sync`, { method: "POST", headers: await authHeader() });
     clearApiCache();
-    if (!res.ok) throw new Error(`Sheet sync failed: ${res.status}`);
+    if (!res.ok) throw new Error(formatApiError(res.status, await res.text()));
     const { changed } = (await res.json()) as { changed: boolean };
     if (changed) notifyIfWrite("POST");
     return changed;
@@ -368,7 +380,10 @@ export const api = {
     const body = new FormData();
     body.append("file", file);
     const res = await fetch(`${API_URL}/api/ocr/extract/${userId}`, { method: "POST", headers: await authHeader(), body });
-    if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `Upload failed: ${res.status}`);
+    if (!res.ok) {
+      const detail = (await res.json().catch(() => null))?.detail;
+      throw new ExtractError(res.status, typeof detail === "string" ? detail : "");
+    }
     return res.json();
   },
   importOcr: (userId: string, transactions: OcrTxn[]) =>
@@ -381,7 +396,7 @@ export const api = {
     if (photo) body.append("photo", photo);
     const res = await fetch(`${API_URL}/api/expenses/${userId}`, { method: "POST", headers: await authHeader(), body });
     clearApiCache();
-    if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `Could not save: ${res.status}`);
+    if (!res.ok) throw new Error(photoErrorMessage(res.status, (await res.json().catch(() => null))?.detail, "Could not save that item."));
     return res.json();
   },
   // Photo -> price memory: teach once (photo + name + price), then a photo alone books the expense
@@ -392,7 +407,7 @@ export const api = {
     body.append("photo", photo);
     const res = await fetch(`${API_URL}/api/expenses/${userId}/teach`, { method: "POST", headers: await authHeader(), body });
     clearApiCache();
-    if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `Could not save: ${res.status}`);
+    if (!res.ok) throw new Error(photoErrorMessage(res.status, (await res.json().catch(() => null))?.detail, "Could not save that item."));
     return res.json() as Promise<{ item: string; price: number }>;
   },
   snapPhoto: async (userId: string, photo: File): Promise<SnapResult> => {
@@ -400,7 +415,7 @@ export const api = {
     body.append("photo", photo);
     const res = await fetch(`${API_URL}/api/expenses/${userId}/snap`, { method: "POST", headers: await authHeader(), body });
     clearApiCache();
-    if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `Could not read that photo: ${res.status}`);
+    if (!res.ok) throw new Error(photoErrorMessage(res.status, (await res.json().catch(() => null))?.detail, "Could not read that photo."));
     return res.json();
   },
   /** Phone pay app: books a scanned-QR payment into the ledger (no real money moves). `code` is the pairing code from the dashboard. */

@@ -94,3 +94,12 @@ export function humanize(slug: string): string {
 export function humanizeSlugs(text: string): string {
   return text.replace(/\b[a-z]+(?:_[a-z]+)+\b/g, (m) => m.replace(/_/g, " "));
 }
+
+/** Goal target date (YYYY-MM-DD, optional): must be today or later. `now` is injectable for tests. */
+export function validateTargetDate(iso: string, now: Date = new Date()): string | null {
+  if (!iso) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso) || Number.isNaN(Date.parse(`${iso}T00:00:00Z`))) return "Pick a valid target date.";
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  if (iso < today) return "The target date is in the past. Pick today or a later date.";
+  return null;
+}
