@@ -2,7 +2,7 @@
 // Usage: BASE_URL=http://localhost:3750 node tests/transactions-quickviews.e2e.mjs
 import { open } from "./_pw.mjs";
 
-const { browser, page, logs } = await open("/transactions");
+const { browser, page } = await open("/transactions");
 const crashed = async () => (await page.getByText("Something went wrong").count()) > 0;
 const errs = [];
 page.on("pageerror", (e) => errs.push(e.message));

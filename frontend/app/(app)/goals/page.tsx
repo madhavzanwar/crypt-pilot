@@ -42,6 +42,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { triggerConfetti } from "@/components/ui/Confetti";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { validateTargetDate } from "@/lib/validate";
+import { todayISO } from "@/lib/spend";
 
 export interface CoverOption {
   key: string;
@@ -108,6 +109,7 @@ export default function GoalsPage() {
   const [name, setName] = useState("");
   const [targetAmount, setTargetAmount] = useState("");
   const [targetDate, setTargetDate] = useState("");
+  const [minDate] = useState(() => todayISO());
   const [pickedCover, setPickedCover] = useState<string | null>(null);
   const [fundingAccountId, setFundingAccountId] = useState("");
   const [autoTrack, setAutoTrack] = useState(false);
@@ -276,7 +278,7 @@ export default function GoalsPage() {
               <input
                 id="goal-date"
                 type="date"
-                min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)}
+                min={minDate}
                 value={targetDate}
                 onChange={(e) => setTargetDate(e.target.value)}
                 className="w-full rounded-chip border border-mist bg-white px-3 py-2 text-sm text-ink focus:border-ember focus:outline-none focus:ring-1 focus:ring-ember"
