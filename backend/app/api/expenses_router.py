@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from app.core import store
 from app.core.auth import resolve_user_id
-from app.ocr import parse_receipt, read_text
+from app.ocr import OcrUnavailable, parse_receipt, read_text
 from app.expenses import vlm
 from app.expenses.suggest import item_key, remember, suggest
 from app.models import AccountRow, PriceMemoryRow, TransactionRow
@@ -56,7 +56,10 @@ async def suggest_expense(
 
 def _suggest_sync(user_id: str, image: bytes | None, name: str | None, city: str | None) -> dict:
     # CPU-bound (OCR + CLIP): runs in a worker thread so it never blocks the event loop for other requests
-    text = read_text(image) if image else ""
+    try:
+        text = read_text(image) if image else ""
+    except OcrUnavailable:  # no OCR engine here: carry on with the photo model / name instead of failing
+        text = ""
     bill = parse_receipt(text)
     if text and not bill["total"]:  # readable text but no total found: let the vision model look at it
         bill = vlm.read_bill(image)

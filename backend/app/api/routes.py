@@ -88,6 +88,7 @@ def _forecast_inputs_from_snapshot(snap: DashboardSnapshot, user_id: str) -> For
         transactions=None,
         horizon_days=snap.forecast.horizon_days,
         monthly_income=snap.monthly_income,
+        baseline_monthly_net=snap.monthly_income - snap.monthly_expenses,
     )
 
 

@@ -56,11 +56,13 @@ AGENTS = [
 ]
 
 
-def _finding(agent: str, severity: str, title: str, detail: str, rows: list[TransactionRow], merchant: str | None = None) -> dict:
+def _finding(agent: str, severity: str, title: str, detail: str, rows: list[TransactionRow], merchant: str | None = None,
+             amount: float | None = None) -> dict:
+    """`amount` overrides the sum of the rows' outflows (for findings about a recurring series that has no single row)."""
     return {
         "agent": agent, "severity": severity, "title": title, "detail": detail,
         "merchant": merchant or (rows[0].merchant if rows else None),
-        "amount": round(sum(-r.amount for r in rows if r.amount < 0), 2),
+        "amount": round(abs(amount), 2) if amount is not None else round(sum(-r.amount for r in rows if r.amount < 0), 2),
         "txn_ids": [r.id for r in rows],
     }
 
@@ -142,7 +144,8 @@ def subscription_sleuth(rows, _a) -> list[dict]:
         recurring = detect_recurring(_df(spend))
         for r in find_redundant_subscriptions(recurring):
             out.append(_finding("subscription_sleuth", "low", f"Overlapping subscription: {r.merchant}",
-                                f"₹{r.amount:,.0f} {r.frequency.value}. You pay for more than one service of the same kind, so consider keeping one.", [], r.merchant))
+                                f"₹{abs(r.amount):,.0f} {r.frequency.value}. You pay for more than one service of the same kind, so consider keeping one.", [], r.merchant,
+                                amount=abs(r.amount)))
     series = defaultdict(list)
     for r in spend:
         if r.is_recurring:

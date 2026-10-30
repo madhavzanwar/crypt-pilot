@@ -292,6 +292,7 @@ def _build_dashboard_snapshot(user_id: str, extra_txns: Optional[list[Transactio
         transactions=df,
         horizon_days=_FORECAST_HORIZON_DAYS,
         monthly_income=monthly_income,
+        baseline_monthly_net=monthly_income - monthly_expenses,
     )
     recommendations = generate_recommendations(
         recurring=recurring_all,

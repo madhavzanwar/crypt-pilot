@@ -35,6 +35,7 @@ from app.api.pay_router import router as pay_router
 from app.api.webhooks_router import router as webhooks_router
 from app.api.tax_router import router as tax_router
 from app.api.transactions_router import router as transactions_router
+from app.ocr import OCR_UNAVAILABLE_MESSAGE, OcrUnavailable
 from app.core.audit import log_audit_event
 from app.crypto_bridge.router import router as crypto_router
 
@@ -107,6 +108,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(OcrUnavailable)
+async def _ocr_unavailable(_: Request, exc: OcrUnavailable) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": OCR_UNAVAILABLE_MESSAGE})
+
 
 @app.exception_handler(RequestValidationError)
 async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
