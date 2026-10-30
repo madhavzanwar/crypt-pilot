@@ -13,3 +13,12 @@ test("502 shows backend detail and sharing hint", () => {
   assert.equal(m, "Could not read the sheet. Share it as Anyone with the link can view.");
   assert.match(formatApiError(500, "boom"), /Something went wrong/);
 });
+import { validateTargetDate } from "../lib/validate.ts";
+test("goal target date must not be in the past", () => {
+  const now = new Date(2026, 9, 30, 12);
+  assert.equal(validateTargetDate("", now), null);
+  assert.equal(validateTargetDate("2026-10-30", now), null);
+  assert.equal(validateTargetDate("2027-01-01", now), null);
+  assert.match(validateTargetDate("2020-01-01", now), /past/);
+  assert.match(validateTargetDate("garbage", now), /valid/);
+});

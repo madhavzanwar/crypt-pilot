@@ -41,6 +41,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { triggerConfetti } from "@/components/ui/Confetti";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { validateTargetDate } from "@/lib/validate";
 
 export interface CoverOption {
   key: string;
@@ -126,6 +127,11 @@ export default function GoalsPage() {
     }
     if (!amount || amount <= 0) {
       setCreateError("Enter a target amount greater than zero.");
+      return;
+    }
+    const dateError = validateTargetDate(targetDate);
+    if (dateError) {
+      setCreateError(dateError);
       return;
     }
     setCreating(true);
@@ -270,6 +276,7 @@ export default function GoalsPage() {
               <input
                 id="goal-date"
                 type="date"
+                min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)}
                 value={targetDate}
                 onChange={(e) => setTargetDate(e.target.value)}
                 className="w-full rounded-chip border border-mist bg-white px-3 py-2 text-sm text-ink focus:border-ember focus:outline-none focus:ring-1 focus:ring-ember"

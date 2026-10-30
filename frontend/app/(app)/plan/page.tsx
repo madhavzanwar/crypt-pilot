@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
@@ -62,12 +63,14 @@ function ParamsForm({ value, onApply }: { value: PlanParams; onApply: (p: PlanPa
     setSeen(value);
     setDraft({});
   }
-  const field = (k: keyof PlanParams, label: string) => (
+  const field = (k: keyof PlanParams, label: string, placeholder: string) => (
     <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-pewter">
       {label}
       <input
         className={INPUT}
         type="number"
+        inputMode="decimal"
+        placeholder={placeholder}
         value={draft[k] ?? (value[k] === undefined ? "" : String(value[k]))}
         onChange={(e) => setDraft({ ...draft, [k]: e.target.value })}
       />
@@ -80,10 +83,10 @@ function ParamsForm({ value, onApply }: { value: PlanParams; onApply: (p: PlanPa
   };
   return (
     <div className="flex flex-wrap items-end gap-3">
-      {field("reserve", "Min reserve")}
-      {field("goal_amount", "Goal amount")}
-      {field("goal_month", "Goal by month")}
-      {field("tolerance", "Risk tolerance (0-1)")}
+      {field("reserve", "Min reserve", "Auto (from your spending)")}
+      {field("goal_amount", "Goal amount", "With goal month, e.g. 50000")}
+      {field("goal_month", "Goal by month", "With goal amount, 1-6")}
+      {field("tolerance", "Risk tolerance (0-1)", "Default 0.10")}
       <Button variant="primary" onClick={apply}>Plan</Button>
     </div>
   );
@@ -162,6 +165,12 @@ export default function PlanPage() {
 
       {loading && !data ? (
         <PlanSkeleton />
+      ) : error && !data && /months of history/i.test(error) ? (
+        <EmptyState
+          title="Not enough history to plan yet"
+          body="A plan needs a few months of transactions. Upload a bank statement and it will appear here."
+          action={<Link href="/upload"><Button variant="secondary">Upload a statement</Button></Link>}
+        />
       ) : error && !data ? (
         <EmptyState
           title="Could not build the plan"
