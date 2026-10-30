@@ -83,6 +83,14 @@ _BALANCE_ROW = re.compile(r"^\W*(?:opening|closing|brought\s*forward|carried\s*f
 _FOOTER = re.compile(r"\b(?:page\s*\d+|printed|authori[sz]ed|signatory|all amounts|computer generated)\b", re.I)
 
 
+_DIRECTION_TOKEN = re.compile(r"(?<![\w/])(?:dr|cr)\.?(?![\w/])", re.I)
+
+
+def clean_description(desc: str) -> str:
+    """Drop standalone Dr/Cr tokens (they are direction markers, not part of the merchant name) and tidy the spaces."""
+    return re.sub(r"\s+", " ", _DIRECTION_TOKEN.sub(" ", desc)).strip(" -|\t")
+
+
 def parse_transactions(clean_text: str) -> list[dict]:
     """Rows like 'DATE  narration  amount  [balance]'. Wrapped narration lines are joined to the row above.
 
@@ -125,7 +133,7 @@ def parse_transactions(clean_text: str) -> list[dict]:
             sign = -1
         if balance is not None:
             prev_balance = balance
-        rows.append({"date": d.isoformat(), "description": desc[:160] or "Transaction", "amount": round(sign * value, 2), "balance": balance})
+        rows.append({"date": d.isoformat(), "description": clean_description(desc)[:160] or "Transaction", "amount": round(sign * value, 2), "balance": balance})
     return rows
 
 

@@ -22,7 +22,17 @@ class RateLimiter:
         self.window_seconds = window_seconds
         self._calls: dict[str, deque[float]] = defaultdict(deque)
 
-    def check(self, key: str) -> None:
+    def _human_wait(self, seconds: int) -> str:
+        if seconds < 90:
+            return "a minute" if seconds > 45 else f"{max(seconds, 1)} seconds"
+        minutes = round(seconds / 60)
+        if minutes >= 55:
+            return "an hour" if minutes <= 65 else f"{round(minutes / 60)} hours"
+        return f"{minutes} minutes"
+
+    def check(self, key: str, *, record: bool = True) -> None:
+        """Raise 429 when `key` is over its limit. With `record=False` the call is only checked; call `record(key)` once the
+        request turned out to be valid, so rejected/failed attempts do not eat the user's allowance."""
         now = time.monotonic()
         if len(self._calls) > 5000:  # evict idle keys so unique client ids cannot grow memory without bound
             for k in [k for k, v in self._calls.items() if not v or now - v[-1] > self.window_seconds]:
@@ -34,10 +44,16 @@ class RateLimiter:
             retry_after = int(self.window_seconds - (now - q[0])) + 1
             raise HTTPException(
                 429,
-                f"Rate limit exceeded ({self.max_calls} requests per {int(self.window_seconds)}s). "
-                f"Retry in ~{retry_after}s.",
+                f"You've reached the limit for now ({self.max_calls} per {self._human_wait(int(self.window_seconds))}). "
+                f"Retry in about {self._human_wait(retry_after)}.",
+                headers={"Retry-After": str(retry_after)},
             )
-        q.append(now)
+        if record:
+            q.append(now)
+
+    def record(self, key: str) -> None:
+        """Count one accepted request against `key` (pair with `check(key, record=False)`)."""
+        self._calls[key].append(time.monotonic())
 
 
 # One shared instance per protected endpoint, keyed by the resolved user_id

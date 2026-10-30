@@ -191,7 +191,8 @@ async def upload_transactions(file: UploadFile, request: Request, user_id: str =
     was last cached for this user (or a freshly computed one if none was
     cached yet), "after" is recomputed post-ingest.
     """
-    upload_limiter.check(scoped_key(request, user_id))
+    rl_key = scoped_key(request, user_id)
+    upload_limiter.check(rl_key, record=False)  # only validated uploads use up the allowance
     raw = await file.read(_MAX_UPLOAD_BYTES + 1)
     if not raw:
         raise HTTPException(400, "uploaded file is empty")
@@ -205,6 +206,7 @@ async def upload_transactions(file: UploadFile, request: Request, user_id: str =
         raise HTTPException(400, str(exc)) from exc
     if len(rows) > _MAX_UPLOAD_ROWS:
         raise HTTPException(413, f"Too many transactions in one upload (max {_MAX_UPLOAD_ROWS})")
+    upload_limiter.record(rl_key)
 
     before = get_last_snapshot(user_id) or build_dashboard_snapshot(user_id)
 
