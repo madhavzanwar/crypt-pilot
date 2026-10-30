@@ -150,6 +150,10 @@ function Field({ label, children, error }: { label: string; children: ReactNode;
 
 function DiffCard({ diff }: { diff: RecomputeDiff }) {
   const scoreDelta = diff.health_score_after - diff.health_score_before;
+  // The backend's own what-if sentence is replaced by the banner above, so it is not shown twice.
+  const narrative = diff.simulated
+    ? diff.narrative.replace(/What-if only: nothing was saved to your ledger\.?\s*/i, "").trim()
+    : diff.narrative;
 
   return (
     <Card className="gap-5 px-6">
@@ -162,9 +166,15 @@ function DiffCard({ diff }: { diff: RecomputeDiff }) {
         </div>
       </CardHeader>
 
-      {diff.narrative && (
+      {diff.simulated && (
+        <p role="status" data-testid="whatif-note" className="rounded-surface border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900">
+          What-if only: nothing was saved
+        </p>
+      )}
+
+      {narrative && (
         <div className="rounded-surface border border-black/[0.06] bg-white p-4 text-sm leading-relaxed text-graphite">
-          {humanizeSlugs(diff.narrative)}
+          {humanizeSlugs(narrative)}
         </div>
       )}
 

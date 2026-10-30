@@ -49,3 +49,25 @@ export function formatApiError(status: number, text: string): string {
   }
   return "That request could not be completed. Please check your inputs and try again.";
 }
+
+/** The backend refused a chat message that looked like a seed phrase or private key (400 {error:"secret_input", detail}). `message` is the friendly detail. */
+export class SecretInputError extends Error {
+  constructor(detail: string) {
+    super(detail);
+    this.name = "SecretInputError";
+  }
+}
+
+/** Returns the friendly detail when `text` is a secret_input rejection body, else null. */
+export function secretInputDetail(status: number, text: string): string | null {
+  if (status !== 400) return null;
+  try {
+    const body = JSON.parse(text) as { error?: unknown; detail?: unknown };
+    if (body.error !== "secret_input") return null;
+    return typeof body.detail === "string" && body.detail.trim()
+      ? body.detail
+      : "This looks like a seed phrase or a private key. Never share it with anyone, including this chat.";
+  } catch {
+    return null;
+  }
+}

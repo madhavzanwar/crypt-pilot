@@ -18,6 +18,7 @@ import { formatDate } from "@/lib/format";
 import { formatCurrency } from "@/components/ui/money";
 import { useVoiceT } from "@/lib/crypto/voice/strings";
 import { messageHasSecret } from "@/lib/crypto/extractAddress";
+import { SecretInputError } from "@/lib/apiError";
 import { cleanHistory, findSplitSecret, REDACTED } from "@/lib/crypto/secretGuard";
 import { runActions, snapshotScreen } from "@/lib/voiceAgent";
 import { isRecentTransactionQuestion, pageToOpen, scrollCommand, scrollToSelector, speak, stopSpeaking, useVoiceInput } from "@/lib/voice";
@@ -239,8 +240,15 @@ export function ChatPopup() {
         doneStep("Done");
         patch({ answer: reply.text.replace(/\*\*/g, ""), over: true });
       }
-    } catch {
+    } catch (err) {
       if (spoken) patch({ over: true });
+      if (err instanceof SecretInputError) {
+        // the server refused it as a secret: hide the sent text and show the server's friendly explanation
+        setMsgs((all) => all.map((m, i) => (i === all.length - 1 && m.role === "user" ? { ...m, text: REDACTED } : m)));
+        setMsgs((m) => [...m, { role: "assistant", text: err.message }]);
+        setLoading(false);
+        return;
+      }
       reply = { role: "assistant", text: "Sorry, I couldn't answer right now. Please try again in a minute." };
     }
     setMsgs((m) => [...m, reply]);

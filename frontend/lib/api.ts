@@ -1,4 +1,4 @@
-import { formatApiError } from "@/lib/apiError";
+import { formatApiError, SecretInputError, secretInputDetail } from "@/lib/apiError";
 import { TranslateCache } from "@/lib/translateCache";
 import { getLang, getSimpleNow } from "@/lib/i18n";
 
@@ -114,6 +114,8 @@ function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 /** Friendly message for a failed response (see lib/apiError.ts); technical detail goes to the console only. */
 async function errorMessage(path: string, res: Response): Promise<string> {
   const text = await res.text();
+  const secret = secretInputDetail(res.status, text);
+  if (secret) throw new SecretInputError(secret);
   if (res.status >= 500 || res.status === 422) console.error(`API ${path} failed: ${res.status} ${text.slice(0, 500)}`);
   return formatApiError(res.status, text);
 }

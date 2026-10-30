@@ -205,6 +205,8 @@ export interface RecomputeDiff {
   new_recommendations: Recommendation[];
   removed_recommendation_actions: ActionType[];
   narrative: string;
+  /** True: a what-if only; nothing was written to the ledger. */
+  simulated?: boolean;
 }
 
 export interface SimulationRequest {
