@@ -9,6 +9,7 @@ from datetime import date
 
 import pandas as pd
 
+from app.analytics.basis import trailing_income_expenses
 from app.schemas import TxnCategory
 
 # Categories treated as "essential" spend for emergency-fund sizing.
@@ -34,28 +35,8 @@ def trailing_savings_rate(df: pd.DataFrame, months: int, as_of: date | None = No
     Income = sum of positive amounts; expenses = sum of |negative amounts|,
     excluding transfers between the user's own accounts (category=transfer)
     which are not real spend."""
-    if df.empty:
-        return 0.0
-
-    work = df.copy()
-    work["date"] = pd.to_datetime(work["date"])
-    as_of_ts = pd.Timestamp(as_of) if as_of is not None else work["date"].max()
-    window_start = as_of_ts - pd.DateOffset(months=months)
-    window = work[(work["date"] > window_start) & (work["date"] <= as_of_ts)]
-    # Exclude transfers between the user's own accounts, AND credit-card bill
-    # payments: a CC bill payment moves cash from checking to pay off charges
-    # that were already counted as spend (dining/shopping/etc.) at the time
-    # they were made, so including it too double-counts that spend. (Bug
-    # found during integration: real persona data has both the original
-    # credit-card purchase AND the monthly bill-payment transaction, which
-    # without this exclusion pushed several personas' savings rate strongly
-    # negative even though their discretionary spend alone was reasonable.)
-    _excluded = {TxnCategory.transfer.value, TxnCategory.credit_card_payment.value}
-    window = window[~window["category"].isin(_excluded)]
-
-    income_total = window.loc[window["amount"] > 0, "amount"].sum()
-    expense_total = -window.loc[window["amount"] < 0, "amount"].sum()
-    return savings_rate(float(income_total), float(expense_total))
+    income_total, expense_total = trailing_income_expenses(df, months, as_of)
+    return savings_rate(income_total, expense_total)
 
 
 def emergency_fund_months(

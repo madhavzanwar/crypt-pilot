@@ -1,5 +1,6 @@
 "use client";
 
+import { currencySymbol, fromDisplayAmount, toDisplayAmount } from "@/components/ui/money";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
@@ -11,6 +12,7 @@ import { Input } from "@/components/shadcn/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/shadcn/tabs";
 import { Chip } from "@/components/ui/Chip";
 import { formatDate } from "@/lib/format";
+import { humanizeSlugs, validateAmount, validateEventDate, validateText } from "@/lib/validate";
 import { cn } from "@/lib/utils";
 
 type EventKind = "transaction" | "recurring";
@@ -19,7 +21,8 @@ export function TimelineTab() {
   const userId = useUserId();
   const [kind, setKind] = useState<EventKind>("transaction");
   const [merchant, setMerchant] = useState("");
-  const [amount, setAmount] = useState(1000);
+  const [amount, setAmount] = useState("1000");
+  const [touched, setTouched] = useState(false);
   const [frequency, setFrequency] = useState("monthly");
   const [date, setDate] = useState(() => {
     const d = new Date();
@@ -30,19 +33,26 @@ export function TimelineTab() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const errors = {
+    merchant: validateText(merchant, "Description"),
+    amount: validateAmount(amount, "Amount"),
+    date: validateEventDate(date),
+  };
+  const show = (k: keyof typeof errors) => (touched ? errors[k] : null);
+
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!Number.isFinite(amount) || amount < 1) return setError("Enter an amount of at least ₹1");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return setError("Pick a valid date");
+    setTouched(true);
+    if (errors.merchant || errors.amount || errors.date) return setError(null);
     setSubmitting(true);
     setError(null);
     setDiff(null);
     try {
-      const signedAmount = -Math.abs(amount);
+      const signedAmount = -Math.abs(Number(amount));
       const payload =
         kind === "transaction"
-          ? { kind: "transaction", merchant, amount: signedAmount, date }
-          : { kind: "recurring", merchant, amount: signedAmount, frequency, next_expected_date: date };
+          ? { kind: "transaction", merchant: merchant.trim(), amount: signedAmount, date }
+          : { kind: "recurring", merchant: merchant.trim(), amount: signedAmount, frequency, next_expected_date: date };
       const result = await api.addEvent(userId, payload);
       setDiff(result);
     } catch (err) {
@@ -60,7 +70,7 @@ export function TimelineTab() {
           <p className="text-sm text-graphite">Add a future expense or bill and see how your cash flow and health score react.</p>
         </CardHeader>
 
-        <form onSubmit={submit} className="flex flex-col gap-5 px-6">
+        <form onSubmit={submit} noValidate className="flex flex-col gap-5 px-6">
           <Tabs value={kind} onValueChange={(v) => setKind(v as EventKind)}>
             <TabsList className="w-full">
               <TabsTrigger value="transaction">One-off expense</TabsTrigger>
@@ -68,16 +78,25 @@ export function TimelineTab() {
             </TabsList>
           </Tabs>
 
-          <Field label="Merchant or description">
-            <Input required value={merchant} onChange={(e) => setMerchant(e.target.value)} placeholder="e.g. Health insurance premium" />
+          <Field label="Merchant or description" error={show("merchant")}>
+            <Input required aria-invalid={!!show("merchant")} maxLength={200} value={merchant} onChange={(e) => setMerchant(e.target.value)} placeholder="e.g. Health insurance premium" />
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Amount (₹)">
-              <Input required type="number" min={1} value={amount} onChange={(e) => setAmount(Number(e.target.value))} className="tnum" />
+            <Field label={`Amount (${currencySymbol()})`} error={show("amount")}>
+              <Input
+                required
+                type="number"
+                min={0}
+                step="any"
+                aria-invalid={!!show("amount")}
+                value={amount === "" ? "" : String(toDisplayAmount(Number(amount)))}
+                onChange={(e) => setAmount(e.target.value === "" ? "" : String(fromDisplayAmount(Number(e.target.value))))}
+                className="tnum"
+              />
             </Field>
-            <Field label={kind === "transaction" ? "Date" : "First due date"}>
-              <Input required type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <Field label={kind === "transaction" ? "Date" : "First due date"} error={show("date")}>
+              <Input required type="date" aria-invalid={!!show("date")} value={date} onChange={(e) => setDate(e.target.value)} />
             </Field>
           </div>
 
@@ -119,17 +138,22 @@ export function TimelineTab() {
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, children, error }: { label: string; children: ReactNode; error?: string | null }) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-xs font-semibold uppercase tracking-wider text-pewter">{label}</span>
       {children}
+      {error && <span role="alert" className="text-xs font-medium text-rose-600 normal-case tracking-normal">{error}</span>}
     </label>
   );
 }
 
 function DiffCard({ diff }: { diff: RecomputeDiff }) {
   const scoreDelta = diff.health_score_after - diff.health_score_before;
+  // The backend's own what-if sentence is replaced by the banner above, so it is not shown twice.
+  const narrative = diff.simulated
+    ? diff.narrative.replace(/What-if only: nothing was saved to your ledger\.?\s*/i, "").trim()
+    : diff.narrative;
 
   return (
     <Card className="gap-5 px-6">
@@ -142,9 +166,15 @@ function DiffCard({ diff }: { diff: RecomputeDiff }) {
         </div>
       </CardHeader>
 
-      {diff.narrative && (
+      {diff.simulated && (
+        <p role="status" data-testid="whatif-note" className="rounded-surface border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900">
+          What-if only: nothing was saved
+        </p>
+      )}
+
+      {narrative && (
         <div className="rounded-surface border border-black/[0.06] bg-white p-4 text-sm leading-relaxed text-graphite">
-          {diff.narrative}
+          {humanizeSlugs(narrative)}
         </div>
       )}
 
@@ -201,7 +231,7 @@ function DiffCard({ diff }: { diff: RecomputeDiff }) {
                 className="rounded-chip border border-black/[0.06] bg-white p-3.5 text-sm font-medium text-ink shadow-sm flex items-center gap-2"
               >
                 <span className="h-2 w-2 rounded-full bg-ember shrink-0" />
-                <span>{r.text}</span>
+                <span>{humanizeSlugs(r.text)}</span>
               </li>
             ))}
           </ul>

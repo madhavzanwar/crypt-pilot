@@ -205,6 +205,8 @@ export interface RecomputeDiff {
   new_recommendations: Recommendation[];
   removed_recommendation_actions: ActionType[];
   narrative: string;
+  /** True: a what-if only; nothing was written to the ledger. */
+  simulated?: boolean;
 }
 
 export interface SimulationRequest {
@@ -833,7 +835,7 @@ export interface SecurityFinding {
   web?: { answer: string; url: string };
   ai?: { model: string; verdict: "confirm" | "doubt"; note: string };
 }
-export interface AgentSummary { agent: string; name: string; findings: number; ms: number; score?: number; source?: string | null; error?: string | null; model?: string; ai?: "ok" | "error" | "off"; backup?: boolean }
+export interface AgentSummary { agent: string; name: string; findings: number; ms: number; score?: number; source?: string | null; error?: string | null; model?: string; ai?: "ok" | "error" | "off"; backup?: boolean; level?: "high" | "medium" | "low"; mode?: string }
 export interface SecurityReport {
   created_at: string;
   risk_score: number;
@@ -874,6 +876,10 @@ export type CouncilVote = { agent: string; name: string; score: number; level: s
 export type CouncilVerdict = {
   type: "verdict"; cached: boolean; score: number; level: string; counts: Record<string, number>; votes: CouncilVote[];
   dissent: { agent: string; name: string; level: string; why: string }[]; actions: string[]; anchor: number; tokens: number; debated: boolean;
+  /** Set by the backend when the headline must qualify the level, e.g. "Low risk (wallets unchecked)". */
+  level_label?: string;
+  /** The backend's own note about wallets that could not be verified. */
+  caveat?: string;
 };
 export type CouncilEvent =
   | { type: "facts"; facts: Record<string, unknown>; approx_tokens: number }

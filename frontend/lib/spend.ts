@@ -1,7 +1,11 @@
 import type { Transaction, TxnCategory } from "@/lib/types";
 
-/** Categories that move money between the user's own accounts, not real spend/income. */
-const NON_SPEND: TxnCategory[] = ["transfer", "credit_card_payment", "income"];
+/**
+ * Categories that move money between the user's own accounts, not real spend/income.
+ * Same rule as the backend's app/analytics/basis.py (_NOT_SPEND_OR_INCOME): every other outflow is spend, every other
+ * inflow (salary, refunds, interest) is income.
+ */
+const NON_SPEND: TxnCategory[] = ["transfer", "credit_card_payment"];
 
 export const CATEGORY_META: Record<TxnCategory, { label: string; color: string }> = {
   income: { label: "Income", color: "#12a56b" },
@@ -61,14 +65,25 @@ function monthLabel(month: string): string {
   return MONTH_FMT.format(new Date(`${month}-01T00:00:00`));
 }
 
-/** Aggregates raw transactions into monthly, category and merchant totals. Positive amount = inflow. */
-export function summarizeSpend(txns: Transaction[], monthsBack = 6): SpendSummary {
+/** Local calendar date as YYYY-MM-DD. */
+export function todayISO(now: Date = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Aggregates raw transactions into monthly, category and merchant totals. Positive amount = inflow.
+ * "This month" is anchored on TODAY like the backend: rows dated after today are not part of the real ledger yet,
+ * so one mis-dated future row can never move the latest month.
+ */
+export function summarizeSpend(allTxns: Transaction[], monthsBack = 6, today: string = todayISO()): SpendSummary {
+  const txns = allTxns.filter((t) => t.date.slice(0, 10) <= today);
   const byMonth = new Map<string, { income: number; spend: number }>();
   for (const t of txns) {
     const key = t.date.slice(0, 7);
     const m = byMonth.get(key) ?? { income: 0, spend: 0 };
-    if (t.amount > 0 && t.category === "income") m.income += t.amount;
-    else if (t.amount < 0 && !NON_SPEND.includes(t.category)) m.spend += -t.amount;
+    if (NON_SPEND.includes(t.category)) continue;
+    if (t.amount > 0) m.income += t.amount;
+    else if (t.amount < 0) m.spend += -t.amount;
     byMonth.set(key, m);
   }
 

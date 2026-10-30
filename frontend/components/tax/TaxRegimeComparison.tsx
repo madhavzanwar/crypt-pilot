@@ -15,6 +15,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import type { TaxOptimizationAnalysis } from "@/lib/types";
+import { validateGross } from "@/lib/validate";
 import { api } from "@/lib/api";
 import { formatCurrency, formatSignedCurrency } from "@/components/ui/money";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -31,6 +32,8 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
   const [analysis, setAnalysis] = useState<TaxOptimizationAnalysis>(initialAnalysis);
   const [isPending, startTransition] = useTransition();
   const [showSlabs, setShowSlabs] = useState(false);
+  const [grossError, setGrossError] = useState<string | null>(null);
+  const [calcError, setCalcError] = useState<string | null>(null);
 
   // Form State initialized from analysis / detected deductions
   const [grossIncome, setGrossIncome] = useState(initialAnalysis.gross_annual_income);
@@ -80,8 +83,10 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
           hra_exemption: h,
         });
         setAnalysis(result);
+        setCalcError(null);
       } catch (err) {
         console.error("Failed to recalculate tax", err);
+        setCalcError(err instanceof Error ? err.message : "Could not recalculate your tax. Please check the values.");
       }
     });
   }
@@ -214,8 +219,9 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
             <span className="text-[11px] text-pewter font-medium">(Section 115BAC)</span>
           </div>
           <p className="text-xs text-graphite mb-5">
-            Default regime. Simpler structure with wider slabs, ₹75,000 standard deduction, and full
-            tax rebate on income up to ₹7.75 Lakhs.
+            Default regime. Simpler structure with wider slabs, a {formatCurrency(75000)} standard deduction, and a
+            full 87A rebate: no tax on taxable income up to {formatCurrency(1200000)}, which means salaried income
+            up to {formatCurrency(1275000)} after the standard deduction (FY 2025-26).
           </p>
 
           <div className="space-y-4 pt-4 border-t border-black/[0.06]">
@@ -257,7 +263,7 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
                 <span className="font-medium text-emerald-700 tnum">
                   {analysis.new_regime.rebate_87a > 0
                     ? `-${formatCurrency(analysis.new_regime.rebate_87a)}`
-                    : "₹0"}
+                    : formatCurrency(0)}
                 </span>
               </div>
             </div>
@@ -333,7 +339,7 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
                 <span className="font-medium text-emerald-700 tnum">
                   {analysis.old_regime.rebate_87a > 0
                     ? `-${formatCurrency(analysis.old_regime.rebate_87a)}`
-                    : "₹0"}
+                    : formatCurrency(0)}
                 </span>
               </div>
             </div>
@@ -378,7 +384,7 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold uppercase tracking-wider text-pewter">
-                Gross Annual Income (₹)
+                Gross Annual Income (INR)
               </label>
             </div>
             <input
@@ -386,15 +392,26 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
               step={10000}
               value={grossIncome}
               onChange={(e) => {
-                const val = Number(e.target.value) || 0;
+                const raw = e.target.value;
+                const val = Number(raw) || 0;
                 setGrossIncome(val);
-                handleRecalculate({ income: val });
+                const bad = validateGross(raw);
+                setGrossError(bad);
+                if (!bad) handleRecalculate({ income: val });
               }}
+              min={0}
+              aria-invalid={!!grossError}
               className="w-full rounded-chip border border-mist bg-paper px-3.5 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-ember/30 font-mono tnum"
             />
-            <span className="text-[11px] text-pewter">
-              ~{formatCurrency(grossIncome / 12)}/month gross salary
-            </span>
+            {grossError ? (
+              <span role="alert" className="text-[11px] font-medium text-rose-600">{grossError} Showing the last valid result.</span>
+            ) : calcError ? (
+              <span role="alert" className="text-[11px] font-medium text-rose-600">{calcError}</span>
+            ) : (
+              <span className="text-[11px] text-pewter">
+                ~{formatCurrency(grossIncome / 12)}/month gross salary
+              </span>
+            )}
           </div>
 
           {/* Section 80C */}
@@ -403,7 +420,7 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
               <label className="text-xs font-semibold uppercase tracking-wider text-pewter">
                 Section 80C (SIP / EPF / PPF)
               </label>
-              <span className="text-[11px] text-pewter font-mono">Max ₹1.5L</span>
+              <span className="text-[11px] text-pewter font-mono">Max INR 1.5L</span>
             </div>
             <input
               type="number"
@@ -431,7 +448,7 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
               <label className="text-xs font-semibold uppercase tracking-wider text-pewter">
                 Section 80D (Health Insurance)
               </label>
-              <span className="text-[11px] text-pewter font-mono">Max ₹75k</span>
+              <span className="text-[11px] text-pewter font-mono">Max INR 75k</span>
             </div>
             <input
               type="number"
@@ -459,7 +476,7 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
               <label className="text-xs font-semibold uppercase tracking-wider text-pewter">
                 Section 80CCD(1B) (NPS)
               </label>
-              <span className="text-[11px] text-pewter font-mono">Max ₹50k</span>
+              <span className="text-[11px] text-pewter font-mono">Max INR 50k</span>
             </div>
             <input
               type="number"
@@ -482,7 +499,7 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
               <label className="text-xs font-semibold uppercase tracking-wider text-pewter">
                 Section 24(b) (Home Loan Interest)
               </label>
-              <span className="text-[11px] text-pewter font-mono">Max ₹2.0L</span>
+              <span className="text-[11px] text-pewter font-mono">Max INR 2.0L</span>
             </div>
             <input
               type="number"
@@ -537,7 +554,7 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
             <div className="p-3 rounded-chip bg-fog border border-mist space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-ink">Section 80C</span>
-                <span className="font-mono text-pewter">{formatCurrency(sec80c)} / ₹1.5L</span>
+                <span className="font-mono text-pewter">{formatCurrency(sec80c)} / INR 1.5L</span>
               </div>
               <div className="w-full bg-mist/60 h-2 rounded-full overflow-hidden">
                 <div
@@ -551,7 +568,7 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
             <div className="p-3 rounded-chip bg-fog border border-mist space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-ink">Section 80D</span>
-                <span className="font-mono text-pewter">{formatCurrency(sec80d)} / ₹75k</span>
+                <span className="font-mono text-pewter">{formatCurrency(sec80d)} / INR 75k</span>
               </div>
               <div className="w-full bg-mist/60 h-2 rounded-full overflow-hidden">
                 <div
@@ -565,7 +582,7 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
             <div className="p-3 rounded-chip bg-fog border border-mist space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-ink">NPS 80CCD(1B)</span>
-                <span className="font-mono text-pewter">{formatCurrency(secNps)} / ₹50k</span>
+                <span className="font-mono text-pewter">{formatCurrency(secNps)} / INR 50k</span>
               </div>
               <div className="w-full bg-mist/60 h-2 rounded-full overflow-hidden">
                 <div

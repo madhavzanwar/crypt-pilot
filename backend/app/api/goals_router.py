@@ -6,7 +6,7 @@ and required monthly savings calculations.
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.analytics.goals import project_goal
@@ -87,6 +87,12 @@ def list_goals(user_id: str = Depends(resolve_user_id)) -> list[GoalProgress]:
     return result
 
 
+def _check_target_date(target_date, current: float, target: float) -> None:
+    """A target date in the past only makes sense for a goal that is already achieved (current >= target)."""
+    if target_date is not None and target_date < datetime.now(timezone.utc).date() and current < target:
+        raise HTTPException(422, "The target date has already passed. Pick a date in the future, or mark the goal as achieved first.")
+
+
 @router.post("/api/goals/{user_id}", response_model=GoalProgress)
 def create_goal(req: GoalCreateRequest, user_id: str = Depends(resolve_user_id)) -> GoalProgress:
     if req.funding_account_id:
@@ -100,6 +106,7 @@ def create_goal(req: GoalCreateRequest, user_id: str = Depends(resolve_user_id))
         if acc:
             current_amount = max(0.0, acc.balance)
 
+    _check_target_date(req.target_date, current_amount, req.target_amount)
     row = GoalRow(
         user_id=user_id,
         name=req.name,
@@ -127,6 +134,9 @@ def update_goal(
     goal_id: str, req: GoalUpdateRequest, user_id: str = Depends(resolve_user_id)
 ) -> GoalProgress:
     row = _get_owned_goal(user_id, goal_id)
+    if req.target_date is not None:  # moving an existing overdue goal's progress is fine; setting a past date is not
+        _check_target_date(req.target_date, req.current_amount if req.current_amount is not None else row.current_amount,
+                           req.target_amount if req.target_amount is not None else row.target_amount)
     if req.funding_account_id is not None:
         if req.funding_account_id != "":
             acc = store.get(AccountRow, req.funding_account_id)

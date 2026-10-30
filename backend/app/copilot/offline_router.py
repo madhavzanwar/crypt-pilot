@@ -9,6 +9,8 @@ it is not canned text, it reflects real snapshot data every time.
 """
 from __future__ import annotations
 
+from app.core.money import inr
+
 import re
 
 from app.copilot import tools
@@ -76,9 +78,9 @@ def _facts_from_summary(summary: dict) -> list[Fact]:
     if "error" in summary:
         return []
     return [
-        Fact(text=f"Net worth is ₹{summary['net_worth']:,.0f}.", value=summary["net_worth"]),
+        Fact(text=f"Net worth is {inr(summary['net_worth'])}.", value=summary["net_worth"]),
         Fact(
-            text=f"Monthly income is ₹{summary['monthly_income']:,.0f} and monthly expenses are ₹{summary['monthly_expenses']:,.0f}.",
+            text=f"Monthly income is {inr(summary['monthly_income'])} and monthly expenses are {inr(summary['monthly_expenses'])}.",
             value=summary["monthly_income"] - summary["monthly_expenses"],
         ),
         Fact(
@@ -119,7 +121,7 @@ def _intent_spending(user_id: str, message: str) -> AnswerContract:
     if "error" not in recurring:
         facts.append(
             Fact(
-                text=f"You have {recurring['count']} recurring obligations totalling ₹{recurring['monthly_total']:,.0f}/month.",
+                text=f"You have {recurring['count']} recurring obligations totalling {inr(recurring['monthly_total'])}/month.",
                 value=recurring["monthly_total"],
             )
         )
@@ -179,11 +181,11 @@ def _intent_debt(user_id: str, message: str) -> AnswerContract:
         )
     facts = [
         Fact(
-            text=f"You have {debt['count']} debt(s) totalling ₹{debt['total_principal']:,.0f} in principal.",
+            text=f"You have {debt['count']} debt(s) totalling {inr(debt['total_principal'])} in principal.",
             value=debt["total_principal"],
         ),
         Fact(
-            text=f"Minimum payments across debts total ₹{debt['total_minimum_payment']:,.0f}/month.",
+            text=f"Minimum payments across debts total {inr(debt['total_minimum_payment'])}/month.",
             value=debt["total_minimum_payment"],
         ),
     ]
@@ -283,11 +285,11 @@ def _intent_affordability(user_id: str, message: str) -> AnswerContract:
         horizon=impact_payload.get("horizon", "next 3 months"),
     )
     affordable = result.get("affordable")
-    facts = [Fact(text=f"You asked about a ₹{amount:,.0f} purchase.", value=amount)]
+    facts = [Fact(text=f"You asked about a {inr(amount)} purchase.", value=amount)]
     if "free_cash_flow_monthly" in result:
         facts.append(
             Fact(
-                text=f"Your current monthly free cash flow is ₹{result['free_cash_flow_monthly']:,.0f}.",
+                text=f"Your current monthly free cash flow is {inr(result['free_cash_flow_monthly'])}.",
                 value=result["free_cash_flow_monthly"],
             )
         )
@@ -295,9 +297,9 @@ def _intent_affordability(user_id: str, message: str) -> AnswerContract:
         Recommendation(
             action=ActionType.affordability_check,
             text=(
-                f"₹{amount:,.0f} looks affordable without disrupting your monthly cash flow."
+                f"{inr(amount)} looks affordable without disrupting your monthly cash flow."
                 if affordable
-                else f"₹{amount:,.0f} would strain your monthly cash flow -- consider spreading the cost or waiting."
+                else f"{inr(amount)} would strain your monthly cash flow -- consider spreading the cost or waiting."
             ),
             rationale=result.get("note", "Estimated from current monthly free cash flow."),
             impact=impact,
@@ -306,7 +308,7 @@ def _intent_affordability(user_id: str, message: str) -> AnswerContract:
         )
     ]
     narrative = (
-        f"Based on your current cash flow, a ₹{amount:,.0f} purchase looks "
+        f"Based on your current cash flow, a {inr(amount)} purchase looks "
         + ("affordable." if affordable else "tight -- proceed carefully.")
     )
     return AnswerContract(
@@ -368,8 +370,8 @@ def _intent_overview(user_id: str, message: str) -> AnswerContract:
     income = float(summary.get("monthly_income") or 0)
     spend = float(summary.get("monthly_expenses") or 0)
     left = income - spend
-    parts = [f"Here's your picture: about \u20b9{income:,.0f} comes in each month and about \u20b9{spend:,.0f} goes out"]
-    parts.append(f"so roughly \u20b9{left:,.0f} is left over." if left >= 0 else f"so you are spending about \u20b9{-left:,.0f} more than you earn.")
+    parts = [f"Here's your picture: about {inr(income)} comes in each month and about {inr(spend)} goes out"]
+    parts.append(f"so roughly {inr(left)} is left over." if left >= 0 else f"so you are spending about {inr(-left)} more than you earn.")
     return AnswerContract(
         query=message,
         facts=_facts_from_summary(summary),

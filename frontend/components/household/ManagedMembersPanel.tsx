@@ -10,7 +10,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { formatDate } from "@/lib/format";
-import { formatCurrency } from "@/components/ui/money";
+import { currencySymbol, formatCurrency, fromDisplayAmount } from "@/components/ui/money";
 import { categoryLabel } from "@/components/ui/labels";
 
 const CATEGORIES = [
@@ -88,7 +88,7 @@ export function ManagedMembersPanel({
       const res = await api.addManagedMember(userId, {
         name: name.trim(),
         relationship: relationship.trim(),
-        opening_balance: Number(opening) || 0,
+        opening_balance: fromDisplayAmount(Number(opening) || 0),
       });
       setName("");
       setOpening("");
@@ -104,7 +104,7 @@ export function ManagedMembersPanel({
 
   async function handleRecord(e: React.FormEvent) {
     e.preventDefault();
-    const amt = Number(amount);
+    const amt = fromDisplayAmount(Number(amount));
     if (!selected || !merchant.trim() || !amt || amt <= 0) return;
     setSaving(true);
     setActionError(null);
@@ -169,7 +169,7 @@ export function ManagedMembersPanel({
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label htmlFor="mm-open" className="text-[11px] font-medium text-graphite">Opening balance (₹)</label>
+              <label htmlFor="mm-open" className="text-[11px] font-medium text-graphite">Opening balance ({currencySymbol()})</label>
               <input id="mm-open" type="number" min="0" className={inputCls} placeholder="0" value={opening}
                 onChange={(e) => setOpening(e.target.value)} />
             </div>
@@ -236,7 +236,7 @@ export function ManagedMembersPanel({
                         onChange={(e) => setMerchant(e.target.value)} />
                     </div>
                     <div className="sm:col-span-2 flex flex-col gap-1">
-                      <label htmlFor="tx-amt" className="text-[11px] font-medium text-graphite">Amount (₹)</label>
+                      <label htmlFor="tx-amt" className="text-[11px] font-medium text-graphite">Amount ({currencySymbol()})</label>
                       <input id="tx-amt" type="number" min="0" className={inputCls} value={amount}
                         onChange={(e) => setAmount(e.target.value)} />
                     </div>

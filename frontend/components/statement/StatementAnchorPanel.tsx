@@ -6,7 +6,8 @@ import { VerifyHash } from "@/components/crypto/web3/VerifyHash";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { statementSubject } from "@/lib/crypto/eas/statement";
-import { useT } from "@/lib/i18n";
+import { StatementVerify } from "./StatementVerify";
+import { useT } from "@/components/i18nLocal";
 import { Anchor } from "lucide-react";
 import { useMemo, useState } from "react";
 import { statementDigest, statementPeriod, type StatementData } from "./auditHash";
@@ -30,7 +31,18 @@ export function StatementAnchorPanel({ data }: { data: StatementData }) {
   const healthScore = data.dashboard.health_score.overall;
   const auditHash = digest.bytes32;
   const subject = useMemo(
-    () => statementSubject({ auditHash, period, healthScore }),
+    () => {
+      const base = statementSubject({ auditHash, period, healthScore });
+      // The attested value is keccak256 of the anchor payload (which embeds the SHA-256 above): a different hash,
+      // so it must not wear the name "Statement hash". Pasting the printed SHA-256 is handled by StatementVerify.
+      return {
+        ...base,
+        hashLabel: "Attestation payload hash (keccak256)",
+        acceptRawInput: false,
+        // The printed SHA-256 is not an accepted value here (it is not what is attested); StatementVerify takes it.
+        candidates: (k: Parameters<typeof base.candidates>[0]) => base.candidates(k).slice(0, 1).map((c) => ({ ...c, label: "Attestation payload hash" })),
+      };
+    },
     [auditHash, period, healthScore],
   );
 
@@ -97,7 +109,17 @@ export function StatementAnchorPanel({ data }: { data: StatementData }) {
           title={t("stmt.anchor.flowTitle", "Anchor statement hash")}
           onOpenChange={setAttestOpen}
         />
-        {!attestOpen && <VerifyHash subject={subject} />}
+        <StatementVerify recomputedHex={digest.hex} />
+        {!attestOpen && (
+          <details className="rounded-xl border border-mist bg-fog p-3 text-xs">
+            <summary className="cursor-pointer font-medium text-ink">
+              {t("stmt.anchor.chainCheck", "Check an on-chain attestation (advanced)")}
+            </summary>
+            <div className="mt-3">
+              <VerifyHash subject={subject} />
+            </div>
+          </details>
+        )}
       </Card>
     </section>
   );

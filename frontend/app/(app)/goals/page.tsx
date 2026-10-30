@@ -41,6 +41,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { triggerConfetti } from "@/components/ui/Confetti";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { validateTargetDate } from "@/lib/validate";
+import { todayISO } from "@/lib/spend";
 
 export interface CoverOption {
   key: string;
@@ -107,6 +109,7 @@ export default function GoalsPage() {
   const [name, setName] = useState("");
   const [targetAmount, setTargetAmount] = useState("");
   const [targetDate, setTargetDate] = useState("");
+  const [minDate] = useState(() => todayISO());
   const [pickedCover, setPickedCover] = useState<string | null>(null);
   const [fundingAccountId, setFundingAccountId] = useState("");
   const [autoTrack, setAutoTrack] = useState(false);
@@ -126,6 +129,11 @@ export default function GoalsPage() {
     }
     if (!amount || amount <= 0) {
       setCreateError("Enter a target amount greater than zero.");
+      return;
+    }
+    const dateError = validateTargetDate(targetDate);
+    if (dateError) {
+      setCreateError(dateError);
       return;
     }
     setCreating(true);
@@ -270,6 +278,7 @@ export default function GoalsPage() {
               <input
                 id="goal-date"
                 type="date"
+                min={minDate}
                 value={targetDate}
                 onChange={(e) => setTargetDate(e.target.value)}
                 className="w-full rounded-chip border border-mist bg-white px-3 py-2 text-sm text-ink focus:border-ember focus:outline-none focus:ring-1 focus:ring-ember"
@@ -737,7 +746,7 @@ function CoverGoalCard({
               disabled={saving}
               className="hidden sm:inline-flex rounded-full px-2 py-1 text-[11px] font-medium text-graphite bg-fog hover:bg-white border border-mist cursor-pointer tnum"
             >
-              +₹5k
+              +{formatCurrency(5000)}
             </button>
           </div>
 

@@ -78,6 +78,8 @@ export default function WalletGuard() {
   const trimmed = value.trim();
   const check = validateAddress(trimmed, { allowDemo: true });
   const busy = state.phase === "checking";
+  // ?run=1 never spends a credit: when nothing was shown (no remembered result), say what to do instead of looking broken
+  const linkHint = params.get("run") === "1" && !initialIsSecret && state.phase === "idle" && trimmed !== "" && trimmed === (initial ?? "").trim() && check.ok;
   const fmtError = trimmed !== "" && !check.ok ? (check.reason === "mixed_case" ? g("wg.input.err.mixed") : check.reason === "checksum" ? g("wg.input.err.checksum") : g("wg.input.err.format")) : null;
 
   /** Anything that looks like a seed phrase or private key is wiped and never sent. */
@@ -226,6 +228,9 @@ export default function WalletGuard() {
             </Button>
             <p className="text-xs text-pewter">{g("wg.check.cost")}</p>
           </div>
+          {linkHint && (
+            <p role="status" className="rounded-card border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-800">{g("wg.deeplink.hint")}</p>
+          )}
         </form>
 
         <DemoChips

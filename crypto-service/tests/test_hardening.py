@@ -79,3 +79,8 @@ def test_cookie_secure_when_samesite_none(settings: Settings) -> None:
     with TestClient(create_app(s, build_state(s)), base_url="https://testserver") as c:
         cookie = c.get("/api/credits").headers["set-cookie"]
     assert "Secure" in cookie and "SameSite=none" in cookie and "HttpOnly" in cookie
+
+
+def test_non_json_body_names_body_not_an_offset(client: TestClient) -> None:
+    r = client.post("/api/check", content=b"a" * 5000, headers={"content-type": "application/json"})
+    assert r.status_code == 422 and r.json() == {"error": "invalid request: body"}

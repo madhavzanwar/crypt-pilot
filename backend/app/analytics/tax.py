@@ -7,6 +7,8 @@ health insurance, Section 24b home loan interest, and HRA).
 """
 from __future__ import annotations
 
+from app.core.money import inr
+
 import re
 from typing import Optional
 
@@ -398,6 +400,9 @@ def analyze_tax_optimization(
         if (custom_overrides and custom_overrides.hra_exemption is not None)
         else min(detected.rent_paid_detected * 0.4, 180_000.0)  # estimated HRA exemption
     )
+    # HRA exemption can never exceed what is plausible for the salary: it is at most 50% of basic pay (metro) and basic
+    # pay is below gross, so an absurd entry cannot wipe out the whole tax
+    hra = min(hra, gross_income * 0.5)
     other = (
         custom_overrides.other_deductions
         if (custom_overrides and custom_overrides.other_deductions is not None)
@@ -428,7 +433,7 @@ def analyze_tax_optimization(
     if new_calc.net_tax_payable < old_calc.net_tax_payable:
         recommended = "new"
         rationale = (
-            f"The New Tax Regime saves you ₹{tax_diff:,.0f} annually (+₹{monthly_delta:,.0f}/month take-home) "
+            f"The New Tax Regime saves you {inr(tax_diff)} annually (+{inr(monthly_delta)}/month take-home) "
             f"thanks to lower tax slabs and the ₹75,000 standard deduction."
         )
         break_even = calculate_break_even_deductions(
@@ -439,9 +444,13 @@ def analyze_tax_optimization(
     elif old_calc.net_tax_payable < new_calc.net_tax_payable:
         recommended = "old"
         rationale = (
-            f"The Old Tax Regime saves you ₹{tax_diff:,.0f} annually (+₹{monthly_delta:,.0f}/month take-home) "
+            f"The Old Tax Regime saves you {inr(tax_diff)} annually (+{inr(monthly_delta)}/month take-home) "
             f"due to your substantial deductions across Section 80C, 80D, and home loan/HRA benefits."
         )
+        break_even = 0.0
+    elif gross_income <= 0:
+        recommended = "new"
+        rationale = "Enter your gross annual income to compare the two regimes."
         break_even = 0.0
     else:
         recommended = "new"

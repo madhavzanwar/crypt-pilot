@@ -6,7 +6,7 @@ import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
-import { formatAxisCurrency, formatCurrency, formatSignedCurrency } from "@/components/ui/money";
+import { currencySymbol, formatAxisCurrency, formatCurrency, formatSignedCurrency, fromDisplayAmount, toDisplayAmount } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 import { simulate, type Baseline, type ScenarioActions, type SimResult } from "@/lib/scenario-sim";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
@@ -33,7 +33,9 @@ const SAMPLE: Baseline = {
 
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
-function NumField({ label, value, onChange, step = 500 }: { label: string; value: number; onChange: (n: number) => void; step?: number }) {
+function NumField({ label, value, onChange, step = 500, money = false }: { label: string; value: number; onChange: (n: number) => void; step?: number; money?: boolean }) {
+  // Money fields are held in INR but typed in the active currency.
+  const shown = money ? toDisplayAmount(value) : value;
   return (
     <label className="flex flex-col gap-1 text-xs font-medium text-graphite">
       {label}
@@ -41,8 +43,11 @@ function NumField({ label, value, onChange, step = 500 }: { label: string; value
         type="number"
         min={0}
         step={step}
-        value={Number.isFinite(value) ? value : 0}
-        onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
+        value={Number.isFinite(shown) ? shown : 0}
+        onChange={(e) => {
+          const typed = Math.max(0, Number(e.target.value) || 0);
+          onChange(money ? fromDisplayAmount(typed) : typed);
+        }}
         className="tnum"
       />
     </label>
@@ -152,14 +157,14 @@ function Planner({ initial, usingSample }: { initial: Baseline; usingSample: boo
           <CardDescription>Your numbers today. Edit any of them and everything below recalculates.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <NumField label="Monthly income (₹)" value={base.income} onChange={set("income")} />
-          <NumField label="Monthly expenses (₹)" value={base.expenses} onChange={set("expenses")} />
-          <NumField label="of which discretionary (₹)" value={base.discretionary} onChange={set("discretionary")} />
-          <NumField label="Starting cash (₹)" value={base.cash} onChange={set("cash")} />
-          <NumField label="Debt outstanding (₹)" value={base.debt} onChange={set("debt")} />
+          <NumField money label={`Monthly income (${currencySymbol()})`} value={base.income} onChange={set("income")} />
+          <NumField money label={`Monthly expenses (${currencySymbol()})`} value={base.expenses} onChange={set("expenses")} />
+          <NumField money label={`of which discretionary (${currencySymbol()})`} value={base.discretionary} onChange={set("discretionary")} />
+          <NumField money label={`Starting cash (${currencySymbol()})`} value={base.cash} onChange={set("cash")} />
+          <NumField money label={`Debt outstanding (${currencySymbol()})`} value={base.debt} onChange={set("debt")} />
           <NumField label="Debt APR (%)" value={base.aprPct} onChange={set("aprPct")} step={0.5} />
-          <NumField label="Required debt payment (₹/mo)" value={base.minPayment} onChange={set("minPayment")} />
-          <NumField label="Emergency reserve (₹)" value={base.reserve} onChange={set("reserve")} />
+          <NumField money label={`Required debt payment (${currencySymbol()}/mo)`} value={base.minPayment} onChange={set("minPayment")} />
+          <NumField money label={`Emergency reserve (${currencySymbol()})`} value={base.reserve} onChange={set("reserve")} />
         </CardContent>
       </Card>
 

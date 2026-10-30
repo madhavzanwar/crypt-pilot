@@ -110,6 +110,7 @@ class PlanResult(BaseModel):
     uncertainty_changed_choice: bool
     rationale: str
     risk_adjusted: SequenceResult | None = None
+    basis: dict[str, float] | None = None  # shared monthly income / spend / committed (app.analytics.basis), same as the dashboard
 
 
 class Shock(BaseModel):

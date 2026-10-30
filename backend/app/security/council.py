@@ -45,7 +45,7 @@ _SEV = {"high": 3, "medium": 2, "low": 1}
 
 
 def compact_facts(user_id: str) -> dict:
-    rows, accounts = store.query(TransactionRow, user_id=user_id), store.query(AccountRow, user_id=user_id)
+    rows, accounts = agents.security_rows(user_id), store.query(AccountRow, user_id=user_id)
     checks = agents.run_checks(rows, accounts)
     findings = sorted((f for v in checks.values() for f in v), key=lambda f: -_SEV[f["severity"]])
     snap = build_dashboard_snapshot(user_id)
@@ -243,6 +243,9 @@ async def convene(user_id: str, wallets: list[str] | None = None, lang: str = "e
                            "unverified": unverified}
         if unverified:  # UNKNOWN / unscreened is not safe: say so in the verdict itself, never leave a bare "low"
             result["caveat"] = chain_analyst.unverified_caveat(unverified)
+            if not (chain_vote and not chain_vote.get("abstain")):
+                # nothing about the wallets was actually checked: the headline must not read as a plain "Low Risk"
+                result["level_label"] = f"{result['level'].title()} risk (wallets unchecked)"
             if chain_analyst.UNVERIFIED_ACTION.lower() not in (a.lower() for a in result["actions"]):
                 result["actions"] = [*result["actions"][:2], chain_analyst.UNVERIFIED_ACTION]
     if rejected:

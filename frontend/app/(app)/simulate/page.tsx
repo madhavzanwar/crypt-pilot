@@ -474,7 +474,7 @@ function AmountSlider({
         className="w-full accent-ember cursor-pointer h-11 bg-mist rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
       />
       <div className="flex justify-between text-[10px] text-pewter font-medium">
-        <span>₹0</span>
+        <span>{formatCurrency(0)}</span>
         <span>{formatCurrency(Math.round(effectiveMax / 2))}</span>
         <span>{formatCurrency(effectiveMax)}</span>
       </div>

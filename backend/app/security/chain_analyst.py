@@ -331,5 +331,7 @@ def council_vote(results: list[dict[str, Any]]) -> dict[str, Any]:
         tail = f" ({', '.join(bits)})"
     room = 160 - len(tail)  # the vote line is capped at 160 characters: shorten the reason, never the wallet count
     why = (head if len(head) <= room else head[: room - 1].rstrip() + "…") + tail
-    do = {"BLOCK": f"Do not send funds to {short(worst['address'])}", "WARN": f"Verify {short(worst['address'])} before paying", "ALLOW": ""}[worst["verdict"]]
+    same = [r["address"] for r in voting if r["verdict"] == worst["verdict"]]  # every wallet with the worst verdict, not just one
+    names = ", ".join(short(a) for a in same[:3]) + (f" and {len(same) - 3} more" if len(same) > 3 else "")
+    do = {"BLOCK": f"Do not send funds to {names}", "WARN": f"Verify {names} before paying", "ALLOW": ""}[worst["verdict"]]
     return {**base, "score": score, "level": level, "abstain": False, "why": why[:160], "do": do[:100]}

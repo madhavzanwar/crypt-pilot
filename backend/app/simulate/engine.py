@@ -14,6 +14,8 @@ module will eventually own is marked `# TODO(integration)`.
 """
 from __future__ import annotations
 
+import math
+
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
@@ -59,6 +61,10 @@ class ForecastInputs:
     # 0.0 (default) means "just don't go negative" -- any positive value
     # means "never let a simulated action's forecast dip below this amount".
     minimum_balance_to_keep: float = 0.0
+    # Dashboard basis for "monthly free cash flow" (trailing average income - spending). When set, the what-if reports
+    # this baseline plus the action's recurring-schedule change, so it agrees with the dashboard instead of summing
+    # only the detected recurring series (which is a different, much larger number).
+    baseline_monthly_net: Optional[float] = None
 
 
 def _forecast_from(inputs: ForecastInputs, recurring_override: Optional[list[RecurringObligation]] = None,
@@ -88,6 +94,14 @@ def _free_cash_flow(recurring: list[RecurringObligation]) -> float:
         freq = item.frequency.value if hasattr(item.frequency, "value") else item.frequency
         total += item.amount * freq_to_months.get(freq, 1.0)
     return total
+
+
+def _fcf(inputs: ForecastInputs, recurring: list[RecurringObligation]) -> float:
+    """Monthly free cash flow for `recurring` on the dashboard's basis (see `baseline_monthly_net`)."""
+    change = _free_cash_flow(recurring) - _free_cash_flow(inputs.recurring)
+    if inputs.baseline_monthly_net is None:
+        return _free_cash_flow(recurring)
+    return inputs.baseline_monthly_net + change
 
 
 def _approx_health_delta(free_cash_flow_delta: float, current_health_score: float) -> float:
@@ -158,8 +172,8 @@ def _do_cancel_subscription(inputs: ForecastInputs, params: dict, health_before:
     cancelled = [r for r in inputs.recurring if r.group_id in group_ids]
     new_recurring = _remove_recurring(inputs.recurring, group_ids)
 
-    fcf_before = _free_cash_flow(inputs.recurring)
-    fcf_after = _free_cash_flow(new_recurring)
+    fcf_before = _fcf(inputs, inputs.recurring)
+    fcf_after = _fcf(inputs, new_recurring)
 
     forecast_after = _forecast_from(inputs, recurring_override=new_recurring)
     health_after = _approx_health_delta(fcf_after - fcf_before, health_before)
@@ -217,6 +231,8 @@ def _do_reduce_category_spend(inputs: ForecastInputs, params: dict, health_befor
 def _do_prepay_debt(inputs: ForecastInputs, params: dict, health_before: float):
     debt_id = params.get("debt_id")
     extra_payment = float(params.get("extra_payment", 0))
+    if not math.isfinite(extra_payment) or extra_payment < 0:
+        raise ValueError("prepay_debt: extra_payment must be zero or more")
     debt = _find_debt(inputs.debts, debt_id) if debt_id else None
     if debt is None:
         raise ValueError(f"prepay_debt: unknown debt_id {debt_id!r}")
@@ -279,8 +295,8 @@ def _do_increase_sip(inputs: ForecastInputs, params: dict, health_before: float)
         future_value = monthly_amount * n
     total_contributed = monthly_amount * n
 
-    fcf_before = _free_cash_flow(inputs.recurring)
-    fcf_after = _free_cash_flow(new_recurring)
+    fcf_before = _fcf(inputs, inputs.recurring)
+    fcf_after = _fcf(inputs, new_recurring)
     health_after = _approx_health_delta(fcf_after - fcf_before, health_before)
 
     impact = ImpactEstimate(
@@ -315,8 +331,8 @@ def _do_build_emergency_fund(inputs: ForecastInputs, params: dict, health_before
     new_recurring = inputs.recurring + [fund_obligation]
     forecast_after = _forecast_from(inputs, recurring_override=new_recurring)
 
-    fcf_before = _free_cash_flow(inputs.recurring)
-    fcf_after = _free_cash_flow(new_recurring)
+    fcf_before = _fcf(inputs, inputs.recurring)
+    fcf_after = _fcf(inputs, new_recurring)
     # Building an emergency fund improves resilience even though it reduces
     # nominal free cash flow -- approximate a small positive health nudge
     # capped modestly, rather than penalising the score for saving money.

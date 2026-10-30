@@ -4,7 +4,9 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from app.api.budgets_router import router as budgets_router
@@ -33,7 +35,9 @@ from app.api.pay_router import router as pay_router
 from app.api.webhooks_router import router as webhooks_router
 from app.api.tax_router import router as tax_router
 from app.api.transactions_router import router as transactions_router
-from app.core.audit import log_audit_event
+from app.ocr import OCR_UNAVAILABLE_MESSAGE, OcrUnavailable
+from app.core.audit import humanise_action, log_audit_event
+from app.core.errors import HintedHTTPException
 from app.crypto_bridge.router import router as crypto_router
 
 _MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -112,6 +116,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(OcrUnavailable)
+async def _ocr_unavailable(_: Request, exc: OcrUnavailable) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": OCR_UNAVAILABLE_MESSAGE})
+
+
+@app.exception_handler(HintedHTTPException)
+async def _hinted_http_error(_: Request, exc: HintedHTTPException) -> JSONResponse:
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail, "hint": exc.hint}, headers=exc.headers)
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+    """FastAPI's default 422 echoes the offending input and its `ctx`; NaN/Infinity/1e999 (and exception objects in `ctx`) cannot be
+    serialised, which turned a bad request into a bare 500. Same {"detail": [...]} shape, without `input`/`ctx`, so it is also
+    safe for secrets that were typed into the wrong field."""
+    errors = [{"type": str(e.get("type", "value_error")), "loc": [p if isinstance(p, int) else str(p) for p in e.get("loc", ())],
+               "msg": str(e.get("msg", "Invalid value"))} for e in exc.errors()]
+    return JSONResponse(status_code=422, content={"detail": errors})
+
 
 app.include_router(router, prefix="/api")
 app.include_router(transactions_router, prefix="/api")
@@ -219,6 +243,7 @@ async def audit_log_middleware(request: Request, call_next):
                 path=path,
                 status_code=status,
                 client_ip=request.client.host if request.client else None,
+                detail=humanise_action("rate_limited" if status == 429 else "auth_denied", method, path),
             )
         elif method in _MUTATING_METHODS and 200 <= status < 300 and path.startswith("/api/"):
             await run_in_threadpool(
@@ -229,6 +254,7 @@ async def audit_log_middleware(request: Request, call_next):
                 path=path,
                 status_code=status,
                 client_ip=request.client.host if request.client else None,
+                detail=humanise_action("mutation", method, path),
             )
     except Exception:  # noqa: BLE001 - audit logging must never break a response
         pass

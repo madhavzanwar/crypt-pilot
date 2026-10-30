@@ -52,10 +52,12 @@ from typing import Optional
 import pandas as pd
 from app.core import store
 
+from app.analytics.basis import through_today, trailing_income_expenses
 from app.analytics.anomalies import detect_anomalies
 from app.analytics.benchmarks import benchmark_context
 from app.analytics.debt import compute_dti, credit_utilization as _credit_utilization
 from app.analytics.health_score import compute_health_score
+from app.analytics.basis import committed_monthly
 from app.analytics.recurring import detect_recurring
 from app.analytics.savings import emergency_fund_months, trailing_savings_rate
 from app.forecast.cashflow import build_forecast
@@ -93,7 +95,7 @@ def _transactions_df(rows: list[TransactionRow]) -> pd.DataFrame:
         )
     df = pd.DataFrame([r.model_dump() for r in rows])
     df["date"] = pd.to_datetime(df["date"])
-    return df.sort_values("date").reset_index(drop=True)
+    return through_today(df.sort_values("date").reset_index(drop=True))
 
 
 def _debts_schema(rows: list[DebtRow], user_id: str, accounts: Optional[list[AccountRow]] = None) -> list[Debt]:
@@ -134,20 +136,7 @@ def _aggregate_credit_utilization(accounts: list[AccountRow]) -> Optional[float]
 def _avg_income_expenses(df: pd.DataFrame, months: int = _TRAILING_MONTHS) -> tuple[float, float]:
     """Trailing-`months`-month average monthly income/expenses, same window
     convention as `app.analytics.savings.trailing_savings_rate`."""
-    if df.empty:
-        return 0.0, 0.0
-    work = df.copy()
-    work["date"] = pd.to_datetime(work["date"])
-    as_of = work["date"].max()
-    window_start = as_of - pd.DateOffset(months=months)
-    window = work[(work["date"] > window_start) & (work["date"] <= as_of)]
-    # Same exclusion as app.analytics.savings.trailing_savings_rate (transfers
-    # and credit-card bill payments are not new spend -- see that module for
-    # why credit_card_payment is excluded here).
-    _excluded = {TxnCategory.transfer.value, TxnCategory.credit_card_payment.value}
-    window = window[~window["category"].isin(_excluded)]
-    income_total = float(window.loc[window["amount"] > 0, "amount"].sum())
-    expense_total = float(-window.loc[window["amount"] < 0, "amount"].sum())
+    income_total, expense_total = trailing_income_expenses(df, months)
     return income_total / months, expense_total / months
 
 
@@ -228,7 +217,7 @@ def empty_dashboard_snapshot(user_id: str) -> DashboardSnapshot:
     )
 
 
-def _build_dashboard_snapshot(user_id: str) -> DashboardSnapshot:
+def _build_dashboard_snapshot(user_id: str, extra_txns: Optional[list[TransactionRow]] = None) -> DashboardSnapshot:
     """Build (and cache) a real DashboardSnapshot for `user_id` from the DB.
 
     A demo persona id with no accounts falls back to the Phase-0 fixture
@@ -242,7 +231,7 @@ def _build_dashboard_snapshot(user_id: str) -> DashboardSnapshot:
             return demo_dashboard_snapshot(user_id)
         return empty_dashboard_snapshot(user_id)
 
-    txn_rows = store.query(TransactionRow, user_id=user_id)
+    txn_rows = [*store.query(TransactionRow, user_id=user_id), *(extra_txns or [])]
     debt_rows = store.query(DebtRow, user_id=user_id)
     # IncomeRow is queried for completeness/future use (e.g. irregular income
     # sources not visible as transactions yet); the recurring-detection path
@@ -291,6 +280,7 @@ def _build_dashboard_snapshot(user_id: str) -> DashboardSnapshot:
         transactions=df,
         horizon_days=_FORECAST_HORIZON_DAYS,
         monthly_income=monthly_income,
+        baseline_monthly_net=monthly_income - monthly_expenses,
     )
     recommendations = generate_recommendations(
         recurring=recurring_all,
@@ -354,6 +344,7 @@ def _build_dashboard_snapshot(user_id: str) -> DashboardSnapshot:
         net_worth=net_worth,
         monthly_income=monthly_income,
         monthly_expenses=monthly_expenses,
+        committed_monthly=committed_monthly(recurring_all, monthly_expenses),
         savings_rate=savings_rate,
         recurring_obligations=recurring_obligations,
         debts=debts,
@@ -362,8 +353,14 @@ def _build_dashboard_snapshot(user_id: str) -> DashboardSnapshot:
         generated_at=datetime.now(timezone.utc),
     )
 
-    _cache_snapshot(snapshot)
+    if not extra_txns:  # a what-if build must never replace the cached real snapshot (it is the "before" of the next diff)
+        _cache_snapshot(snapshot)
     return snapshot
+
+
+def simulate_dashboard_snapshot(user_id: str, extra_txns: list[TransactionRow]) -> DashboardSnapshot:
+    """The snapshot as it would look with `extra_txns` added. Nothing is stored or cached."""
+    return _build_dashboard_snapshot(user_id, extra_txns)
 
 
 _snapshots: dict[str, tuple[int, float, DashboardSnapshot]] = {}

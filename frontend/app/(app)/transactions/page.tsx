@@ -105,11 +105,14 @@ interface QuickFilter {
   isInflow?: boolean;
 }
 
+/** Filter label; the high-value threshold is shown in the selected currency. */
+const quickLabel = (qf: { id: string; label: string }): string => (qf.id === "high_value" ? `${qf.label} (> ${formatCurrency(5000)})` : qf.label);
+
 const QUICK_FILTERS: QuickFilter[] = [
   { id: "all", label: "All Transactions" },
   { id: "pending_review", label: "Pending Review", reviewStatus: "pending" },
   { id: "subscriptions", label: "Subscriptions", category: "subscriptions" },
-  { id: "high_value", label: "High Value (> ₹5k)", isHighValue: true },
+  { id: "high_value", label: "High Value", isHighValue: true },
   { id: "inflow", label: "Inflow", isInflow: true },
   { id: "dining", label: "Dining", category: "dining" },
   { id: "groceries", label: "Groceries", category: "groceries" },
@@ -530,7 +533,7 @@ export default function TransactionsPage() {
               <span>results</span>
               {activeQuickFilter !== "all" && (
                 <span className="text-[11px] text-ember font-medium ml-1">
-                  (filtered by {QUICK_FILTERS.find((q) => q.id === activeQuickFilter)?.label})
+                  (filtered by {quickLabel(QUICK_FILTERS.find((q) => q.id === activeQuickFilter) ?? { id: "", label: "" })})
                 </span>
               )}
             </div>

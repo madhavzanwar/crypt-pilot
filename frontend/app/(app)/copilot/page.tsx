@@ -13,6 +13,9 @@ import MicButton from "@/components/crypto/voice/MicButton";
 import { VoiceProviderChip } from "@/components/crypto/voice/VoiceProviderChip";
 import type { CheckResponse, Lang as CryptoLang, VoiceProvider } from "@/lib/crypto/api";
 import { messageHasSecret, scanAddresses } from "@/lib/crypto/extractAddress";
+import { showAnswerBubble } from "@/lib/crypto/walletFirst";
+import { SecretInputError } from "@/lib/apiError";
+import { cleanHistory, findSplitSecret, REDACTED } from "@/lib/crypto/secretGuard";
 import { toCryptoLang } from "@/lib/crypto/lang";
 import { engineLabel, useVoiceT, type VoiceStringKey } from "@/lib/crypto/voice/strings";
 import { useCryptoStatus } from "@/lib/crypto/voice/useCryptoStatus";
@@ -66,6 +69,7 @@ export default function CopilotPage() {
   const cryptoStatus = useCryptoStatus();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [secretWarn, setSecretWarn] = useState(false);
+  const [secretDetail, setSecretDetail] = useState<string | null>(null);
   const [needAddress, setNeedAddress] = useState(false);
   const [voiceProvider, setVoiceProvider] = useState<VoiceProvider | null>(null);
   // wallet cards, keyed `${chatId}:${index of the user turn}`; only messages sent in this visit run on their own
@@ -111,6 +115,7 @@ export default function CopilotPage() {
     setInput("");
     setArmed({});
     setSecretWarn(false);
+    setSecretDetail(null);
     setVoiceProvider(null);
   }
 
@@ -140,6 +145,7 @@ export default function CopilotPage() {
   function rejectSecret() {
     setInput("");
     setVoiceProvider(null);
+    setSecretDetail(null);
     setSecretWarn(true);
   }
 
@@ -180,7 +186,15 @@ export default function CopilotPage() {
 
   async function send(message: string) {
     if (!message.trim() || loading) return;
-    if (messageHasSecret(message)) return rejectSecret();
+    const split = findSplitSecret(turns.filter((t) => t.role === "user").map((t) => t.message), message);
+    if (split >= 0) {
+      if (split > 0) {
+        // earlier halves were already sent once: hide them and never re-send them as history
+        const idx = turns.map((t, i) => (t.role === "user" ? i : -1)).filter((i) => i >= 0).slice(-split);
+        setTurns((all) => all.map((t, i) => (idx.includes(i) ? { ...t, message: REDACTED } : t)));
+      }
+      return rejectSecret();
+    }
     const id = chatId ?? newChatId();
     const found = scanAddresses(message).scans;
     if (found.length === 0 && WALLET_QUESTION.test(message) && /\b(safe|pay|send|scam|check|trust)/i.test(message)) {
@@ -197,7 +211,7 @@ export default function CopilotPage() {
     });
     setSecretWarn(false);
     setVoiceProvider(null);
-    const history = turns.slice(-8).map((t) => ({ role: t.role, content: t.role === "user" ? t.message : t.answer?.narrative ?? "" }));
+    const history = cleanHistory(turns.slice(-8).map((t) => ({ role: t.role, content: t.role === "user" ? t.message : t.answer?.narrative ?? "" })));
     const withUser: Turn[] = [...turns, { role: "user", message }];
     setChatId(id);
     setTurns(withUser);
@@ -209,6 +223,16 @@ export default function CopilotPage() {
     try {
       answer = await api.chat(message, userId, engine, history);
     } catch (err) {
+      if (err instanceof SecretInputError) {
+        // refused server-side as a seed phrase / key: never keep the text, show the server's friendly explanation
+        const redacted: Turn[] = [...turns, { role: "user", message: REDACTED }];
+        setTurns(redacted);
+        setSecretDetail(err.message);
+        setSecretWarn(true);
+        save({ id, title: chats.find((c) => c.id === id)?.title ?? "Chat", updatedAt: nowMs(), turns: redacted });
+        setLoading(false);
+        return;
+      }
       setError(err instanceof Error ? err.message : "Something went wrong");
     }
     if (answer) {
@@ -452,9 +476,10 @@ export default function CopilotPage() {
                         {t.message}
                       </motion.div>,
                     );
-                    // no reply yet (still thinking, or the chat backend failed): the wallet check still shows
-                    if (turns[i + 1]?.role !== "assistant") out.push(walletFor(i));
+                    // a wallet question shows the wallet card first, then (if it says anything useful) the chat answer
+                    out.push(walletFor(i));
                   } else {
+                    if (turns[i - 1]?.role === "user" && !showAnswerBubble(scans[i - 1]?.scans.length ?? 0, t.answer?.narrative)) return out;
                     out.push(
                       <motion.div key={`a${i}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex w-full gap-3">
                         <FinPilotAvatar className="mt-0.5" />
@@ -464,7 +489,6 @@ export default function CopilotPage() {
                         </div>
                       </motion.div>,
                     );
-                    if (turns[i - 1]?.role === "user") out.push(walletFor(i - 1));
                   }
                   return out;
                 })}
@@ -515,7 +539,7 @@ export default function CopilotPage() {
             <div role="alert" className="mb-2 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50/70 p-3 text-xs text-rose-700">
               <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
               <p className="min-w-0 flex-1">
-                <span className="font-semibold">{tr("cp.secret.title")}</span> {tr("cp.secret.body")}
+                <span className="font-semibold">{tr("cp.secret.title")}</span> {secretDetail ?? tr("cp.secret.body")}
               </p>
               <button type="button" onClick={() => setSecretWarn(false)} aria-label={tr("cp.secret.dismiss")} className="cursor-pointer rounded-full p-0.5 hover:bg-rose-100">
                 <X className="size-3.5" />

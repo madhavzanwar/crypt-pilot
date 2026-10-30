@@ -38,7 +38,7 @@ import { Button } from "@/components/shadcn/button";
 import { Switch } from "@/components/shadcn/switch";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { cn } from "@/lib/utils";
-import { formatAxisCurrency, formatCurrency } from "@/components/ui/money";
+import { currencySymbol, formatAxisCurrency, formatCurrency, fromDisplayAmount, toDisplayAmount } from "@/components/ui/money";
 
 type Group = "subscriptions" | "essentials" | "bills";
 
@@ -97,13 +97,17 @@ const nextId = () => `custom-${++uid}`;
 
 export function OptOutSimulator() {
   const userId = useUserId();
-  const [income, setIncome] = useState(10000);
-  const [other, setOther] = useState(3500);
+  // Typed values win; until then the defaults come from the user's own dashboard (QA-12), with generic sample values only as a fallback.
+  const [incomeEdit, setIncome] = useState<number | null>(null);
+  const [otherEdit, setOther] = useState<number | null>(null);
   const [items, setItems] = useState<Item[]>(DEFAULT_ITEMS);
   const [draft, setDraft] = useState({ name: "", cost: 0 });
 
   const fetchDashboard = useCallback(() => api.dashboard(userId), [userId]);
   const { data: dashboard } = useAsync(fetchDashboard, [userId]);
+  const income = incomeEdit ?? (dashboard && dashboard.monthly_income > 0 ? Math.round(dashboard.monthly_income) : 10000);
+  const listed = DEFAULT_ITEMS.reduce((t, x) => t + x.cost, 0);
+  const other = otherEdit ?? (dashboard && dashboard.monthly_expenses > 0 ? Math.max(0, Math.round(dashboard.monthly_expenses - listed)) : 3500);
   const detected = (dashboard?.recurring_obligations ?? []).filter((o) => o.category === "subscriptions");
 
   const patch = (id: string, p: Partial<Item>) =>
@@ -466,14 +470,14 @@ function NumField({
     <label className={cn("flex flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-pewter", className)}>
       {label}
       <span className="relative">
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-graphite">₹</span>
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-graphite">{currencySymbol()}</span>
         <input
           type="number"
           inputMode="numeric"
           min={0}
-          value={value === 0 ? "" : value}
+          value={value === 0 ? "" : toDisplayAmount(value)}
           placeholder="0"
-          onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
+          onChange={(e) => onChange(fromDisplayAmount(Math.max(0, Number(e.target.value) || 0)))}
           className="h-10 w-full rounded-chip border border-black/[0.1] bg-white pl-7 pr-3 text-sm font-semibold normal-case tracking-normal text-ink outline-none tnum focus-visible:ring-2 focus-visible:ring-lime-dark"
         />
       </span>

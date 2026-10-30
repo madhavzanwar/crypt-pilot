@@ -19,6 +19,7 @@ import pandas as pd
 
 _ISO_DATE_RE = re.compile(r"^\d{4}[-/]\d{1,2}[-/]\d{1,2}")
 
+from app.core.validate import check_amount, check_date
 from app.ingest.categorize import categorize
 from app.models import TransactionRow
 from app.schemas import TxnCategory
@@ -127,6 +128,12 @@ def parse_transaction_csv(
 
         if amount is None:
             continue
+
+        try:
+            check_date(parsed_date.date())
+            check_amount(float(amount), allow_zero=True)
+        except ValueError as exc:
+            raise ValueError(f"Row {i + 2} of the file is not usable: {exc}") from exc
 
         category: TxnCategory
         raw_category = str(df[category_col].iloc[i]).strip() if category_col else ""

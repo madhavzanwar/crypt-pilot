@@ -11,7 +11,7 @@ import {
 import { api } from "@/lib/api";
 import { useUserId } from "@/lib/hooks";
 import type { AgentSummary, SecurityEvent, SecurityFinding, SecurityReport } from "@/lib/types";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, localizeMoneyText } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/shadcn/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
@@ -46,6 +46,15 @@ const SEV = {
   medium: { label: "Check this", cls: "bg-amber-100 text-amber-700", bar: "bg-amber-400" },
   low: { label: "Minor", cls: "bg-fog text-graphite", bar: "bg-pewter" },
 } as const;
+
+/** The node sub-label of a finished agent. The Risk Scorer reports a level, never a green "All clear" over a high score. */
+const LEVEL_NOTE = { high: "High risk", medium: "Medium risk", low: "Low risk" } as const;
+function doneLabel(agent: string, info: Partial<AgentSummary> | undefined, found: number): string {
+  if (agent === "risk_scorer" && info?.level) return LEVEL_NOTE[info.level] ?? "Scored";
+  if (found) return `${found} found`;
+  if (info?.error) return "no AI text";
+  return "All clear";
+}
 
 const R = 39; // ring radius, % of the stage
 const pos = (i: number) => {
@@ -92,7 +101,7 @@ function Stage({ state, report, running, checked, walletsListed }: { state: Agen
         {ALL.map((a, i) => {
           const { x, y } = pos(i);
           const st = state[a.id]?.status ?? "idle";
-          const found = (state[a.id]?.info?.findings ?? 0) > 0;
+          const found = (state[a.id]?.info?.findings ?? 0) > 0 || (a.id === "risk_scorer" && ["high", "medium"].includes(state[a.id]?.info?.level ?? ""));
           return (
             <g key={a.id}>
               <motion.line
@@ -151,6 +160,7 @@ function Stage({ state, report, running, checked, walletsListed }: { state: Agen
         const st = state[a.id]?.status ?? "idle";
         const info = state[a.id]?.info;
         const found = info?.findings ?? 0;
+        const alarm = found > 0 || (a.id === "risk_scorer" && (info?.level === "high" || info?.level === "medium"));
         const Icon = a.icon;
         const chain = a.id === CHAIN_AGENT.id;
         const note = chain && st === "done" ? chainNote(report, info as ChainInfo) : null;
@@ -171,7 +181,7 @@ function Stage({ state, report, running, checked, walletsListed }: { state: Agen
                     "relative flex size-12 items-center justify-center rounded-full shadow-md ring-2 transition-colors duration-500 sm:size-14",
                     st === "idle" && "bg-white text-pewter ring-white",
                     st === "running" && "bg-lime text-ink ring-lime-dark",
-                    st === "done" && (found ? "bg-rose-500 text-white ring-rose-200" : note?.tone === "grey" ? "bg-slate-400 text-white ring-slate-200" : "bg-leaf text-white ring-lime/60"),
+                    st === "done" && (alarm ? "bg-rose-500 text-white ring-rose-200" : note?.tone === "grey" ? "bg-slate-400 text-white ring-slate-200" : "bg-leaf text-white ring-lime/60"),
                   )}
                 >
                   {st === "running" ? <Loader2 className="size-5 animate-spin" /> : <Icon className="size-5" />}
@@ -185,9 +195,9 @@ function Stage({ state, report, running, checked, walletsListed }: { state: Agen
                 </AnimatePresence>
               </div>
               <span className="text-[10px] font-semibold leading-tight text-ink sm:text-xs">{a.name}</span>
-              <span className="hidden text-[10px] leading-tight text-graphite sm:block">{note ? note.label : st === "running" ? "Checking..." : st === "done" ? (found ? `${found} found` : info?.error ? "no AI text" : "All clear") : chain ? (walletsListed === 0 ? "Add a wallet to screen" : "Waiting") : "Waiting"}</span>
+              <span className="hidden text-[10px] leading-tight text-graphite sm:block">{note ? note.label : st === "running" ? "Checking..." : st === "done" ? doneLabel(a.id, info, found) : chain ? (walletsListed === 0 ? "Add a wallet to screen" : "Waiting") : "Waiting"}</span>
               {note && ci?.screened ? <span className="hidden max-w-full truncate text-[9px] leading-tight text-pewter sm:block">{ci.tigergraph ? "TigerGraph" : ci.engine ?? "graph"}{ci.graph_ms != null ? ` · ${ci.graph_ms} ms` : ""}</span> : null}
-              {st === "done" && info?.model && <span className="hidden max-w-full truncate text-[9px] leading-tight text-pewter sm:block" title={`${info.model} (${info.ai})`}>{info.model.split("/").pop()}{info.backup ? " · backup" : ""}{info.ai === "error" ? " · offline" : ""}</span>}
+              {st === "done" && info?.model && info.mode !== "rules" && <span className="hidden max-w-full truncate text-[9px] leading-tight text-pewter sm:block" title={`${info.model} (${info.ai})`}>{info.model.split("/").pop()}{info.backup ? " · backup" : ""}{info.ai === "error" ? " · offline" : ""}</span>}
             </div>
           </motion.div>
         );
@@ -212,8 +222,8 @@ function Finding({ f, label, i }: { f: Finding; label: string; i: number }) {
         <span className="text-[11px] text-pewter">Found by {label}</span>
         {f.amount > 0 && <span className="ml-auto text-sm font-semibold tnum text-ink">{formatCurrency(f.amount)}</span>}
       </div>
-      <p className="mt-2 text-sm font-semibold text-ink">{f.title}</p>
-      <p className="mt-0.5 text-xs text-graphite">{f.detail}</p>
+      <p className="mt-2 text-sm font-semibold text-ink">{localizeMoneyText(f.title, { absolute: true })}</p>
+      <p className="mt-0.5 text-xs text-graphite">{localizeMoneyText(f.detail, { absolute: true })}</p>
       {w && <div className="mt-2"><ChainChips w={w} /></div>}
       {f.corroborated_by && <p className="mt-1.5 text-[11px] font-semibold text-rose-700">Also flagged by {f.corroborated_by.map((id) => AGENTS.find((a) => a.id === id)?.name ?? id).join(", ")}</p>}
       {f.web?.answer && (
@@ -317,6 +327,7 @@ export default function EvidenceRoomPage() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="grid gap-5">
+      <h1 className="sr-only">Evidence Room</h1>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 font-display text-lg">
@@ -391,7 +402,7 @@ export default function EvidenceRoomPage() {
                     <p className="flex items-center gap-2 font-display text-lg font-semibold text-ink">
                       <AlertTriangle className="size-5 text-amber-500" /> {report.findings.length} problem(s) found
                     </p>
-                    <p className="text-sm text-graphite">The AI explanation is not available right now. {report.verdict_error}</p>
+                    <p className="text-sm text-graphite">The AI explanation is not available right now.{report.verdict_error ? ` ${report.verdict_error.replace(/^[.\s]+/, "")}` : ""}</p>
                   </>
                 )}
               </CardContent>

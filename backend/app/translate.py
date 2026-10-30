@@ -42,6 +42,12 @@ def _save() -> None:
 _load()
 
 
+def uncached(lang: str, texts: list[str]) -> list[str]:
+    """The texts that would cost a model call (not yet translated)."""
+    have = _cache.get(lang, {})
+    return [t for t in texts if t.strip() and t not in have]
+
+
 def _prompt(lang: str, texts: list[str]) -> str:
     return (
         f"Translate each string of this JSON array from English to {LANGS[lang]} for a personal-finance app. "

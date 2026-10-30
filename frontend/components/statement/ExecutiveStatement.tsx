@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import type { DashboardSnapshot, Account, Transaction } from "@/lib/types";
 import { formatPercent, formatDate } from "@/lib/format";
-import { formatCurrency, formatSignedCurrency, formatSignedImpact } from "@/components/ui/money";
+import { activeCurrency, formatCurrency, formatImpactValue, formatSignedCurrency, formatSignedImpact } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 import { ShieldCheck, CheckCircle2, Activity } from "lucide-react";
 import { FinPilotLogo } from "@/components/FinPilotLogo";
@@ -11,6 +11,7 @@ import { CategoryDonut, IncomeVsSpend, TopMerchants } from "@/components/dashboa
 import { ForecastChart } from "@/components/dashboard/ForecastChart";
 import { NetWorthTrend } from "@/components/dashboard/NetWorthTrend";
 import { CATEGORY_META, summarizeSpend } from "@/lib/spend";
+import { debtLabel, impactTone } from "@/components/statement/statementText";
 import { periodRangeLabel, statementDigest, statementPeriod } from "@/components/statement/auditHash";
 
 interface ExecutiveStatementProps {
@@ -58,6 +59,12 @@ const PERSONA_PROFILES: Record<
  * 3. Net Worth Delta & Capital Allocation Balance Sheet
  * 4. Delineated Three-Lane Verification Contract (Facts, Predictions, Strategic Interventions)
  */
+function parseStamp(raw: string): Date | null {
+  const iso = /^\d{4}-\d{2}-\d{2}T[\d:.]+$/.test(raw) ? `${raw}Z` : raw;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export function ExecutiveStatement({ dashboard, accounts, transactions, userId }: ExecutiveStatementProps) {
   const profile = PERSONA_PROFILES[userId] || {
     fullName: userId.replace("demo-", "").toUpperCase(),
@@ -104,14 +111,12 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
   );
 
   const period = statementPeriod(transactions, dashboard.generated_at);
-  const generated = new Date(dashboard.generated_at);
-  const stamp = Number.isNaN(generated.getTime()) ? null : generated;
+  // The server stamp is UTC (sometimes without a zone suffix); show it in the reader's own timezone, never a fixed one.
+  const stamp = parseStamp(dashboard.generated_at);
   const auditTimestamp = stamp
-    ? `${stamp.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })}, ${stamp.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" })} IST`
+    ? `${stamp.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}, ${stamp.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZoneName: "short" })}`
     : "n/a";
-  const certifiedOn = stamp
-    ? stamp.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })
-    : "n/a";
+  const certifiedOn = stamp ? stamp.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "n/a";
 
   const spend = summarizeSpend(transactions);
   const recent = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
@@ -201,7 +206,9 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
             <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 block">
               Base Currency & FY
             </span>
-            <span className="font-medium text-black">Indian Rupee (INR ₹)</span>
+            <span className="font-medium text-black">
+              {activeCurrency().code === "INR" ? "Indian Rupee (INR ₹)" : `Indian Rupee (INR); figures shown in ${activeCurrency().code}`}
+            </span>
             <span className="text-[11px] text-neutral-500 block">FY 2026–27 (Apr–Mar)</span>
           </div>
           <div>
@@ -434,8 +441,8 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
                 dashboard.debts.map((d) => (
                   <div key={d.id} className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <span className="font-medium text-black capitalize">
-                        {d.account_id.replace(/_/g, " ")}
+                      <span className="font-medium text-black">
+                        {debtLabel(d.account_id, accounts)}
                       </span>
                       <span className="text-[10px] text-neutral-400 ml-1.5">
                         ({d.interest_rate_apr.toFixed(1)}% APR)
@@ -719,7 +726,7 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
                   Lane 3: Strategic Interventions Ranked by Net Worth Impact
                 </span>
               </div>
-              <span className="text-[10px] text-neutral-400 font-mono">Simulated Delta</span>
+              <span className="text-[10px] text-neutral-400 font-mono">Simulated Delta · baselines are modelled, not section 02 actuals</span>
             </div>
             <div className="space-y-3">
               {dashboard.insights.recommendations.map((rec, idx) => (
@@ -729,8 +736,18 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
                 >
                   <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
                     <span className="min-w-0 font-bold text-black text-sm">{rec.text}</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 print:border print:border-black print:text-black">
-                      {formatSignedImpact(rec.impact.metric, rec.impact.delta)} {rec.impact.delta < 0 ? "Net Loss" : "Net Gain"}
+                    <span
+                      className={cn(
+                        "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded print:border print:border-black print:text-black",
+                        impactTone(rec.impact.metric, rec.impact.delta) === "loss"
+                          ? "bg-rose-100 text-rose-800"
+                          : impactTone(rec.impact.metric, rec.impact.delta) === "gain"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-neutral-100 text-neutral-700",
+                      )}
+                    >
+                      {formatSignedImpact(rec.impact.metric, rec.impact.delta)}{" "}
+                      {{ gain: "Net Gain", loss: "Net Loss", neutral: "No change" }[impactTone(rec.impact.metric, rec.impact.delta)]}
                     </span>
                   </div>
                   <p className="text-neutral-600 text-[11px]">{rec.rationale}</p>
@@ -739,9 +756,9 @@ export function ExecutiveStatement({ dashboard, accounts, transactions, userId }
                       Metric: <strong className="text-black">{rec.impact.metric}</strong>
                     </span>
                     <span className="text-neutral-500">
-                      Baseline: {formatCurrency(rec.impact.before)} → Modeled:{" "}
+                      Modelled baseline: {formatImpactValue(rec.impact.metric, rec.impact.before)} → Modeled:{" "}
                       <strong className="text-emerald-700 print:text-black">
-                        {formatCurrency(rec.impact.after)}
+                        {formatImpactValue(rec.impact.metric, rec.impact.after)}
                       </strong>
                     </span>
                     <span className="text-neutral-500">Horizon: {rec.impact.horizon}</span>

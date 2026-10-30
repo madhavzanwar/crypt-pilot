@@ -57,7 +57,7 @@ def check(b: Stage) -> dict:
     if b.agent not in agents.CHECKS:
         raise HTTPException(422, f"Unknown agent {b.agent}")
     t0 = time.time()
-    findings = agents.CHECKS[b.agent](store.query(TransactionRow, user_id=b.user_id), store.query(AccountRow, user_id=b.user_id))
+    findings = agents.CHECKS[b.agent](agents.security_rows(b.user_id), store.query(AccountRow, user_id=b.user_id))
     return {"findings": findings, "ms": _ms(t0, b, "check", len(findings))}
 
 
@@ -67,7 +67,7 @@ def review(b: Stage) -> dict:
     if b.agent not in ai_agents.MODELS:
         raise HTTPException(422, f"Unknown agent {b.agent}")
     t0 = time.time()
-    findings, extra = ai_agents.review(b.agent, b.findings, store.query(TransactionRow, user_id=b.user_id), b.board, b.run)
+    findings, extra = ai_agents.review(b.agent, b.findings, agents.security_rows(b.user_id), b.board, b.run)
     return {"findings": findings, "extra": extra, "ms": _ms(t0, b, "review", len(findings))}
 
 
@@ -99,7 +99,7 @@ def save(b: Stage) -> dict:
     """Same saved report the streaming route writes, so the Evidence Room shows it as the latest report."""
     names = {key: name for key, name, _ in agents.AGENTS}
     summaries = [{**s, "name": names.get(s.get("agent"), s.get("agent"))} for s in b.summaries]
-    rows = store.query(TransactionRow, user_id=b.user_id)
+    rows = agents.security_rows(b.user_id)
     report = agents.save_report(b.user_id, b.run, rows, b.findings, b.score, summaries, b.verdict, b.source, b.error)
     return {"run": b.run, "risk_score": report["risk_score"], "risk_level": report["risk_level"], "findings": len(b.findings)}
 

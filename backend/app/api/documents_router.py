@@ -22,7 +22,8 @@ _MAX_CHARS = 200_000
 
 @router.post("/api/documents/{user_id}")
 async def upload_document(file: UploadFile, request: Request, user_id: str = Depends(resolve_user_id)) -> dict:
-    upload_limiter.check(scoped_key(request, user_id))
+    rl_key = scoped_key(request, user_id)
+    upload_limiter.check(rl_key, record=False)  # only validated uploads use up the allowance
     name = file.filename or "document.txt"
     if not name.lower().endswith(_EXTS):
         raise HTTPException(400, f"Only {', '.join(_EXTS)} files are supported")
@@ -33,6 +34,7 @@ async def upload_document(file: UploadFile, request: Request, user_id: str = Dep
     text = compact(name, original)[:_MAX_CHARS]
     if not text.strip():
         raise HTTPException(400, "No text found in that file")
+    upload_limiter.record(rl_key)
     row = DocumentRow(user_id=user_id, name=name, text=text)
     store.put(row)
     return {"id": row.id, "name": name, "chars": len(text), "original_chars": len(original), "chunks": len(split_document(text))}

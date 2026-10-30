@@ -16,6 +16,8 @@ import { ScenariosTab } from "@/components/forecast-risk/ScenariosTab";
 import { AccuracyTab } from "@/components/forecast-risk/AccuracyTab";
 import { money, pct } from "@/components/forecast-risk/shared";
 import { cn } from "@/lib/utils";
+import { Controls } from "@/components/forecast-risk/Controls";
+import { friendlyForecastError } from "@/components/forecast-risk/forecastInputs";
 
 const TABS = [
   { id: "forecast", label: "Forecast" },
@@ -31,7 +33,6 @@ const TOLERANCES = [{ label: "Cautious (5%)", v: 0.05 }, { label: "Balanced (10%
 const PILL = "cursor-pointer rounded-full border px-4 py-2 text-xs font-semibold transition-all";
 const PILL_ON = "border-lime-dark bg-lime text-ink shadow-md";
 const PILL_OFF = "border-black/[0.08] bg-white text-graphite hover:bg-fog hover:text-ink";
-const INPUT = "min-h-11 w-full rounded-chip border border-black/[0.1] bg-white px-3 text-sm text-ink tnum outline-none focus-visible:ring-2 focus-visible:ring-ember";
 
 function Pills<T extends string | number>({ value, options, onChange }: { value: T; options: { v: T; label: string }[]; onChange: (v: T) => void }) {
   return (
@@ -39,49 +40,6 @@ function Pills<T extends string | number>({ value, options, onChange }: { value:
       {options.map((o) => (
         <button key={String(o.v)} type="button" onClick={() => onChange(o.v)} className={cn(PILL, value === o.v ? PILL_ON : PILL_OFF)}>{o.label}</button>
       ))}
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1.5 text-xs font-semibold text-graphite">
-      {label}
-      {children}
-    </label>
-  );
-}
-
-/** Numeric/text inputs are drafted locally and only sent to the engine on Apply (each run is ~1s of simulation). */
-function Controls({ q, onApply }: { q: ForecastRiskQuery; onApply: (q: ForecastRiskQuery) => void }) {
-  const init = (v: number | undefined, scale = 1) => (v === undefined ? "" : String(Math.round(v * scale)));
-  const [d, setD] = useState({
-    reserve: init(q.reserve), savings: init(q.savings), extra_debt: init(q.extra_debt), goal_amount: init(q.goal_amount),
-    goal_month: init(q.goal_month), cut: init(q.cut ?? 0.2, 100), sims: String(q.sims ?? 2000), seed: String(q.seed ?? 42),
-  });
-  const set = (k: keyof typeof d) => (e: React.ChangeEvent<HTMLInputElement>) => setD((p) => ({ ...p, [k]: e.target.value }));
-  const num = (s: string) => (s.trim() === "" || Number.isNaN(Number(s)) ? undefined : Number(s));
-  const apply = () =>
-    onApply({
-      ...q,
-      reserve: num(d.reserve), savings: num(d.savings), extra_debt: num(d.extra_debt),
-      goal_amount: num(d.goal_amount), goal_month: num(d.goal_month),
-      cut: Math.min(30, Math.max(0, num(d.cut) ?? 20)) / 100,
-      sims: Math.min(10000, Math.max(500, num(d.sims) ?? 2000)), seed: num(d.seed) ?? 42,
-    });
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Field label="Cash reserve (INR)"><input className={INPUT} inputMode="numeric" placeholder="Auto" value={d.reserve} onChange={set("reserve")} /></Field>
-        <Field label="Discretionary cut (%, max 30)"><input className={INPUT} inputMode="numeric" value={d.cut} onChange={set("cut")} /></Field>
-        <Field label="Extra savings / month"><input className={INPUT} inputMode="numeric" placeholder="Auto" value={d.savings} onChange={set("savings")} /></Field>
-        <Field label="Extra debt repayment / month"><input className={INPUT} inputMode="numeric" placeholder="Auto" value={d.extra_debt} onChange={set("extra_debt")} /></Field>
-        <Field label="Savings goal (INR)"><input className={INPUT} inputMode="numeric" placeholder="None" value={d.goal_amount} onChange={set("goal_amount")} /></Field>
-        <Field label="Goal by month #"><input className={INPUT} inputMode="numeric" placeholder="None" value={d.goal_month} onChange={set("goal_month")} /></Field>
-        <Field label="Simulations (500-10,000)"><input className={INPUT} inputMode="numeric" value={d.sims} onChange={set("sims")} /></Field>
-        <Field label="Random seed"><input className={INPUT} inputMode="numeric" value={d.seed} onChange={set("seed")} /></Field>
-      </div>
-      <div><Button onClick={apply}>Apply and re-run</Button></div>
     </div>
   );
 }
@@ -100,6 +58,8 @@ export default function ForecastRiskPage() {
   const [q, setQ] = useState<ForecastRiskQuery>({ source: "real", profile: "moderate", horizon: 6, tolerance: 0.1 });
   const [tab, setTab] = useState<TabId>("forecast");
   const [formKey, setFormKey] = useState(0);
+  // an error already shown is dismissed when the person moves to another tab
+  const [seenError, setSeenError] = useState<string | null>(null);
   const { data, error, loading, reload } = useAsync<ForecastRiskReport | null>(
     () => (userId ? api.forecastRisk(userId, q) : Promise.resolve(null)),
     [userId, JSON.stringify(q)],
@@ -138,10 +98,14 @@ export default function ForecastRiskPage() {
         </div>
       )}
 
+      {error && data && error !== seenError && (
+        <p role="alert" className="rounded-card border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">{friendlyForecastError(error)}</p>
+      )}
+
       {loading && !data ? (
         <Skel />
       ) : error && !data ? (
-        <EmptyState title="Could not run the forecast" body={error} action={<Button variant="secondary" onClick={reload}>Retry</Button>} />
+        <EmptyState title="Could not run the forecast" body={friendlyForecastError(error)} action={<Button variant="secondary" onClick={reload}>Retry</Button>} />
       ) : data && data.status === "insufficient_history" ? (
         <EmptyState
           title="Not enough history to forecast"
@@ -178,7 +142,7 @@ export default function ForecastRiskPage() {
 
           <div className="flex flex-wrap gap-2.5">
             {TABS.map((t) => (
-              <button key={t.id} type="button" onClick={() => setTab(t.id)} className={cn(PILL, "py-2.5", tab === t.id ? PILL_ON : PILL_OFF)}>{t.label}</button>
+              <button key={t.id} type="button" onClick={() => { setTab(t.id); setSeenError(error); }} className={cn(PILL, "py-2.5", tab === t.id ? PILL_ON : PILL_OFF)}>{t.label}</button>
             ))}
           </div>
 

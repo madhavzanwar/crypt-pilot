@@ -1,3 +1,5 @@
+import { extractErrorMessage, formatApiError, photoErrorMessage, SecretInputError, secretInputDetail } from "@/lib/apiError";
+import { TranslateCache } from "@/lib/translateCache";
 import { getLang, getSimpleNow } from "@/lib/i18n";
 
 import type {
@@ -145,28 +147,13 @@ function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return value;
 }
 
-/** Plain server message for a 4xx (e.g. "That OTP is not correct"); a generic message for 5xx (detail goes to the console); the status line otherwise. */
+/** Friendly message for a failed response (see lib/apiError.ts); technical detail goes to the console only. */
 async function errorMessage(path: string, res: Response): Promise<string> {
   const text = await res.text();
-  if (res.status < 500) {
-    try {
-      const detail = (JSON.parse(text) as { detail?: unknown }).detail;
-      if (typeof detail === "string" && detail) return detail;
-    } catch {
-      // not JSON: fall through
-    }
-  }
-  if (res.status >= 500) {
-    console.error(`API ${path} failed: ${res.status} ${text}`);
-    return "Something went wrong on our side. Please try again in a moment.";
-  }
-  // A non-JSON body (an HTML 404 page from the proxy, say) is noise for the user: keep it in the console only.
-  const trimmed = text.trim();
-  if (trimmed.startsWith("<") || trimmed.length > 200) {
-    console.error(`API ${path} failed: ${res.status} ${trimmed.slice(0, 500)}`);
-    return `API ${path} failed: ${res.status}`;
-  }
-  return `API ${path} failed: ${res.status} ${text}`;
+  const secret = secretInputDetail(res.status, text);
+  if (secret) throw new SecretInputError(secret);
+  if (res.status >= 500 || res.status === 422) console.error(`API ${path} failed: ${res.status} ${text.slice(0, 500)}`);
+  return formatApiError(res.status, text);
 }
 
 const pairHeader = (code?: string): Record<string, string> => (code ? { "X-Pair-Code": code } : {});
@@ -200,11 +187,30 @@ function planQuery(p: object): string {
   return s ? `?${s}` : "";
 }
 
+// One cache per tab: never ask the server for the same string twice, and back off after a failure (see lib/translateCache.ts).
+const translations = new TranslateCache(
+  async (lang, texts) => (await request<{ translations: Record<string, string> }>("/api/translate", { method: "POST", body: JSON.stringify({ lang, texts }) })).translations,
+  () => (typeof window === "undefined" ? null : window.localStorage),
+);
+
+/** Failed /api/ocr/extract call: keeps the HTTP status so the UI can pick a friendly message or fall back to the CSV importer. */
+export class ExtractError extends Error {
+  status: number;
+  detail: string;
+  constructor(status: number, detail: string) {
+    super(extractErrorMessage(status, detail));
+    this.name = "ExtractError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
 export const api = {
   health: () => apiFetch<{ status: string }>("/api/health"),
   /** English UI text -> Hindi/Marathi (server caches; used only for text nobody hand-translated). */
-  translateTexts: (lang: string, texts: string[]) =>
-    apiFetch<{ translations: Record<string, string> }>("/api/translate", { method: "POST", body: JSON.stringify({ lang, texts }) }),
+  translateTexts: async (lang: string, texts: string[]) => ({
+    translations: await translations.translate(lang, texts),
+  }),
   voiceAct: (text: string, path: string, lang: string, screen: unknown, history: string[], userId = "") =>
     apiFetch<{ thinking?: string; say: string; ask_copilot: boolean; actions: import("@/lib/voiceAgent").VoiceAction[] }>("/api/voice/act", { method: "POST", body: JSON.stringify({ text, path, lang, screen, history, user_id: userId }) }),
   schemeAnalyst: (scheme: string, question: string) =>
@@ -295,7 +301,7 @@ export const api = {
   aaImport: (userId: string, consentId: string) =>
     apiFetch<{ accounts: number; transactions: number }>(`/api/aa/${userId}/import`, { method: "POST", body: JSON.stringify({ consent_id: consentId }) }),
   connectConnector: (userId: string, connector: string, profile: ConnectProfile, url = "") =>
-    apiFetch<{ connected: boolean; accounts: number; transactions: number }>(
+    apiFetch<{ connected: boolean; accounts: number; transactions: number; has_data?: boolean; message?: string }>(
       `/api/connectors/${userId}/${connector}/connect`,
       { method: "POST", body: JSON.stringify({ profile, url }) }
     ),
@@ -303,7 +309,7 @@ export const api = {
   syncSheet: async (userId: string): Promise<boolean> => {
     const res = await fetch(`${API_URL}/api/connectors/${userId}/google_sheets/sync`, { method: "POST", headers: await authHeader() });
     clearApiCache();
-    if (!res.ok) throw new Error(`Sheet sync failed: ${res.status}`);
+    if (!res.ok) throw new Error(formatApiError(res.status, await res.text()));
     const { changed } = (await res.json()) as { changed: boolean };
     if (changed) notifyIfWrite("POST");
     return changed;
@@ -311,7 +317,7 @@ export const api = {
   /** Downloads a connected source's dataset as a CSV file. */
   exportConnector: async (userId: string, connector: string) => {
     const res = await fetch(`${API_URL}/api/connectors/${userId}/${connector}/export`, { headers: await authHeader() });
-    if (!res.ok) throw new Error(`Export failed: ${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(formatApiError(res.status, await res.text()));
     const url = URL.createObjectURL(await res.blob());
     const a = Object.assign(document.createElement("a"), { href: url, download: `${connector}.csv` });
     a.click();
@@ -365,7 +371,7 @@ export const api = {
   clearThreats: (userId: string) => apiFetch<{ removed: number }>(`/api/security/${userId}/demo-threats`, { method: "DELETE" }),
   securityGraph: (userId: string, months: number) => apiFetch<SecurityGraph>(`/api/security/${userId}/graph?months=${months}`),
   simulateFraud: (userId: string, merchant: string, amount: number) =>
-    apiFetch<{ caught: boolean; findings: SecurityFinding[] }>(`/api/security/${userId}/simulate-fraud`, { method: "POST", body: JSON.stringify({ merchant, amount }) }),
+    apiFetch<{ caught: boolean; outcome?: "caught" | "unverified" | "not_flagged"; findings: SecurityFinding[] }>(`/api/security/${userId}/simulate-fraud`, { method: "POST", body: JSON.stringify({ merchant, amount }) }),
   myData: (userId: string) => apiFetch<MyData>(`/api/security/${userId}/data`),
   exportAllData: async (userId: string) => {
     const res = await fetch(`${API_URL}/api/security/${userId}/data/export`, { headers: await authHeader() });
@@ -390,7 +396,7 @@ export const api = {
       headers: await authHeader(),
       body,
     });
-    if (!res.ok) throw new Error(`API upload failed: ${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(formatApiError(res.status, await res.text()));
     notifyIfWrite("POST");
     return publishInsights((await res.json()) as RecomputeDiff);
   },
@@ -402,7 +408,7 @@ export const api = {
     body.append("file", file);
     const res = await fetch(`${API_URL}/api/documents/${userId}`, { method: "POST", headers: await authHeader(), body });
     clearApiCache();
-    if (!res.ok) throw new Error(`Upload failed: ${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(formatApiError(res.status, await res.text()));
     return res.json();
   },
   // Statement / passbook photo -> OCR -> personal data removed -> preview; nothing is saved until importOcr
@@ -410,7 +416,10 @@ export const api = {
     const body = new FormData();
     body.append("file", file);
     const res = await fetch(`${API_URL}/api/ocr/extract/${userId}`, { method: "POST", headers: await authHeader(), body });
-    if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `Upload failed: ${res.status}`);
+    if (!res.ok) {
+      const detail = (await res.json().catch(() => null))?.detail;
+      throw new ExtractError(res.status, typeof detail === "string" ? detail : "");
+    }
     return res.json();
   },
   importOcr: (userId: string, transactions: OcrTxn[]) =>
@@ -423,7 +432,7 @@ export const api = {
     if (photo) body.append("photo", photo);
     const res = await fetch(`${API_URL}/api/expenses/${userId}`, { method: "POST", headers: await authHeader(), body });
     clearApiCache();
-    if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `Could not save: ${res.status}`);
+    if (!res.ok) throw new Error(photoErrorMessage(res.status, (await res.json().catch(() => null))?.detail, "Could not save that item."));
     return res.json();
   },
   // Photo -> price memory: teach once (photo + name + price), then a photo alone books the expense
@@ -434,7 +443,7 @@ export const api = {
     body.append("photo", photo);
     const res = await fetch(`${API_URL}/api/expenses/${userId}/teach`, { method: "POST", headers: await authHeader(), body });
     clearApiCache();
-    if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `Could not save: ${res.status}`);
+    if (!res.ok) throw new Error(photoErrorMessage(res.status, (await res.json().catch(() => null))?.detail, "Could not save that item."));
     return res.json() as Promise<{ item: string; price: number }>;
   },
   snapPhoto: async (userId: string, photo: File): Promise<SnapResult> => {
@@ -442,7 +451,7 @@ export const api = {
     body.append("photo", photo);
     const res = await fetch(`${API_URL}/api/expenses/${userId}/snap`, { method: "POST", headers: await authHeader(), body });
     clearApiCache();
-    if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `Could not read that photo: ${res.status}`);
+    if (!res.ok) throw new Error(photoErrorMessage(res.status, (await res.json().catch(() => null))?.detail, "Could not read that photo."));
     return res.json();
   },
   /** Phone pay app: books a scanned-QR payment into the ledger (no real money moves). `code` is the pairing code from the dashboard. */

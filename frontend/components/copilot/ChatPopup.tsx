@@ -16,6 +16,10 @@ import { useUserId } from "@/lib/hooks";
 import { getOfflineOnly } from "@/lib/user";
 import { formatDate } from "@/lib/format";
 import { formatCurrency } from "@/components/ui/money";
+import { useVoiceT } from "@/lib/crypto/voice/strings";
+import { messageHasSecret } from "@/lib/crypto/extractAddress";
+import { SecretInputError } from "@/lib/apiError";
+import { cleanHistory, findSplitSecret, REDACTED } from "@/lib/crypto/secretGuard";
 import { runActions, snapshotScreen } from "@/lib/voiceAgent";
 import { isRecentTransactionQuestion, pageToOpen, scrollCommand, scrollToSelector, speak, stopSpeaking, useVoiceInput } from "@/lib/voice";
 
@@ -64,6 +68,8 @@ export function ChatPopup() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [loading, setLoading] = useState(false);
   const [caption, setCaption] = useState("");
+  const [secretWarn, setSecretWarn] = useState(false);
+  const { tr } = useVoiceT();
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -88,14 +94,15 @@ export function ChatPopup() {
 
   const voice = useVoiceInput(
     (text) => {
-      patch({ heard: text, live: false });
+      // a spoken seed phrase or key is never shown, sent or remembered
+      patch({ heard: messageHasSecret(text) ? "" : text, live: false });
       void send(text, true);
     },
     (problem) => {
       setLog(null);
       setCaption(problem);
     },
-    (live) => setLog((l) => ({ heard: live, live: true, steps: l?.steps ?? [], answer: "", over: false })),
+    (live) => setLog((l) => ({ heard: messageHasSecret(live) ? "" : live, live: true, steps: l?.steps ?? [], answer: "", over: false })),
   );
 
   const startVoice = () => {
@@ -169,7 +176,22 @@ export function ChatPopup() {
   async function send(text?: string, spoken = false) {
     const message = (text ?? input).trim();
     if (!message || loading) return;
-    const history = msgs.slice(-8).map((m) => ({ role: m.role, content: m.text }));
+    // seed phrases and private keys (also split over several messages) never leave the input: nothing is sent, shown or stored
+    const earlier = msgs.filter((m) => m.role === "user").map((m) => m.text);
+    const split = findSplitSecret(earlier, message);
+    if (split >= 0) {
+      setInput("");
+      setSecretWarn(true);
+      setLog(null);
+      if (split > 0) {
+        // the earlier pieces were already sent once; hide them and never send them again in the history
+        const users = msgs.map((m, i) => (m.role === "user" ? i : -1)).filter((i) => i >= 0).slice(-split);
+        setMsgs((all) => all.map((m, i) => (users.includes(i) ? { ...m, text: REDACTED } : m)));
+      }
+      return;
+    }
+    setSecretWarn(false);
+    const history = cleanHistory(msgs.slice(-8).map((m) => ({ role: m.role, content: m.text })));
     setMsgs((m) => [...m, { role: "user", text: message }]);
     setInput("");
     setLoading(true);
@@ -218,8 +240,15 @@ export function ChatPopup() {
         doneStep("Done");
         patch({ answer: reply.text.replace(/\*\*/g, ""), over: true });
       }
-    } catch {
+    } catch (err) {
       if (spoken) patch({ over: true });
+      if (err instanceof SecretInputError) {
+        // the server refused it as a secret: hide the sent text and show the server's friendly explanation
+        setMsgs((all) => all.map((m, i) => (i === all.length - 1 && m.role === "user" ? { ...m, text: REDACTED } : m)));
+        setMsgs((m) => [...m, { role: "assistant", text: err.message }]);
+        setLoading(false);
+        return;
+      }
       reply = { role: "assistant", text: "Sorry, I couldn't answer right now. Please try again in a minute." };
     }
     setMsgs((m) => [...m, reply]);
@@ -310,6 +339,16 @@ export function ChatPopup() {
                   </div>
                 </div>
               ))}
+              {secretWarn && (
+                <div role="alert" className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+                  <p className="min-w-0 flex-1">
+                    <span className="font-semibold">{tr("cp.secret.title")}</span> {tr("cp.secret.body")}
+                  </p>
+                  <button type="button" onClick={() => setSecretWarn(false)} aria-label={tr("cp.secret.dismiss")} className="rounded-full p-0.5 hover:bg-rose-100">
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              )}
               {loading && <p className="animate-pulse text-xs text-pewter">FinPilot is thinking…</p>}
               <div ref={endRef} />
             </div>
@@ -317,7 +356,12 @@ export function ChatPopup() {
             <div className="bg-white p-2.5">
               <PromptInputBox
                 value={input}
-                onChange={setInput}
+                onChange={(v) => {
+                  if (messageHasSecret(v)) {
+                    setInput("");
+                    setSecretWarn(true);
+                  } else setInput(v);
+                }}
                 onSend={() => send()}
                 isLoading={loading}
                 placeholder="Ask FinPilot..."

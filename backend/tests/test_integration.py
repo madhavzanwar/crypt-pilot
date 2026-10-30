@@ -167,7 +167,7 @@ def test_events_endpoint_recurring_kind_is_supported():
     actually show up as a recurring_obligations entry on the next dashboard
     fetch (detect_recurring() needs >= 3 backdated occurrences to see it)."""
     r = client.post(
-        "/api/events/demo-priya",
+        "/api/events/guest-recurkind0001",
         json={
             "kind": "recurring",
             "merchant": "Test Gym Membership",
@@ -177,10 +177,11 @@ def test_events_endpoint_recurring_kind_is_supported():
         },
     )
     assert r.status_code == 200
+    assert r.json()["simulated"] is False  # a private guest ledger keeps real entries
     diff = r.json()
     assert diff["trigger"] == "recurring"
 
-    after = build_dashboard_snapshot("demo-priya")
+    after = build_dashboard_snapshot("guest-recurkind0001")
     matches = [o for o in after.recurring_obligations if "test gym membership" in o.merchant]
     assert matches, "new recurring obligation should be detected after 3 backdated occurrences"
     # Obligation must be an outflow (negative) regardless of the sign posted.

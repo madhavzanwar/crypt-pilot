@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
+import { EXTRA } from "@/lib/i18nExtra";
 
 export const LANGS = [
   { code: "en", native: "English" },
@@ -69,6 +70,18 @@ const S: Record<string, string[]> = {
   "nav.Household": ["Household", "परिवार", "कुटुंब"],
   "nav.Tax": ["Tax", "कर", "कर"],
   "nav.Statement": ["Statement", "विवरण", "विवरण"],
+  "nav.Forecast & Risk": ["Forecast & Risk", "पूर्वानुमान और जोखिम", "अंदाज आणि जोखीम"],
+  "nav.Simulate": ["Simulate", "सिमुलेशन", "सिम्युलेशन"],
+  "nav.Evidence Council": ["Evidence Council", "साक्ष्य परिषद", "पुरावा परिषद"],
+  "nav.Risk Council": ["Risk Council", "जोखिम परिषद", "जोखीम परिषद"],
+  "nav.Twin Simulator": ["Twin Simulator", "ट्विन सिमुलेटर", "ट्विन सिम्युलेटर"],
+  "nav.More": ["More", "और देखें", "आणखी"],
+  "nav.Upload document": ["Upload document", "दस्तावेज़ अपलोड करें", "दस्तऐवज अपलोड करा"],
+  "nav.Financial Security": ["Financial Security", "वित्तीय सुरक्षा", "आर्थिक सुरक्षा"],
+  "nav.Compare, Tax & Timeline": ["Compare, Tax & Timeline", "तुलना, कर और समयरेखा", "तुलना, कर आणि कालरेषा"],
+  "nav.My Data": ["My Data", "मेरा डेटा", "माझा डेटा"],
+  "nav.Plan": ["Plan", "योजना", "योजना"],
+  "nav.Profile": ["Profile", "प्रोफ़ाइल", "प्रोफाइल"],
   "login.welcome": ["Welcome back", "वापसी पर स्वागत है", "पुन्हा स्वागत आहे"],
   "login.create": ["Create your account", "अपना खाता बनाएं", "तुमचे खाते तयार करा"],
   "login.email": ["Email address", "ईमेल पता", "ईमेल पत्ता"],
@@ -138,6 +151,9 @@ const S: Record<string, string[]> = {
   "d.connect_h": ["Connect a bank account to wake up your dashboard", "अपने डैशबोर्ड को जगाने के लिए बैंक खाता जोड़ें", "तुमचा डॅशबोर्ड सुरू करण्यासाठी बँक खाते जोडा"],
   "d.connect_p": ["One tap links your payments. FinPilot imports, categorises and analyses everything. Nothing to type in.", "एक टैप में आपके भुगतान जुड़ जाते हैं। फिनपायलट सब कुछ आयात, वर्गीकृत और विश्लेषित करता है। कुछ टाइप नहीं करना।", "एका टॅपमध्ये तुमची पेमेंट्स जोडली जातात. फिनपायलट सर्व काही इम्पोर्ट, वर्गीकरण आणि विश्लेषण करतो. काहीही टाइप करायचे नाही."],
   "d.connect_gp": ["Connect a bank account", "बैंक खाता जोड़ें", "बँक खाते जोडा"],
+  "d.nodata_h": ["Connected, but no transactions yet", "जुड़ गया, पर अभी कोई लेनदेन नहीं", "जोडले गेले, पण अजून व्यवहार नाहीत"],
+  "d.nodata_p": ["Your source is linked, but it has not brought in any transactions. Upload a bank statement and your dashboard will fill in.", "आपका स्रोत जुड़ा है, पर उससे कोई लेनदेन नहीं आया। बैंक स्टेटमेंट अपलोड करें, डैशबोर्ड भर जाएगा।", "तुमचा स्रोत जोडला आहे, पण त्यातून व्यवहार आले नाहीत. बँक स्टेटमेंट अपलोड करा, डॅशबोर्ड भरेल."],
+  "d.nodata_btn": ["Upload a statement", "स्टेटमेंट अपलोड करें", "स्टेटमेंट अपलोड करा"],
   "d.money_out": ["Money out", "बाहर गया पैसा", "बाहेर गेलेले पैसे"],
   "d.per_month": ["per month", "प्रति माह", "दरमहा"],
   "d.monthly_spend": ["Monthly spend", "मासिक खर्च", "मासिक खर्च"],
@@ -335,7 +351,7 @@ const S: Record<string, string[]> = {
 
 /** Translate a key into the current language; falls back to English, then `fallback`, then the key. */
 export function translate(lang: Lang, key: string, fallback?: string): string {
-  const row = S[key];
+  const row = EXTRA[key] ?? S[key];
   return row?.[LANGS.findIndex((l) => l.code === lang)] || row?.[0] || fallback || key;
 }
 

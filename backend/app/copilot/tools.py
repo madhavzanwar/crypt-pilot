@@ -388,6 +388,7 @@ def simulate_action(user_id: str, action: str, action_params: dict = {}) -> dict
             transactions=None,
             horizon_days=snap.forecast.horizon_days,
             monthly_income=snap.monthly_income,
+            baseline_monthly_net=snap.monthly_income - snap.monthly_expenses,
         )
         result = real_simulate(
             action_enum,

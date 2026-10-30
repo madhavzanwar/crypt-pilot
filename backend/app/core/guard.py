@@ -17,7 +17,7 @@ from fastapi.concurrency import run_in_threadpool
 from app.core.config import get_settings
 from app.core.ratelimit import RateLimiter, client_ip
 
-translate_limiter = RateLimiter(60, 600)  # per client: 60 translate calls / 10 min
+translate_limiter = RateLimiter(150, 600)  # per client: 150 translate calls that reach the model / 10 min (cache hits are free)
 web_limiter = RateLimiter(20, 60)  # per client: 20 web-intel calls / minute (the shared Tavily cap stays on top)
 ops_limiter = RateLimiter(60, 60)
 probe_limiter = RateLimiter(6, 60)

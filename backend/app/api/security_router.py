@@ -9,12 +9,14 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from typing import Annotated
 
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, field_validator
+
+from app.core.validate import check_amount
 
 from app.api.connectors_router import CATALOG, DATASET_FILES, _dataset
 from app.api.jobs_router import enqueue_evidence
 from app.core import store
-from app.core.audit import log_audit_event
+from app.core.audit import humanise_action, log_audit_event
 from app.core.auth import resolve_user_id
 from app.models import AccountRow, AuditLogRow, ConnectionRow, TransactionRow
 from app.security import agents, chain_analyst, council
@@ -91,7 +93,7 @@ def clear(user_id: str = Depends(resolve_user_id)) -> dict:
 def graph(request: Request, months: int = 6, user_id: str = Depends(resolve_user_id)) -> dict:
     months = max(1, min(months, 12))
     since = date.today() - timedelta(days=30 * months)
-    all_rows, accounts = store.query(TransactionRow, user_id=user_id), store.query(AccountRow, user_id=user_id)
+    all_rows, accounts = agents.security_rows(user_id), store.query(AccountRow, user_id=user_id)
     rows = [t for t in agents._spend(all_rows) if t.date >= since]
     flagged: dict[str, list[str]] = defaultdict(list)
     for fs in agents.run_checks(all_rows, accounts).values():
@@ -137,19 +139,34 @@ def graph(request: Request, months: int = 6, user_id: str = Depends(resolve_user
 
 
 class FraudSim(BaseModel):
-    merchant: str
-    amount: float
-    wallet: str | None = None  # optional: a crypto wallet the payment would go to, screened by the Chain Analyst
+    merchant: str = Field(max_length=200)
+    amount: float = Field(allow_inf_nan=False)
+    wallet: str | None = Field(default=None, max_length=300)  # optional: a crypto wallet the payment would go to, screened by the Chain Analyst
+
+    @field_validator("merchant")
+    @classmethod
+    def _merchant_required(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Enter the merchant or shop name to simulate a payment to")
+        return v
+
+    @field_validator("amount")
+    @classmethod
+    def _amount_positive(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("Enter an amount above zero: the simulated payment is money going out")
+        return check_amount(v)
 
 
 @router.post("/{user_id}/simulate-fraud")
 def simulate_fraud(body: FraudSim, user_id: str = Depends(resolve_user_id)) -> dict:
     """Run the agents on your ledger plus one hypothetical payment (nothing is stored)."""
-    rows, accounts = store.query(TransactionRow, user_id=user_id), store.query(AccountRow, user_id=user_id)
+    rows, accounts = agents.security_rows(user_id), store.query(AccountRow, user_id=user_id)
     if not accounts:
         raise HTTPException(409, "Connect a data source first")
-    sim = [TransactionRow(id="sim", user_id=user_id, account_id=accounts[0].id, date=date.today(), amount=-abs(body.amount),
-                          merchant=body.merchant.strip() or "Unknown", category="shopping")]
+    sim = [TransactionRow(id="sim", user_id=user_id, account_id=accounts[0].id, date=date.today(), amount=-body.amount,
+                          merchant=body.merchant, category="shopping")]
     before = {f["title"] for fs in agents.run_checks(rows, accounts).values() for f in fs}
     caught = [f for fs in agents.run_checks(rows + sim, accounts).values() for f in fs if "sim" in f["txn_ids"] or f["title"] not in before]
     out: dict = {}
@@ -162,7 +179,9 @@ def simulate_fraud(body: FraudSim, user_id: str = Depends(resolve_user_id)) -> d
         if finding and not finding["info"]:
             caught.append(finding)
         out["wallet"] = {**result, "finding": finding}
-    return {"caught": bool(caught), "findings": caught, **out}
+    unverified = bool(out.get("wallet")) and out["wallet"].get("status") != "ok"  # UNKNOWN / not screened is never "looks normal"
+    outcome = "caught" if caught else ("unverified" if unverified else "not_flagged")
+    return {"caught": bool(caught), "outcome": outcome, "findings": caught, **out}
 
 
 def _preview(connector: str, rows: list[TransactionRow]) -> tuple[int, list]:
@@ -190,7 +209,8 @@ def my_data(request: Request, user_id: str = Depends(resolve_user_id)) -> dict:
             sources.append({"id": cid, "name": CATALOG[cid][0], "detail": linked[cid].detail, "records": n, "preview": prev, "disconnectable": True})
     log = sorted(store.query(AuditLogRow, user_id=user_id), key=lambda r: r.created_at, reverse=True)[:30]
     _log(request, user_id, "My Data page listed your connected sources")
-    return {"sources": sources, "access_log": [{"when": r.created_at.isoformat(), "event": r.event_type, "method": r.method, "path": r.path, "detail": r.detail, "status": r.status_code} for r in log]}
+    return {"sources": sources, "access_log": [{"when": r.created_at.isoformat(), "event": r.event_type, "method": r.method, "path": r.path, "detail": r.detail, "status": r.status_code,
+            "action": humanise_action(r.event_type, r.method, r.path, r.detail)} for r in log]}
 
 
 @router.get("/{user_id}/data/export")

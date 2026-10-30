@@ -1,7 +1,7 @@
 import { useT } from "@/lib/i18n";
 import { TrendingDown, TrendingUp, Zap } from "lucide-react";
 import type { Transaction } from "@/lib/types";
-import type { MonthTotals } from "@/lib/spend";
+import { todayISO, type MonthTotals } from "@/lib/spend";
 import { formatCurrency } from "@/components/ui/money";
 import { BigAmount } from "@/components/dashboard/BigAmount";
 
@@ -18,9 +18,10 @@ export function IncomeCard({ months, txns }: { months: MonthTotals[]; txns: Tran
   const pct = prev && prev.income > 0 ? (delta / prev.income) * 100 : null;
   const max = Math.max(1, ...months.map((m) => m.income));
 
+  const today = todayISO();
   const bySource = new Map<string, number>();
   for (const t of txns) {
-    if (t.category === "income" && t.amount > 0 && latest && t.date.startsWith(latest.month))
+    if (t.category === "income" && t.amount > 0 && latest && t.date.startsWith(latest.month) && t.date.slice(0, 10) <= today)
       bySource.set(t.merchant, (bySource.get(t.merchant) ?? 0) + t.amount);
   }
   const sources = [...bySource].sort((a, b) => b[1] - a[1]).slice(0, 3);

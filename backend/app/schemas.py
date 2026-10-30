@@ -6,11 +6,14 @@ Do not duplicate these shapes elsewhere -- import from here.
 """
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 from enum import Enum
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.core.validate import check_amount, check_date
 
 _Date = date  # alias: model fields named `date` shadow the type inside class bodies
 
@@ -325,6 +328,7 @@ class DashboardSnapshot(BaseModel):
     net_worth: float
     monthly_income: float
     monthly_expenses: float
+    committed_monthly: float = 0.0  # confirmed recurring obligations per month (shared basis, see app.analytics.basis)
     savings_rate: float
     recurring_obligations: list[RecurringObligation]
     debts: list[Debt]
@@ -372,6 +376,7 @@ class RecomputeDiff(BaseModel):
     removed_recommendation_actions: list[ActionType] = Field(default_factory=list)
     narrative: str
     insights: list[CopilotInsight] = Field(default_factory=list)
+    simulated: bool = False  # True: a what-if, nothing was written to the ledger
 
 
 # ---------------------------------------------------------------------------
@@ -523,6 +528,10 @@ class SafeToSpend(BaseModel):
     amount: float
     basis: str  # human-readable explanation of the formula/data used
     as_of_date: date
+    monthly_income: float = 0.0  # shared basis (same figure as the dashboard)
+    committed_monthly: float = 0.0  # confirmed recurring obligations only
+    spent_so_far: float = 0.0  # everyday spend this month, outside the committed obligations
+    status: str = "ok"  # "ok" | "over" (spent past what is left) | "no_income" (no income on record yet)
 
 
 # ---------------------------------------------------------------------------
@@ -671,6 +680,15 @@ class TaxCalculationRequest(BaseModel):
     hra_exemption: Optional[float] = Field(default=None, ge=0, le=1e11, allow_inf_nan=False)
     other_deductions: Optional[float] = Field(default=None, ge=0, le=1e11, allow_inf_nan=False)
 
+    @field_validator("gross_annual_income", "section_80c", "section_80d", "section_80ccd_1b_nps", "section_24b_home_loan",
+                     "hra_exemption", "other_deductions", mode="before")
+    @classmethod
+    def _non_negative_amount(cls, v, info):
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and v < 0:
+            label = "Gross annual income" if info.field_name == "gross_annual_income" else info.field_name.replace("_", " ")
+            raise ValueError(f"{label} cannot be negative. Enter 0 or more.")
+        return v
+
 
 # ---------------------------------------------------------------------------
 # Household & Co-Piloting Collaboration (Pillar 5D)
@@ -726,23 +744,44 @@ class CreateHouseholdRequest(BaseModel):
     name: str
 
 
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+'-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}$")
+
+
 class CreateInviteRequest(BaseModel):
-    email: str
+    email: str = Field(max_length=254)
     role: HouseholdRole = HouseholdRole.editor
+
+    @field_validator("email")
+    @classmethod
+    def _valid_email(cls, v: str) -> str:
+        v = v.strip()
+        if not _EMAIL_RE.match(v):
+            raise ValueError("Enter a valid email address, like name@example.com")
+        return v
 
 
 class AddManagedMemberRequest(BaseModel):
     name: str
     relationship: Optional[str] = None  # e.g. "Child", "Parent"
-    opening_balance: float = 0.0
+    opening_balance: float = Field(default=0.0, ge=0, le=1e12, allow_inf_nan=False)
 
 
 class AddManagedTransactionRequest(BaseModel):
-    merchant: str
-    amount: float  # positive = money in, negative = money out
+    merchant: str = Field(max_length=200)
+    amount: float = Field(allow_inf_nan=False)  # positive = money in, negative = money out
     category: TxnCategory = TxnCategory.other
     date: Optional[_Date] = None
-    description: Optional[str] = None
+    description: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("amount")
+    @classmethod
+    def _sane_amount(cls, v: float) -> float:
+        return check_amount(v, allow_zero=True)
+
+    @field_validator("date")
+    @classmethod
+    def _sane_date(cls, v):
+        return check_date(v)
 
 
 class MemberLedger(BaseModel):

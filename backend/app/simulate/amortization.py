@@ -34,6 +34,8 @@ def amortize(
     at `_MAX_MONTHS` and return whatever accumulated (this signals "does not
     amortize" rather than looping forever / raising).
     """
+    if extra_monthly_payment < 0 or monthly_payment < 0:
+        raise ValueError("payments cannot be negative")
     balance = principal
     monthly_rate = annual_rate_pct / 100.0 / 12.0
     payment = monthly_payment + extra_monthly_payment
@@ -54,8 +56,8 @@ def amortize(
         balance -= principal_component
         months += 1
         if balance < 0:
-            # last payment was larger than needed; correct the overshoot
-            total_interest += balance  # balance is negative here, reduces interest slightly
+            # the last payment was larger than the balance: the overshoot is principal that is simply not paid, it
+            # says nothing about interest (subtracting it from the interest made "total interest" negative)
             balance = 0
 
     total_paid = principal + total_interest

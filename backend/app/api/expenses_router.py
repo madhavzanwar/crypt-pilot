@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from app.core import store
 from app.core.auth import resolve_user_id
-from app.ocr import parse_receipt, read_text
+from app.ocr import OcrUnavailable, parse_receipt, read_text
 from app.expenses import vlm
 from app.expenses.suggest import item_key, remember, suggest
 from app.models import AccountRow, PriceMemoryRow, TransactionRow
@@ -56,7 +56,10 @@ async def suggest_expense(
 
 def _suggest_sync(user_id: str, image: bytes | None, name: str | None, city: str | None) -> dict:
     # CPU-bound (OCR + CLIP): runs in a worker thread so it never blocks the event loop for other requests
-    text = read_text(image) if image else ""
+    try:
+        text = read_text(image) if image else ""
+    except OcrUnavailable:  # no OCR engine here: carry on with the photo model / name instead of failing
+        text = ""
     bill = parse_receipt(text)
     if text and not bill["total"]:  # readable text but no total found: let the vision model look at it
         bill = vlm.read_bill(image)
@@ -72,6 +75,8 @@ def _suggest_sync(user_id: str, image: bytes | None, name: str | None, city: str
         return out
     except OSError as e:  # unreadable image
         raise HTTPException(422, "Could not read that photo") from e
+    except ImportError as e:  # photo model not installed here
+        raise HTTPException(503, _NO_PHOTO_AI) from e
 
 
 def _account(user_id: str) -> AccountRow:
@@ -99,8 +104,12 @@ async def add_expense(
 def _save(user_id: str, item: str, amount: float, category: str | None, image: bytes | None) -> dict:
     """Book one cash expense and remember its price (and photo) so the next one can be filled in."""
     name = item.strip()
-    if not name or not 0 < amount < 10_000_000:
+    if not name or not amount > 0:
         raise HTTPException(422, "Enter an item and an amount above zero")
+    if len(name) > 100:
+        raise HTTPException(422, "Keep the item name under 100 characters")
+    if not amount < 10_000_000:
+        raise HTTPException(422, "That amount is too large. Enter something under ₹1,00,00,000")
     key = item_key(name)
     if category not in _CATEGORIES:
         category = suggest(user_id, None, key, None)["category"]
@@ -110,11 +119,17 @@ def _save(user_id: str, item: str, amount: float, category: str | None, image: b
         reviewed_at=datetime.now(timezone.utc),
     )
     store.put(row)
-    remember(user_id, key, abs(amount), category, image)
+    try:
+        remember(user_id, key, abs(amount), category, image)
+    except ImportError:  # no photo model on this server: the expense is booked, only the photo is not remembered
+        pass
     return {"id": row.id, "item": key, "amount": abs(amount), "category": category}
 
 
 # --- Photo -> price: teach an item once, then a photo alone books it -------------------------------------------
+
+
+_NO_PHOTO_AI = "Photo recognition isn't available on this server right now. Type the item name and amount to add it instead."
 
 
 @router.post("/expenses/{user_id}/teach")
@@ -133,7 +148,10 @@ async def teach(
     key = item_key(name)
     if category not in _CATEGORIES:
         category = suggest(user_id, None, key, None)["category"]
-    await run_in_threadpool(remember, user_id, key, price, category, image)
+    try:
+        await run_in_threadpool(remember, user_id, key, price, category, image)
+    except ImportError as e:
+        raise HTTPException(503, _NO_PHOTO_AI) from e
     return {"item": key, "price": price, "category": category}
 
 
@@ -147,6 +165,8 @@ async def snap(user_id: str = Depends(resolve_user_id), photo: UploadFile = File
         out = await run_in_threadpool(_snap_suggest, user_id, image)
     except OSError as e:
         raise HTTPException(422, "Could not read that photo") from e
+    except ImportError as e:  # fastembed / the image model is not installed on this server
+        raise HTTPException(503, _NO_PHOTO_AI) from e
     if out["source"] == "memory" and out["price"]:
         return {"added": True, **_save(user_id, out["item"], out["price"], out["category"], image)}
     return {"added": False, "suggestion": out}

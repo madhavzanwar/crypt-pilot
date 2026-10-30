@@ -9,6 +9,7 @@ import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.analytics.basis import monthly_basis
 from app.api.routes import _starting_balance_for_user
 from app.core import store
 from app.core.auth import resolve_user_id
@@ -95,8 +96,10 @@ def get_plan(
     horizon: int = Query(6),
     user_id: str = Depends(resolve_user_id),
 ) -> PlanResult:
-    return plan(_inputs(user_id, PlanParams(
+    result = plan(_inputs(user_id, PlanParams(
         reserve=reserve, goal_amount=goal_amount, goal_month=goal_month, tolerance=tolerance, cut=cut, horizon=horizon)))
+    result.basis = monthly_basis(_transactions_df(store.query(TransactionRow, user_id=user_id)))
+    return result
 
 
 @router.post("/plan/{user_id}/replan", response_model=ReplanResult)

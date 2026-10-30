@@ -1,6 +1,7 @@
 "use client";
 
 import { translate, useLang } from "@/lib/i18n";
+import { MR } from "./copy.mr";
 import type { Lang } from "@/lib/crypto/api";
 import { toCryptoLang } from "@/lib/crypto/lang";
 
@@ -117,7 +118,8 @@ const COPY: Record<string, [string, string]> = {
   "wg.neighbours.na": ["Not computed", "गणना नहीं हुई"],
   "wg.limits.title": ["Limitations", "सीमाएँ"],
   "wg.credits.left": ["{n} credits left", "{n} क्रेडिट बाकी"],
-  "wg.credits.cached": ["Served from cache: no credit used.", "कैश से मिला: कोई क्रेडिट नहीं लगा।"],
+  "wg.credits.cached": ["Served from cache: an earlier check (under 10 minutes old), not a new one. No credit used.", "कैश से मिला: यह पहले की जाँच है (10 मिनट से कम पुरानी), नई नहीं। कोई क्रेडिट नहीं लगा।"],
+  "wg.deeplink.hint": ["This link only filled in the address. Press Check wallet to run it (uses 1 credit).", "इस लिंक ने सिर्फ़ पता भरा है। जाँच चलाने के लिए वॉलेट जाँचें दबाएँ (1 क्रेडिट लगता है)।"],
   "wg.credits.reused": ["Shown from your last check: no credit used.", "आपकी पिछली जाँच से दिखाया गया: कोई क्रेडिट नहीं लगा।"],
   "wg.notice.mock": ["Synthetic or mock data: these are not real wallets.", "नकली या मॉक डेटा: ये असली वॉलेट नहीं हैं।"],
   "wg.notice.replay": ["Replay: a saved real response, not a live check.", "रीप्ले: सहेजा हुआ असली जवाब, लाइव जाँच नहीं।"],
@@ -197,8 +199,8 @@ const COPY: Record<string, [string, string]> = {
 /** Looks a key up in the Wallet Guard table; falls back to FinPilot's i18n, then the key. */
 export function gt(lang: string, key: string, vars?: Record<string, string | number>): string {
   const row = COPY[key];
-  const idx = lang === "hi" ? 1 : 0;
-  let text = row ? row[idx] || row[0] : translate(lang as Parameters<typeof translate>[0], key);
+  // Marathi has its own table; a row it lacks shows Hindi, never English.
+  let text = row ? (lang === "mr" ? MR[key] ?? row[1] : lang === "hi" ? row[1] : row[0]) || row[0] : translate(lang as Parameters<typeof translate>[0], key);
   if (vars) for (const [k, v] of Object.entries(vars)) text = text.replaceAll(`{${k}}`, String(v));
   return text;
 }

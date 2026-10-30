@@ -26,6 +26,18 @@ from app.security import ai_agents, chain_analyst
 from app.models import AccountRow, InvestigationRow, TransactionRow
 
 DEMO_TAG = "demo-threat"
+# Demo threats live in their own bucket (not in the user's ledger), so the shared demo personas' dashboard, statement,
+# forecast and budgets never see them. Only the security agents read ledger + bucket (see `security_rows`).
+THREAT_BUCKET = "threat::{}"
+
+
+def threat_user(user_id: str) -> str:
+    return THREAT_BUCKET.format(user_id)
+
+
+def security_rows(user_id: str) -> list:
+    """The ledger plus any planted demo threats: what the security agents investigate."""
+    return [*store.query(TransactionRow, user_id=user_id), *store.query(TransactionRow, user_id=threat_user(user_id))]
 NON_SPEND = {"transfer", "credit_card_payment", "income"}
 LOOKBACK_DAYS = 120
 _BRANDS = ["amazon", "netflix", "swiggy", "zomato", "uber", "flipkart", "paytm", "phonepe", "spotify", "hotstar", "google", "myntra"]
@@ -44,11 +56,13 @@ AGENTS = [
 ]
 
 
-def _finding(agent: str, severity: str, title: str, detail: str, rows: list[TransactionRow], merchant: str | None = None) -> dict:
+def _finding(agent: str, severity: str, title: str, detail: str, rows: list[TransactionRow], merchant: str | None = None,
+             amount: float | None = None) -> dict:
+    """`amount` overrides the sum of the rows' outflows (for findings about a recurring series that has no single row)."""
     return {
         "agent": agent, "severity": severity, "title": title, "detail": detail,
         "merchant": merchant or (rows[0].merchant if rows else None),
-        "amount": round(sum(-r.amount for r in rows if r.amount < 0), 2),
+        "amount": round(abs(amount), 2) if amount is not None else round(sum(-r.amount for r in rows if r.amount < 0), 2),
         "txn_ids": [r.id for r in rows],
     }
 
@@ -130,7 +144,8 @@ def subscription_sleuth(rows, _a) -> list[dict]:
         recurring = detect_recurring(_df(spend))
         for r in find_redundant_subscriptions(recurring):
             out.append(_finding("subscription_sleuth", "low", f"Overlapping subscription: {r.merchant}",
-                                f"₹{r.amount:,.0f} {r.frequency.value}. You pay for more than one service of the same kind, so consider keeping one.", [], r.merchant))
+                                f"₹{abs(r.amount):,.0f} {r.frequency.value}. You pay for more than one service of the same kind, so consider keeping one.", [], r.merchant,
+                                amount=abs(r.amount)))
     series = defaultdict(list)
     for r in spend:
         if r.is_recurring:
@@ -250,7 +265,8 @@ def write_verdict(findings: list[dict], score: int, run: str | None = None) -> t
             return _Verdict.model_validate(data).model_dump(), model, None
         except Exception as exc:  # noqa: BLE001
             errors.append(f"AI: {'busy' if '429' in str(exc) or '529' in str(exc) else 'unavailable'}")
-    return None, None, "; ".join(errors) + ". The findings above are real; only the written explanation is missing."
+    lead = "; ".join(errors) + ". " if errors else ""  # no AI key = no errors: do not start the sentence with a bare "."
+    return None, None, lead + "The findings above are real; only the written explanation is missing."
 
 
 def verdict_for(findings: list[dict], score: int, run: str | None = None, unverified: int = 0) -> tuple[dict | None, str | None, str | None]:
@@ -293,7 +309,7 @@ def investigate(user_id: str, pace: float = 0.35, wallets: list[str] | None = No
 
     With `wallets` (cleaned by chain_analyst.clean_wallets) the Chain Analyst joins as a tenth stage, just before the Risk
     Scorer. Without wallets it does not run and the nine agents behave exactly as before."""
-    rows, accounts = store.query(TransactionRow, user_id=user_id), store.query(AccountRow, user_id=user_id)
+    rows, accounts = security_rows(user_id), store.query(AccountRow, user_id=user_id)
     all_findings, summaries = [], {}
     run, score = uuid.uuid4().hex[:8], 0
     wallets = list(wallets or [])
@@ -311,7 +327,7 @@ def investigate(user_id: str, pace: float = 0.35, wallets: list[str] | None = No
         elif key == "risk_scorer":
             cross_check(all_findings)
             score, extra = ai_agents.calibrate(risk_score(scored(all_findings)), scored(all_findings), run)
-            res, extra = [], {**extra, "score": score}
+            res, extra = [], {**extra, "score": score, "level": risk_level(score)}
         elif key == chain_analyst.AGENT_ID:
             res, extra = chain_analyst.evidence_step(wallets, lang)
             all_findings += res
@@ -339,7 +355,10 @@ def latest_report(user_id: str) -> dict | None:
 
 
 def plant_demo_threats(user_id: str) -> int:
-    """Add clearly tagged fake suspicious transactions so the agents have something to find."""
+    """Add clearly tagged fake suspicious transactions so the agents have something to find.
+
+    Idempotent (fixed row ids: planting twice still leaves 9 rows), tagged `demo-threat`, kept in a separate bucket so
+    no ledger-based number changes, and removed by `clear_demo_threats`."""
     accounts = store.query(AccountRow, user_id=user_id)
     if not accounts:
         raise ValueError("Connect a data source first")
@@ -350,14 +369,15 @@ def plant_demo_threats(user_id: str) -> int:
         (9, -45000, "Quickcash Global Ltd", "shopping"),
         *[(4, -199, "PixelGift Store", "shopping")] * 5,
     ]
-    rows = [TransactionRow(id=f"{DEMO_TAG}-{user_id}-{i}", user_id=user_id, account_id=acc, date=today - timedelta(days=d), amount=a, merchant=m,
+    rows = [TransactionRow(id=f"{DEMO_TAG}-{user_id}-{i}", user_id=threat_user(user_id), account_id=acc, date=today - timedelta(days=d), amount=a, merchant=m,
                            category=c, tags=json.dumps([DEMO_TAG]), description="Demo suspicious activity") for i, (d, a, m, c) in enumerate(spec)]
     store.put(*rows)
     return len(rows)
 
 
 def clear_demo_threats(user_id: str) -> int:
-    rows = [r for r in store.query(TransactionRow, user_id=user_id) if DEMO_TAG in (r.tags or "")]
+    # also sweeps rows planted into the ledger itself by older versions
+    rows = [r for r in security_rows(user_id) if DEMO_TAG in (r.tags or "")]
     for r in rows:
         store.delete(TransactionRow, r.id)
     return len(rows)

@@ -9,9 +9,19 @@ import numpy as np
 from PIL import Image, UnidentifiedImageError
 
 
+class OcrUnavailable(RuntimeError):
+    """The OCR engine (rapidocr) is not installed on this server; callers answer 503 with a friendly message."""
+
+
+OCR_UNAVAILABLE_MESSAGE = "Reading text from photos is not available on this server. Upload a .txt or .csv instead."
+
+
 @lru_cache(maxsize=2)
 def _engine(devanagari: bool = False):
-    from rapidocr import LangRec, ModelType, OCRVersion, RapidOCR  # imported late: loading the models takes about a second
+    try:
+        from rapidocr import LangRec, ModelType, OCRVersion, RapidOCR  # imported late: loading the models takes about a second
+    except ImportError as exc:
+        raise OcrUnavailable(OCR_UNAVAILABLE_MESSAGE) from exc
 
     if not devanagari:
         return RapidOCR()
@@ -50,13 +60,16 @@ def read_text(data: bytes) -> str:
         return ""
     items = sorted(((float(b[:, 1].mean()), float(b[:, 0].min()), t, float(b[:, 1].max() - b[:, 1].min())) for b, t in zip(res.boxes, res.txts)))
     lines: list[list[tuple[float, str]]] = []
-    last_y, last_h = None, 0.0
+    heights = sorted(h for *_, h in items)
+    med_h = heights[len(heights) // 2] if heights else 0.0
+    line_y: list[float] = []  # running mean centre of each line, so a slightly tilted row still groups together
     for y, x, t, h in items:
-        if last_y is not None and abs(y - last_y) < max(last_h, h) * 0.6:  # same printed line
+        if lines and abs(y - line_y[-1]) < max(med_h, h) * 0.6:  # same printed line
             lines[-1].append((x, t))
+            line_y[-1] += (y - line_y[-1]) / len(lines[-1])
         else:
             lines.append([(x, t)])
-        last_y, last_h = y, h
+            line_y.append(y)
     return "\n".join(" ".join(t for _, t in sorted(line)) for line in lines)
 
 

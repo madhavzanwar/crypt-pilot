@@ -149,3 +149,14 @@ export function formatImpactValue(metric: string, value: number): string {
   }
   return formatCurrency(value);
 }
+
+/** An INR amount as the number to show in an input while the active currency is `cfg` (2 decimals, trimmed). */
+export function toDisplayAmount(amountInINR: number, cfg: MoneyConfig = activeCurrency()): number {
+  const v = finite(amountInINR) * cfg.rateFromINR;
+  return Math.round(v * 100) / 100;
+}
+
+/** What the person typed in the active currency, back to INR (the unit every model and API call uses). */
+export function fromDisplayAmount(typed: number, cfg: MoneyConfig = activeCurrency()): number {
+  return finite(typed) / cfg.rateFromINR;
+}

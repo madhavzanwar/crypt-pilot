@@ -17,6 +17,7 @@ import { ChainChips } from "@/components/crypto/council/ChainParts";
 import { postJson } from "@/components/crypto/council/stream";
 import type { ChainWallet } from "@/components/crypto/council/types";
 import { cn } from "@/lib/utils";
+import { validateAmount, validateText } from "@/lib/validate";
 
 interface Merchant { id: string; label: string; amount: number; flagged: boolean; findings: string[] }
 interface Category { id: string; label: string; amount: number; flagged: boolean; merchants: Merchant[] }
@@ -47,8 +48,9 @@ export default function TwinSimulatorPage() {
   const [picked, setPicked] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<string[]>([]);
   const [fraud, setFraud] = useState({ merchant: "AMAZ0N PAY", amount: "4999", wallet: "" });
-  const [sim, setSim] = useState<{ caught: boolean; findings: SecurityFinding[]; merchant: string; wallet?: ChainWallet } | null>(null);
+  const [sim, setSim] = useState<{ caught: boolean; outcome?: "caught" | "unverified" | "not_flagged"; findings: SecurityFinding[]; merchant: string; wallet?: ChainWallet } | null>(null);
   const [simError, setSimError] = useState<string | null>(null);
+  const [fieldErr, setFieldErr] = useState<{ merchant?: string | null; amount?: string | null }>({});
   const graph = useAsync(useCallback(() => api.securityGraph(userId, months), [userId, months]), [userId, months]);
 
   // Categories with the merchants that feed them (the old network, as an outline you can read).
@@ -76,10 +78,17 @@ export default function TwinSimulatorPage() {
   const flagged = all.filter((m) => m.flagged);
   const node = all.find((m) => m.id === picked);
   const top = cats[0]?.amount ?? 1;
+  const outcome = sim ? (sim.outcome ?? (sim.caught ? "caught" : "not_flagged")) : null;
 
   async function attempt() {
     setSimError(null);
-    const amount = Math.abs(Number(fraud.amount)) || 0;
+    const fe = { merchant: validateText(fraud.merchant, "Merchant name"), amount: validateAmount(fraud.amount, "Amount") };
+    setFieldErr(fe);
+    if (fe.merchant || fe.amount) {
+      setSim(null);
+      return;
+    }
+    const amount = Number(fraud.amount);
     const wallet = fraud.wallet.trim();
     if (wallet && looksLikeSecret(wallet)) {
       setFraud((f) => ({ ...f, wallet: "" }));
@@ -96,7 +105,7 @@ export default function TwinSimulatorPage() {
     try {
       // Without a wallet this is the original request; with one the Chain Analyst screens it too.
       const r = checked
-        ? await postJson<{ caught: boolean; findings: SecurityFinding[]; wallet?: ChainWallet }>(`/api/security/${userId}/simulate-fraud`, { merchant: fraud.merchant, amount, wallet: checked.address })
+        ? await postJson<{ caught: boolean; outcome?: "caught" | "unverified" | "not_flagged"; findings: SecurityFinding[]; wallet?: ChainWallet }>(`/api/security/${userId}/simulate-fraud`, { merchant: fraud.merchant, amount, wallet: checked.address })
         : await api.simulateFraud(userId, fraud.merchant, amount);
       setSim({ ...r, merchant: fraud.merchant });
     } catch (err) {
@@ -107,6 +116,7 @@ export default function TwinSimulatorPage() {
 
   return (
     <div className="grid gap-4">
+      <h1 className="sr-only">Twin Simulator</h1>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Flagged merchants" value={String(flagged.length)} tone={flagged.length ? "text-rose-600" : undefined} />
         <Stat label="Money at risk" value={formatCurrency(flagged.reduce((s, m) => s + m.amount, 0))} tone={flagged.length ? "text-rose-600" : undefined} />
@@ -203,14 +213,22 @@ export default function TwinSimulatorPage() {
               <CardDescription>Nothing is saved. The agents check your ledger plus this one made-up payment.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-2">
-              <Input value={fraud.merchant} onChange={(e) => setFraud({ ...fraud, merchant: e.target.value })} aria-label="Merchant name" />
-              <Input value={fraud.amount} inputMode="numeric" onChange={(e) => setFraud({ ...fraud, amount: e.target.value })} aria-label="Amount in rupees" />
+              <Input value={fraud.merchant} maxLength={200} aria-invalid={!!fieldErr.merchant} onChange={(e) => setFraud({ ...fraud, merchant: e.target.value })} aria-label="Merchant name" />
+              {fieldErr.merchant && <p role="alert" className="text-xs text-rose-700">{fieldErr.merchant}</p>}
+              <Input value={fraud.amount} inputMode="decimal" aria-invalid={!!fieldErr.amount} onChange={(e) => setFraud({ ...fraud, amount: e.target.value })} aria-label="Amount in rupees" />
+              {fieldErr.amount && <p role="alert" className="text-xs text-rose-700">{fieldErr.amount}</p>}
               <Input value={fraud.wallet} onChange={(e) => setFraud({ ...fraud, wallet: e.target.value })} placeholder="Paying a crypto wallet? Paste its address (optional)" aria-label="Crypto wallet address (optional)" className="font-mono text-xs" autoComplete="off" spellCheck={false} />
               <Button size="sm" onClick={attempt}>Run the agents</Button>
               {simError && <p className="text-xs text-rose-700">{simError}</p>}
               {sim && (
-                <div className={cn("rounded-xl p-3 text-xs", sim.caught ? "bg-rose-50 text-rose-800" : "bg-tint-lime text-ink")}>
-                  <p className="font-semibold">{sim.caught ? `Caught: ${sim.findings.length} flag(s) for ${sim.merchant}` : `Not flagged: ${sim.merchant} looks normal to the agents.`}</p>
+                <div className={cn("rounded-xl p-3 text-xs", outcome === "caught" ? "bg-rose-50 text-rose-800" : outcome === "unverified" ? "bg-amber-50 text-amber-900" : "bg-tint-lime text-ink")}>
+                  <p className="font-semibold" data-testid="twin-outcome">
+                    {outcome === "caught"
+                      ? `Caught: ${sim.findings.length} flag(s) for ${sim.merchant}`
+                      : outcome === "unverified"
+                        ? `Unverified: the wallet for ${sim.merchant} could not be checked. That is not an all-clear; treat it as unsafe until verified.`
+                        : `Not flagged: ${sim.merchant} looks normal to the agents.`}
+                  </p>
                   {sim.findings.map((f, i) => <p key={i} className="mt-1">{f.title}</p>)}
                   {sim.wallet && (
                     <div className="mt-2 grid gap-1 border-t border-black/10 pt-2 text-ink">
