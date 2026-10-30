@@ -22,13 +22,13 @@ export default function ConnectPage() {
       <div>
         <h1 className="font-display text-3xl font-semibold text-ink">Connect your money</h1>
         <p className="mt-1 max-w-xl text-sm text-graphite">
-          Link a source once and FinPilot does the rest: imports, categorises and analyses automatically. There is nothing to type in.
+          Link a source once and FinPilot imports, categorises and analyses it automatically. <b>Google Sheets</b> is the live connector for your own expenses, and <b>Upload document</b> reads a bank statement CSV. The bank, invoice and mutual-fund tiles load <b>sample data</b> for the demo.
         </p>
       </div>
       <ConnectorsGrid />
       <IntegrationShowcase
         title="Everything connects ~automatically~"
-        subtitle="Dodo Payments and Cake Wallet are live in this demo, in test mode only. The rest of the sources below are on the roadmap, so you never type a number in."
+        subtitle="Dodo Payments and Cake Wallet are live in this demo, in test mode only. Real bank, Gmail and Drive, and mutual-fund links are on the roadmap."
         integrations={ROADMAP}
       />
     </div>

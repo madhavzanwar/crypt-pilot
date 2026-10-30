@@ -48,6 +48,9 @@ const CATALOG_KEYS: Record<string, [string, string]> = {
   investments: ["mc.invest", "mc.invest_d"],
 };
 
+/** These three do not link to a real bank, Gmail/Drive or depository: Connect loads a bundled sample file. Say so on the card. */
+const SAMPLE_IDS = new Set(["bank", "invoices", "investments"]);
+
 function RailCard({ c }: { c: Connector }) {
   const { t } = useT();
   const meta = ICONS[c.id];
@@ -97,6 +100,7 @@ function ConnectorCard({
   const { t } = useT();
   const meta = ICONS[c.id];
   const keys = CATALOG_KEYS[c.id];
+  const sample = SAMPLE_IDS.has(c.id);
   const noData = c.connected && ((c as Connector & HonestInfo).has_data === false || Boolean(note));
   const honest = (c as Connector & HonestInfo).message || note;
   return (
@@ -110,11 +114,11 @@ function ConnectorCard({
           {checking ? (
             <Skeleton className="h-5 w-16 rounded-full" />
           ) : c.connected ? (
-            <Badge className={noData ? "bg-amber-100 text-amber-800 hover:bg-amber-100" : "bg-leaf/15 text-leaf hover:bg-leaf/15"}>
-              {noData ? t("mc.connected_nodata") : t("mc.connected")}
+            <Badge className={noData || sample ? "bg-amber-100 text-amber-800 hover:bg-amber-100" : "bg-leaf/15 text-leaf hover:bg-leaf/15"}>
+              {sample ? "Sample data loaded" : noData ? t("mc.connected_nodata") : t("mc.connected")}
             </Badge>
           ) : c.available ? (
-            <Badge variant="outline">{t("mc.ready")}</Badge>
+            <Badge variant="outline" className={sample ? "border-amber-300 text-amber-800" : undefined}>{sample ? "Sample data only" : t("mc.ready")}</Badge>
           ) : (
             <Badge variant="secondary">{t("mc.soon")}</Badge>
           )}
@@ -122,7 +126,12 @@ function ConnectorCard({
         <div>
           <h3 className="font-display text-lg font-semibold text-ink">{keys ? t(keys[0]) : c.name}</h3>
           <p className="text-sm text-graphite">{keys ? t(keys[1]) : c.description}</p>
-          {noData && <p className="mt-1 text-xs text-amber-800">{honest || t("mc.nodata_msg")}</p>}
+          {sample && (
+            <p className="mt-1 text-xs text-amber-800">
+              Demo only: this does not link your real {c.id === "bank" ? "bank" : c.id === "invoices" ? "Gmail or Drive" : "holdings"}. It loads a sample file so you can see the app working. For your own data use Google Sheets or Upload document.
+            </p>
+          )}
+          {noData && !sample && <p className="mt-1 text-xs text-amber-800">{honest || t("mc.nodata_msg")}</p>}
           {c.connected && c.connected_at && (
             <p className="mt-1 text-xs text-pewter">
               {c.detail ? `${c.detail} · ` : ""}linked {formatDate(c.connected_at)}
@@ -144,7 +153,7 @@ function ConnectorCard({
             onClick={onLink}
             className="rounded-full bg-lime text-ink hover:bg-lime/85 disabled:bg-fog disabled:text-pewter"
           >
-            <Link2 /> {c.available ? t("mc.connect") : t("mc.soon")}
+            <Link2 /> {!c.available ? t("mc.soon") : sample ? "Load sample data" : t("mc.connect")}
           </Button>
         )}
       </CardContent>
@@ -178,7 +187,7 @@ export function ConnectorsGrid() {
         setNotes((n) => ({ ...n, [c.id]: msg }));
         toast(`${c.name} connected, no transactions yet. ${msg}`);
       } else {
-        toast(res.message || `${c.name} connected.`);
+        toast(SAMPLE_IDS.has(c.id) ? `${c.name}: sample data loaded (demo only, not your real account).` : res.message || `${c.name} connected.`);
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not connect");
