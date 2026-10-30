@@ -3,27 +3,18 @@
 import { useCallback, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  ArrowRightLeft,
   Check,
   CheckCircle2,
-  Clock,
-  Coins,
   Copy,
-  CreditCard,
   Heart,
-  Link2,
   Mail,
   Plus,
-  Receipt,
   Shield,
-  ShieldAlert,
   ShieldCheck,
-  Sparkles,
   Trash2,
   UserCheck,
   UserPlus,
   Users,
-  Wallet,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
@@ -34,6 +25,7 @@ import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { triggerConfetti } from "@/components/ui/Confetti";
+import { SharedExpensesCard } from "@/components/household/SharedExpensesCard";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { ManagedMembersPanel } from "@/components/household/ManagedMembersPanel";
 import {
@@ -78,30 +70,6 @@ export default function HouseholdPage() {
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
 
-  // Shared Expense Split State ("Who Owes Who")
-  const [sharedExpenses, setSharedExpenses] = useState<
-    Array<{
-      id: string;
-      title: string;
-      amount: number;
-      paidBy: string;
-      paidByUserId: string;
-      splitRatio: string;
-      category: string;
-      date: string;
-    }>
-  >([
-    { id: "se-1", title: "Apartment Rent & Society Maintenance", amount: 48000, paidBy: "Priya", paidByUserId: "demo-priya", splitRatio: "50/50", category: "Housing", date: "2026-10-01" },
-    { id: "se-2", title: "Monthly Organic Groceries", amount: 16400, paidBy: "Rishi", paidByUserId: "demo-rishi", splitRatio: "50/50", category: "Groceries", date: "2026-10-02" },
-    { id: "se-3", title: "High-speed Fiber & Power Utilities", amount: 4200, paidBy: "Rishi", paidByUserId: "demo-rishi", splitRatio: "50/50", category: "Utilities", date: "2026-10-03" },
-    { id: "se-4", title: "Weekend Dining & Entertainment", amount: 6800, paidBy: "Priya", paidByUserId: "demo-priya", splitRatio: "50/50", category: "Dining", date: "2026-10-03" },
-  ]);
-
-  const [newExpTitle, setNewExpTitle] = useState("");
-  const [newExpAmount, setNewExpAmount] = useState("");
-  const [newExpPayer, setNewExpPayer] = useState("Priya");
-  const [newExpCategory, setNewExpCategory] = useState("Groceries");
-  const [settledSuccess, setSettledSuccess] = useState<string | null>(null);
 
   async function handleCreateHousehold() {
     if (!householdName.trim()) {
@@ -139,38 +107,6 @@ export default function HouseholdPage() {
     } finally {
       setAcceptingToken(false);
     }
-  }
-
-  function handleAddSharedExpense(e: React.FormEvent) {
-    e.preventDefault();
-    const amt = Number(newExpAmount);
-    if (!newExpTitle.trim() || !amt || amt <= 0) return;
-
-    const newId = `se-${Date.now()}`;
-    const payerUserId = newExpPayer === "Rishi" ? "demo-rishi" : "demo-priya";
-
-    setSharedExpenses((prev) => [
-      {
-        id: newId,
-        title: newExpTitle.trim(),
-        amount: amt,
-        paidBy: newExpPayer,
-        paidByUserId: payerUserId,
-        splitRatio: "50/50",
-        category: newExpCategory,
-        date: new Date().toISOString().split("T")[0],
-      },
-      ...prev,
-    ]);
-
-    setNewExpTitle("");
-    setNewExpAmount("");
-  }
-
-  function handleSettleUp(debtorName: string, creditorName: string, amount: number) {
-    triggerConfetti({ count: 90 });
-    setSettledSuccess(`Settlement of ${formatCurrency(amount)} recorded between ${debtorName} and ${creditorName}! 🎉`);
-    setTimeout(() => setSettledSuccess(null), 5000);
   }
 
   async function handleCreateInvite() {
@@ -710,208 +646,10 @@ export default function HouseholdPage() {
           {/* Family members without accounts + member transaction monitoring */}
           <ManagedMembersPanel userId={userId} members={members} canEdit={canInvite} onChanged={reloadAll} className="md:col-span-6 lg:col-span-12" />
 
-          {/* Shared Expenses Split & Settlement ("Who Owes Who") */}
-          <Card className="md:col-span-6 lg:col-span-12 p-6 border border-black/[0.08] shadow-xs flex flex-col gap-6">
-            <CardHeader className="mb-0">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 w-full">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200 flex items-center gap-1">
-                      <ArrowRightLeft className="h-3 w-3" />
-                      Shared Expense Ledger
-                    </span>
-                    <span className="text-xs text-pewter font-medium">• Fairness & Settle-Up Engine</span>
-                  </div>
-                  <CardTitle className="text-lg font-bold text-ink mt-1">
-                    Shared Expenses & Who Owes Who
-                  </CardTitle>
-                  <p className="text-xs text-graphite mt-0.5">
-                    Track recurring shared household expenses, calculate fair splits, and settle balances instantly.
-                  </p>
-                </div>
-              </div>
-            </CardHeader>
-
-            {/* Settlement Status Banner */}
-            {(() => {
-              const totalShared = sharedExpenses.reduce((sum, e) => sum + e.amount, 0);
-              const priyaTotal = sharedExpenses.filter((e) => e.paidBy === "Priya").reduce((sum, e) => sum + e.amount, 0);
-              const rishiTotal = sharedExpenses.filter((e) => e.paidBy === "Rishi").reduce((sum, e) => sum + e.amount, 0);
-              const fairShare = Math.round(totalShared / Math.max(1, members.length || 2));
-              const priyaDiff = priyaTotal - fairShare;
-
-              const debtor = priyaDiff > 0 ? "Rishi" : "Priya";
-              const creditor = priyaDiff > 0 ? "Priya" : "Rishi";
-              const diffAmount = Math.abs(priyaDiff);
-
-              return (
-                <div className="flex flex-col gap-4">
-                  {settledSuccess && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="p-3.5 rounded-surface bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-900 flex items-center gap-2"
-                    >
-                      <Sparkles className="h-4 w-4 text-emerald-600" />
-                      <span>{settledSuccess}</span>
-                    </motion.div>
-                  )}
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 rounded-surface bg-fog/80 border border-black/[0.04] flex flex-col justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-pewter">
-                        Total Shared This Cycle
-                      </span>
-                      <span className="font-display text-xl sm:text-2xl font-bold text-ink mt-1 tnum">
-                        {formatCurrency(totalShared)}
-                      </span>
-                      <span className="text-[11px] text-pewter mt-1">
-                        Split 50/50 across {members.length || 2} members ({formatCurrency(fairShare)}/each)
-                      </span>
-                    </div>
-
-                    <div className="p-4 rounded-surface bg-fog/80 border border-black/[0.04] flex flex-col justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-pewter">
-                        Contributions by Payer
-                      </span>
-                      <div className="flex items-center justify-between text-xs mt-1.5">
-                        <span className="font-semibold text-ink">Priya paid:</span>
-                        <span className="font-bold text-emerald-700 tnum">{formatCurrency(priyaTotal)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs mt-1">
-                        <span className="font-semibold text-ink">Rishi paid:</span>
-                        <span className="font-bold text-indigo-700 tnum">{formatCurrency(rishiTotal)}</span>
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-surface bg-indigo-50/60 border border-indigo-200 flex flex-col justify-between">
-                      <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-800">
-                          Net Settlement Due
-                        </span>
-                        <div className="font-display text-lg sm:text-xl font-bold text-ink mt-1">
-                          {debtor} owes {creditor} <span className="text-indigo-900 tnum">{formatCurrency(diffAmount)}</span>
-                        </div>
-                      </div>
-                      <Button
-                        variant="primary"
-                        onClick={() => handleSettleUp(debtor, creditor, diffAmount)}
-                        className="h-8 text-xs font-semibold mt-3"
-                      >
-                        <Coins className="h-3.5 w-3.5" />
-                        <span>Settle Up {formatCurrency(diffAmount)}</span>
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Add Shared Expense Form & Table */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
-                    {/* Log Shared Expense Form */}
-                    <form
-                      onSubmit={handleAddSharedExpense}
-                      className="lg:col-span-5 p-4 rounded-surface bg-fog/40 border border-black/[0.04] flex flex-col justify-between gap-3"
-                    >
-                      <div className="flex flex-col gap-2.5">
-                        <span className="text-xs font-bold text-ink flex items-center gap-1.5">
-                          <Receipt className="h-3.5 w-3.5 text-ember" />
-                          Log Shared Household Expense
-                        </span>
-
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[11px] font-medium text-graphite">Expense Description</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Electricity Bill, Weekly Market"
-                            value={newExpTitle}
-                            onChange={(e) => setNewExpTitle(e.target.value)}
-                            className="w-full rounded-chip border border-mist bg-white px-3 py-1.5 text-xs text-ink focus:border-ember focus:outline-none"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="flex flex-col gap-1">
-                            <label className="text-[11px] font-medium text-graphite">Amount (₹)</label>
-                            <input
-                              type="number"
-                              placeholder="₹ Amount"
-                              value={newExpAmount}
-                              onChange={(e) => setNewExpAmount(e.target.value)}
-                              className="w-full rounded-chip border border-mist bg-white px-3 py-1.5 text-xs text-ink focus:border-ember focus:outline-none"
-                            />
-                          </div>
-
-                          <div className="flex flex-col gap-1">
-                            <label className="text-[11px] font-medium text-graphite">Paid By</label>
-                            <select
-                              value={newExpPayer}
-                              onChange={(e) => setNewExpPayer(e.target.value)}
-                              className="w-full rounded-chip border border-mist bg-white px-2.5 py-1.5 text-xs text-ink focus:border-ember focus:outline-none"
-                            >
-                              <option value="Priya">Priya</option>
-                              <option value="Rishi">Rishi</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[11px] font-medium text-graphite">Category</label>
-                          <select
-                            value={newExpCategory}
-                            onChange={(e) => setNewExpCategory(e.target.value)}
-                            className="w-full rounded-chip border border-mist bg-white px-2.5 py-1.5 text-xs text-ink focus:border-ember focus:outline-none"
-                          >
-                            <option value="Housing">Housing & Rent</option>
-                            <option value="Groceries">Groceries & Household</option>
-                            <option value="Utilities">Utilities & Wifi</option>
-                            <option value="Dining">Dining & Entertainment</option>
-                            <option value="Travel">Travel & Transport</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <Button type="submit" variant="secondary" className="h-8 text-xs font-semibold w-full mt-1">
-                        <Plus className="h-3.5 w-3.5" />
-                        <span>Add to Shared Ledger</span>
-                      </Button>
-                    </form>
-
-                    {/* Shared Expenses Table */}
-                    <div className="lg:col-span-7 overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className="border-b border-black/[0.06] text-pewter font-semibold uppercase text-[10px] tracking-wider">
-                            <th className="pb-2">Description</th>
-                            <th className="pb-2">Payer</th>
-                            <th className="pb-2">Split</th>
-                            <th className="pb-2 text-right">Amount</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-black/[0.04]">
-                          {sharedExpenses.map((exp) => (
-                            <tr key={exp.id} className="py-2">
-                              <td className="py-2.5">
-                                <span className="font-semibold text-ink block">{exp.title}</span>
-                                <span className="text-[10px] text-pewter capitalize">{exp.category} • {formatDate(exp.date)}</span>
-                              </td>
-                              <td className="py-2.5">
-                                <span className="font-medium text-ink bg-fog px-2 py-0.5 rounded-full border border-black/[0.04]">
-                                  {exp.paidBy}
-                                </span>
-                              </td>
-                              <td className="py-2.5 text-pewter text-[11px]">{exp.splitRatio}</td>
-                              <td className="py-2.5 text-right font-bold text-ink tnum">
-                                {formatCurrency(exp.amount)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-          </Card>
+          {/* Shared expenses ("Who owes who"): the backend has no shared-expenses endpoint yet, so this is an honest empty state, not sample data */}
+          <div className="md:col-span-6 lg:col-span-12">
+            <SharedExpensesCard />
+          </div>
 
           {/* Pending Invitations Table */}
           {invites.length > 0 && (
