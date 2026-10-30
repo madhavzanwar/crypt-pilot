@@ -265,7 +265,7 @@ export const api = {
   aaImport: (userId: string, consentId: string) =>
     apiFetch<{ accounts: number; transactions: number }>(`/api/aa/${userId}/import`, { method: "POST", body: JSON.stringify({ consent_id: consentId }) }),
   connectConnector: (userId: string, connector: string, profile: ConnectProfile, url = "") =>
-    apiFetch<{ connected: boolean; accounts: number; transactions: number }>(
+    apiFetch<{ connected: boolean; accounts: number; transactions: number; has_data?: boolean; message?: string }>(
       `/api/connectors/${userId}/${connector}/connect`,
       { method: "POST", body: JSON.stringify({ profile, url }) }
     ),
@@ -273,7 +273,7 @@ export const api = {
   syncSheet: async (userId: string): Promise<boolean> => {
     const res = await fetch(`${API_URL}/api/connectors/${userId}/google_sheets/sync`, { method: "POST", headers: await authHeader() });
     clearApiCache();
-    if (!res.ok) throw new Error(`Sheet sync failed: ${res.status}`);
+    if (!res.ok) throw new Error(formatApiError(res.status, await res.text()));
     const { changed } = (await res.json()) as { changed: boolean };
     if (changed) notifyIfWrite("POST");
     return changed;

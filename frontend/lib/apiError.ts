@@ -36,6 +36,17 @@ export function formatApiError(status: number, text: string): string {
   if (status === 403) return "You do not have access to that.";
   if (status === 404) return "We could not find that.";
   if (status === 429) return "Too many requests. Please wait a moment and try again.";
+  if (status === 502) {
+    // Upstream failure (e.g. a Google Sheet that is not shared): the backend's own detail + hint says what to fix.
+    try {
+      const body = JSON.parse(text) as { detail?: unknown; hint?: unknown };
+      const detail = typeof body.detail === "string" ? body.detail.trim() : "";
+      const hint = typeof body.hint === "string" ? body.hint.trim() : "";
+      if (detail || hint) return [detail, hint].filter(Boolean).join(" ");
+    } catch {
+      // not JSON
+    }
+  }
   if (status >= 500) return "Something went wrong on our side. Please try again in a moment.";
   try {
     const detail = (JSON.parse(text) as { detail?: unknown }).detail;

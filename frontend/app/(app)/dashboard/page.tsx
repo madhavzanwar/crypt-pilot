@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Calculator, FileText, Link2, RefreshCw, Sparkles, TrendingDown } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
+import { useConnectors } from "@/lib/connectors";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
 import { Button } from "@/components/shadcn/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn/tabs";
@@ -62,6 +63,7 @@ function Placeholder({ title, body }: { title: string; body: string }) {
 
 export default function DashboardPage() {
   const userId = useUserId();
+  const { hasConnection } = useConnectors();
   const { t } = useT();
   const [simple, setSimple] = useSimpleMode(userId);
   const [analyst, setAnalyst] = useAnalystMode(userId);
@@ -204,15 +206,15 @@ export default function DashboardPage() {
                 <Sparkles className="size-5" />
               </span>
               <div>
-                <h2 className="font-display text-xl font-semibold">{t("d.connect_h")}</h2>
+                <h2 className="font-display text-xl font-semibold">{hasConnection ? t("d.nodata_h") : t("d.connect_h")}</h2>
                 <p className="mt-0.5 max-w-xl text-sm text-ink/75">
-                  {t("d.connect_p")}
+                  {hasConnection ? t("d.nodata_p") : t("d.connect_p")}
                 </p>
               </div>
             </div>
             <Button asChild size="lg" className="shrink-0 rounded-full bg-lime text-ink hover:bg-lime/85">
-              <Link href="/connect">
-                <Link2 /> {t("d.connect_gp")}
+              <Link href={hasConnection ? "/upload" : "/connect"}>
+                <Link2 /> {hasConnection ? t("d.nodata_btn") : t("d.connect_gp")}
               </Link>
             </Button>
           </div>
