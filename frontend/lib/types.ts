@@ -876,6 +876,10 @@ export type CouncilVote = { agent: string; name: string; score: number; level: s
 export type CouncilVerdict = {
   type: "verdict"; cached: boolean; score: number; level: string; counts: Record<string, number>; votes: CouncilVote[];
   dissent: { agent: string; name: string; level: string; why: string }[]; actions: string[]; anchor: number; tokens: number; debated: boolean;
+  /** Set by the backend when the headline must qualify the level, e.g. "Low risk (wallets unchecked)". */
+  level_label?: string;
+  /** The backend's own note about wallets that could not be verified. */
+  caveat?: string;
 };
 export type CouncilEvent =
   | { type: "facts"; facts: Record<string, unknown>; approx_tokens: number }

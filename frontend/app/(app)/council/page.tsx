@@ -94,15 +94,17 @@ export default function CouncilPage() {
           <div className="flex flex-col gap-3 p-5 pt-0">
             <div className="flex flex-wrap items-center gap-3">
               <span className="tnum font-display text-4xl text-ink">{verdict.score}</span>
-              <Badge level={ws.allUnchecked ? "abstain" : verdict.level}>
-                {verdict.level} risk{ws.allUnchecked ? " (listed wallets unchecked)" : ""}
+              <Badge level={ws.allUnchecked || verdict.level_label?.includes("unchecked") ? "abstain" : verdict.level}>
+                {verdict.level_label ? <span className="normal-case">{verdict.level_label}</span> : `${verdict.level} risk${ws.allUnchecked ? " (listed wallets unchecked)" : ""}`}
               </Badge>
               <span className="text-xs text-pewter">
                 {Object.entries(verdict.counts).map(([l, n]) => `${n} ${l}`).join(" · ")}
                 {verdict.cached ? " · cached" : verdict.tokens ? ` · ${verdict.tokens} tokens` : " · rule-based, no model used"}
               </span>
             </div>
-            {ws.unchecked.length > 0 && (
+            {verdict.caveat ? (
+              <p role="note" className="rounded-xl bg-amber-50 p-2.5 text-xs text-amber-800">{tidyText(verdict.caveat)}</p>
+            ) : ws.unchecked.length > 0 && (
               <p role="note" className="rounded-xl bg-amber-50 p-2.5 text-xs text-amber-800">
                 {ws.unchecked.length === 1 ? "1 listed wallet is" : `${ws.unchecked.length} listed wallets are`} not verified (not in the dataset or the graph service did not answer). This score does not cover {ws.unchecked.length === 1 ? "it" : "them"}; treat {ws.unchecked.length === 1 ? "it" : "them"} as unsafe until checked.
               </p>
