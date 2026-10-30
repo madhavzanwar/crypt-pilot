@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { hasAmount } from "@/components/ui/money";
+import { MASK, maskAmounts } from "@/components/ui/maskAmounts";
 
 const STYLE_ID = "fp-privacy-mask-style";
 const SKIP = "script,style,noscript,textarea,input,select,option,[data-no-mask]";
@@ -9,7 +10,8 @@ const SKIP = "script,style,noscript,textarea,input,select,option,[data-no-mask]"
 /**
  * Privacy mode ("hide amounts"). The stylesheet only blurs `.tnum`, which many amounts do not carry, so this scans
  * the page for text that looks like money (a currency symbol or code next to digits) and marks its element
- * `data-amount`; `.hide-amounts [data-amount]` is blurred. New and changed text is picked up by a MutationObserver.
+ * `data-amount`, blurs it and REPLACES the amount text with a mask (the original is kept in memory and restored when
+ * privacy mode is switched off), so the figures are gone from the DOM, copy/paste and screen readers too. New and changed text is picked up by a MutationObserver.
  */
 export function PrivacyMask({ active }: { active: boolean }) {
   useEffect(() => {
@@ -19,6 +21,7 @@ export function PrivacyMask({ active }: { active: boolean }) {
       return;
     }
     root.classList.add("hide-amounts");
+    const originals = new Map<Text, string>();
     let style = document.getElementById(STYLE_ID);
     if (!style) {
       style = document.createElement("style");
@@ -30,7 +33,15 @@ export function PrivacyMask({ active }: { active: boolean }) {
     const mark = (node: Node) => {
       if (node.nodeType === Node.TEXT_NODE) {
         const el = node.parentElement;
-        if (el && !el.closest(SKIP) && hasAmount(node.nodeValue ?? "")) el.setAttribute("data-amount", "1");
+        const value = node.nodeValue ?? "";
+        if (el && !el.closest(SKIP) && hasAmount(value)) {
+          el.setAttribute("data-amount", "1");
+          const masked = maskAmounts(value);
+          if (masked !== value) {
+            originals.set(node as Text, value);
+            node.nodeValue = masked;
+          }
+        }
         return;
       }
       if (node.nodeType !== Node.ELEMENT_NODE) return;
@@ -64,6 +75,10 @@ export function PrivacyMask({ active }: { active: boolean }) {
 
     return () => {
       observer.disconnect();
+      originals.forEach((v, n) => {
+        if (n.isConnected && (n.nodeValue ?? "").includes(MASK)) n.nodeValue = v;
+      });
+      originals.clear();
       if (frame) cancelAnimationFrame(frame);
       root.classList.remove("hide-amounts");
       document.querySelectorAll("[data-amount]").forEach((e) => e.removeAttribute("data-amount"));

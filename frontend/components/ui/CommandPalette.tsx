@@ -23,8 +23,18 @@ import {
   X,
   Keyboard,
   ListChecks,
+  LineChart,
+  ShieldAlert,
+  ScanSearch,
+  Gavel,
+  Network,
+  Link2,
+  ScanText,
+  Database,
+  UserRound,
 } from "lucide-react";
 import { useUserId } from "@/lib/hooks";
+import { useT } from "@/components/i18nLocal";
 import { DEMO_PERSONAS, isDemoUserId, setUserId } from "@/lib/user";
 import { useCurrency, CURRENCIES, type CurrencyCode } from "@/lib/currency";
 import { triggerConfetti } from "@/components/ui/Confetti";
@@ -40,11 +50,46 @@ interface CommandItem {
   onSelect: () => void;
 }
 
+type Icon = React.ComponentType<{ className?: string }>;
+/** [key, href, icon, shortcut]: labels come from components/i18nLocal.ts as cmd.nav.<key> and cmd.nav.<key>.sub. */
+const NAV_ENTRIES: [string, string, Icon, string?][] = [
+  ["dashboard", "/dashboard", LayoutDashboard, "G D"],
+  ["transactions", "/transactions", ReceiptText, "G T"],
+  ["budgets", "/budgets", PieChart, "G B"],
+  ["goals", "/goals", Target, "G G"],
+  ["household", "/household", Users, "G H"],
+  ["copilot", "/copilot", Bot, "G C"],
+  ["simulate", "/simulate", SlidersHorizontal, "G S"],
+  ["forecast", "/forecast-risk", LineChart],
+  ["plan", "/plan", ListChecks, "G N"],
+  ["tax", "/scenarios", FileSpreadsheet, "G X"],
+  ["statement", "/statement", FileText, "G P"],
+  ["security", "/security", ShieldCheck, "G L"],
+  ["finsec", "/financial-security", ShieldAlert],
+  ["wallet", "/wallet-guard", ShieldCheck],
+  ["credits", "/credits", Coins],
+  ["evidence", "/evidence-room", ScanSearch],
+  ["council", "/council", Gavel],
+  ["twin", "/twin", Network],
+  ["connect", "/connect", Link2],
+  ["upload", "/upload", ScanText],
+  ["mydata", "/my-data", Database],
+  ["profile", "/profile", UserRound],
+];
+/** [key, icon, badge, href]: no href means the confetti easter egg. */
+const ACTION_ENTRIES: [string, Icon, string, string?][] = [
+  ["review", ReceiptText, "Action", "/transactions"],
+  ["budget", PlusCircle, "Action", "/budgets"],
+  ["invite", Users, "Action", "/household"],
+  ["confetti", Sparkles, "Fun"],
+];
+
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const router = useRouter();
+  const { t } = useT();
   const userId = useUserId();
   const { currency, setCurrency } = useCurrency();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -84,144 +129,28 @@ export function CommandPalette() {
 
   const allItems: CommandItem[] = useMemo(() => {
     const items: CommandItem[] = [
-      // Navigation
-      {
-        id: "nav-dashboard",
-        group: "navigation",
-        label: "Dashboard",
-        sublabel: "Overview, telemetry & net worth",
-        icon: LayoutDashboard,
-        shortcut: "G D",
-        onSelect: () => router.push("/dashboard"),
-      },
-      {
-        id: "nav-transactions",
-        group: "navigation",
-        label: "Transactions Ledger & Review",
-        sublabel: "Review inbox, categorize & tags",
-        icon: ReceiptText,
-        shortcut: "G T",
-        onSelect: () => router.push("/transactions"),
-      },
-      {
-        id: "nav-budgets",
-        group: "navigation",
-        label: "Budgets & Envelopes",
-        sublabel: "Rollover surplus & overspend alerts",
-        icon: PieChart,
-        shortcut: "G B",
-        onSelect: () => router.push("/budgets"),
-      },
-      {
-        id: "nav-goals",
-        group: "navigation",
-        label: "Financial Goals & Targets",
-        sublabel: "Milestones, artwork & required monthly pace",
-        icon: Target,
-        shortcut: "G G",
-        onSelect: () => router.push("/goals"),
-      },
-      {
-        id: "nav-household",
-        group: "navigation",
-        label: "Household Co-Pilot Hub",
-        sublabel: "Shared wealth split, partner invites & settlement",
-        icon: Users,
-        shortcut: "G H",
-        onSelect: () => router.push("/household"),
-      },
-      {
-        id: "nav-copilot",
-        group: "navigation",
-        label: "AI Wealth Advisor",
-        sublabel: "Autonomous financial intelligence & advice",
-        icon: Bot,
-        shortcut: "G C",
-        onSelect: () => router.push("/copilot"),
-      },
-      {
-        id: "nav-simulate",
-        group: "navigation",
-        label: "Forecast & Scenario Simulator",
-        sublabel: "Monte-Carlo projections & income shocks",
-        icon: SlidersHorizontal,
-        shortcut: "G S",
-        onSelect: () => router.push("/simulate"),
-      },
-      {
-        id: "nav-plan",
-        group: "navigation",
-        label: "Financial Plan",
-        sublabel: "6-month constrained plan with probabilistic forecast",
-        icon: ListChecks,
-        shortcut: "G N",
-        onSelect: () => router.push("/plan"),
-      },
-      {
-        id: "nav-tax",
-        group: "navigation",
-        label: "Tax Analytics & Deductions",
-        sublabel: "Regime analysis & 80C deductions",
-        icon: FileSpreadsheet,
-        shortcut: "G X",
-        onSelect: () => router.push("/tax"),
-      },
-      {
-        id: "nav-statement",
-        group: "navigation",
-        label: "Executive Statement Export",
-        sublabel: "Printable PDF & financial summary",
-        icon: FileText,
-        shortcut: "G P",
-        onSelect: () => router.push("/statement"),
-      },
-      {
-        id: "nav-security",
-        group: "navigation",
-        label: "Security & Audit Logs",
-        sublabel: "Activity logs & access policies",
-        icon: ShieldCheck,
-        shortcut: "G L",
-        onSelect: () => router.push("/security"),
-      },
-
-      // Quick Actions
-      {
-        id: "action-review",
-        group: "actions",
-        label: "Open Review Queue",
-        sublabel: "Process unreviewed transactions",
-        icon: ReceiptText,
-        badge: "Action",
-        onSelect: () => router.push("/transactions"),
-      },
-      {
-        id: "action-budget",
-        group: "actions",
-        label: "Manage Budget Envelopes",
-        sublabel: "Configure rollover & notifications",
-        icon: PlusCircle,
-        badge: "Action",
-        onSelect: () => router.push("/budgets"),
-      },
-      {
-        id: "action-invite",
-        group: "actions",
-        label: "Invite Partner to Household",
-        sublabel: "Generate secure token invite",
-        icon: Users,
-        badge: "Action",
-        onSelect: () => router.push("/household"),
-      },
-      {
-        id: "action-confetti",
-        group: "actions",
-        label: "Celebrate Milestone!",
-        sublabel: "Trigger celebratory particle burst",
-        icon: Sparkles,
-        badge: "Fun",
-        onSelect: () => triggerConfetti({ count: 80 }),
-      },
+      ...NAV_ENTRIES.map(
+        ([key, href, icon, shortcut]): CommandItem => ({
+          id: `nav-${key}`,
+          group: "navigation",
+          label: t(`cmd.nav.${key}`),
+          sublabel: t(`cmd.nav.${key}.sub`),
+          icon,
+          shortcut,
+          onSelect: () => router.push(href),
+        }),
+      ),
+      ...ACTION_ENTRIES.map(
+        ([key, icon, badge, href]): CommandItem => ({
+          id: `action-${key}`,
+          group: "actions",
+          label: t(`cmd.act.${key}`),
+          sublabel: t(`cmd.act.${key}.sub`),
+          icon,
+          badge,
+          onSelect: href ? () => router.push(href) : () => triggerConfetti({ count: 80 }),
+        }),
+      ),
     ];
 
     // Personas
@@ -230,7 +159,7 @@ export function CommandPalette() {
         items.push({
           id: `persona-${p.id}`,
           group: "personas",
-          label: `Switch Persona: ${p.label}`,
+          label: `${t("cmd.switchPersona")} ${p.label}`,
           sublabel: p.id === "demo-priya" ? "Bengaluru • ₹1L/mo" : p.id === "demo-arjun" ? "Mumbai • ₹180k/mo" : "Pune • ₹52k/mo",
           icon: User,
           badge: userId === p.id ? "Active" : undefined,
@@ -245,8 +174,8 @@ export function CommandPalette() {
       items.push({
         id: `currency-${code}`,
         group: "currency",
-        label: `Set Currency: ${c.code} (${c.symbol}) — ${c.label}`,
-        sublabel: `Rate: ${c.rateFromINR} × INR`,
+        label: `${t("cmd.setCurrency")} ${c.code} (${c.symbol}) — ${c.label}`,
+        sublabel: `${t("cmd.rate")}: ${c.rateFromINR} × INR`,
         icon: Coins,
         badge: currency === code ? "Selected" : undefined,
         onSelect: () => setCurrency(code),
@@ -254,7 +183,7 @@ export function CommandPalette() {
     });
 
     return items;
-  }, [router, userId, currency, setCurrency]);
+  }, [router, userId, currency, setCurrency, t]);
 
   const filteredItems = useMemo(() => {
     if (!query.trim()) return allItems;
@@ -285,10 +214,10 @@ export function CommandPalette() {
   };
 
   const groupLabels: Record<string, string> = {
-    navigation: "Navigation & Views",
-    actions: "Quick Actions",
-    personas: "Demo Personas",
-    currency: "Global Currency & Formatting",
+    navigation: t("cmd.group.navigation"),
+    actions: t("cmd.group.actions"),
+    personas: t("cmd.group.personas"),
+    currency: t("cmd.group.currency"),
   };
 
   return (
@@ -314,7 +243,7 @@ export function CommandPalette() {
             className="relative w-full max-w-xl rounded-2xl bg-paper shadow-2xl border border-mist overflow-hidden z-10 flex flex-col max-h-[75vh]"
             role="dialog"
             aria-modal="true"
-            aria-label="FinPilot Command Palette"
+            aria-label={t("cmd.aria")}
           >
             {/* Search Input Bar */}
             <div className="flex items-center gap-3 px-4 py-3.5 border-b border-mist bg-paper">
@@ -322,7 +251,7 @@ export function CommandPalette() {
               <input
                 ref={inputRef}
                 type="text"
-                placeholder="Type a command, search pages, or switch currency..."
+                placeholder={t("cmd.placeholder")}
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
@@ -335,6 +264,7 @@ export function CommandPalette() {
                 <button
                   type="button"
                   onClick={() => setQuery("")}
+                  aria-label={t("cmd.clear")}
                   className="text-pewter hover:text-ink p-1 rounded hover:bg-fog cursor-pointer"
                 >
                   <X className="h-4 w-4" />
@@ -349,7 +279,7 @@ export function CommandPalette() {
             <div className="flex-1 overflow-y-auto p-2 divide-y divide-black/[0.04]">
               {filteredItems.length === 0 ? (
                 <div className="py-12 text-center text-xs text-pewter">
-                  No matching commands or pages for &quot;{query}&quot;
+                  {t("cmd.none")} &quot;{query}&quot;
                 </div>
               ) : (
                 ["navigation", "actions", "personas", "currency"].map((grp) => {
@@ -411,7 +341,7 @@ export function CommandPalette() {
                                         : "bg-ember-soft text-ember border-ember/20"
                                     }`}
                                   >
-                                    {item.badge}
+                                    {t(`cmd.badge.${item.badge}`, item.badge)}
                                   </span>
                                 )}
                                 {item.shortcut && (
@@ -435,11 +365,11 @@ export function CommandPalette() {
             <div className="px-4 py-2.5 bg-fog/80 border-t border-mist flex items-center justify-between text-[11px] text-pewter">
               <div className="flex items-center gap-2">
                 <Keyboard className="h-3.5 w-3.5" />
-                <span>Use ↑ ↓ to navigate, ↵ to select</span>
+                <span>{t("cmd.hint")}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-ink">FinPilot</span>
-                <span>• Command Hub</span>
+                <span>{t("cmd.hub")}</span>
               </div>
             </div>
           </motion.div>

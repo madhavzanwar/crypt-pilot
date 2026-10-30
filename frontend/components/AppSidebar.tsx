@@ -1,6 +1,6 @@
 "use client";
 
-import { useT } from "@/lib/i18n";
+import { useT } from "@/components/i18nLocal";
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -129,8 +129,8 @@ export function AppSidebar({ footer }: { footer?: ReactNode }) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild tooltip="FinPilot home">
-              <Link href="/" aria-label="FinPilot home">
+            <SidebarMenuButton size="lg" asChild tooltip={t("nav.FinPilot home")}>
+              <Link href="/" aria-label={t("nav.FinPilot home")}>
                 <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-mist bg-paper">
                   <FinPilotLogo size={20} />
                 </div>
