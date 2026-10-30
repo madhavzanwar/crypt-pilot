@@ -90,7 +90,7 @@ function explain(base: Baseline, scenarios: Scenario[], results: SimResult[], mo
 
 export function CompareTab() {
   const userId = useUserId();
-  const { data: plan, loading: planLoading } = useAsync(() => api.plan(userId), [userId]);
+  const { data: plan, loading: planLoading } = useAsync(() => api.planIfReady(userId), [userId]);
   const { data: dash, loading: dashLoading } = useAsync(() => api.dashboard(userId), [userId]);
 
   if ((planLoading && !plan) || (dashLoading && !dash)) return <Skeleton className="h-96 w-full rounded-card" />;

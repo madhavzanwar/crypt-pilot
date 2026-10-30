@@ -1,6 +1,7 @@
 "use client";
 
 import { LANGS, translate, useLang, type Lang } from "@/lib/i18n";
+import { PLAN_STRINGS } from "@/components/plan/i18nPlan";
 
 /**
  * Money-page labels (connect, household). [en, hi, mr]. Every row has real Hindi and Marathi text;
@@ -72,6 +73,7 @@ const M: Record<string, [string, string, string]> = {
   "hs.toast_deleted": ["Expense deleted", "खर्च हटाया गया", "खर्च हटवला"],
   "hs.toast_settled": ["Settlement recorded", "निपटान दर्ज हुआ", "निपटारा नोंदवला"],
   "hs.all": ["Everyone", "सभी", "सर्वजण"],
+  ...PLAN_STRINGS,
 };
 
 export const MONEY_KEYS = Object.keys(M);

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
-import type { PlanParams, PlanResult, PlanScenario } from "@/lib/types";
+import type { ForecastMethod, PlanParams, PlanReadiness, PlanResult, PlanScenario } from "@/lib/types";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -17,6 +17,13 @@ import { ReplanPanel } from "@/components/plan/ReplanPanel";
 import { ForecastTable } from "@/components/plan/ForecastTable";
 import { BacktestTable } from "@/components/plan/BacktestTable";
 import { OutcomeTable } from "@/components/plan/OutcomeTable";
+import { PlanPrintView, usePrintPlan } from "@/components/plan/PlanPrintView";
+import { Printer } from "lucide-react";
+import { NotReadyCard } from "@/components/plan/NotReadyCard";
+import { PlanSummaryCard } from "@/components/plan/PlanSummaryCard";
+import { formatCurrency } from "@/components/ui/money";
+import { AdvancedSettings } from "@/components/plan/AdvancedSettings";
+import { useT } from "@/components/i18nMoney";
 import { cn } from "@/lib/utils";
 
 const MY_DATA = "my_data";
@@ -55,7 +62,8 @@ function PlanSkeleton() {
   );
 }
 
-function ParamsForm({ value, onApply }: { value: PlanParams; onApply: (p: PlanParams) => void }) {
+function ParamsForm({ value, onApply, method }: { value: PlanParams; onApply: (p: PlanParams) => void; method?: ForecastMethod }) {
+  const { t } = useT();
   const [draft, setDraft] = useState<Record<string, string>>({});
   // Re-seed the form when a relaxation changes the applied params (adjust-state-during-render).
   const [seen, setSeen] = useState(value);
@@ -86,14 +94,28 @@ function ParamsForm({ value, onApply }: { value: PlanParams; onApply: (p: PlanPa
       {field("reserve", "Min reserve", "Auto (from your spending)")}
       {field("goal_amount", "Goal amount", "With goal month, e.g. 50000")}
       {field("goal_month", "Goal by month", "With goal amount, 1-6")}
-      {field("tolerance", "Risk tolerance (0-1)", "Default 0.10")}
       <Button variant="primary" onClick={apply}>Plan</Button>
+      <AdvancedSettings>
+        <div className="flex flex-wrap items-end gap-3">
+          {field("tolerance", t("pl.adv.tol"), "Default 0.10")}
+          {method && (
+            <dl className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-graphite" data-testid="plan-engine-info">
+              <div><dt className="inline font-semibold text-ink">{t("pl.adv.sims")}: </dt><dd className="inline tnum">{method.n_paths}</dd></div>
+              <div><dt className="inline font-semibold text-ink">{t("pl.adv.seed")}: </dt><dd className="inline tnum">{method.seed}</dd></div>
+              <div><dt className="inline font-semibold text-ink">{t("pl.adv.window")}: </dt><dd className="inline tnum">{method.window_months}</dd></div>
+            </dl>
+          )}
+          {method && <p className="basis-full text-xs text-pewter">{t("pl.adv.fixed")}</p>}
+        </div>
+      </AdvancedSettings>
     </div>
   );
 }
 
 export default function PlanPage() {
   const userId = useUserId();
+  const { t } = useT();
+  const printPlan = usePrintPlan();
   const [source, setSource] = useState(MY_DATA);
   const [params, setParams] = useState<PlanParams>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -107,23 +129,40 @@ export default function PlanPage() {
   }
 
   const isMine = source === MY_DATA;
-  const fetchPlan = useCallback(
-    () => (isMine ? api.plan(userId, params) : api.planScenario(source)),
-    [isMine, userId, params, source]
+  // Ask readiness first (a cheap month count) so a new user never sends a plan request that is bound to 422.
+  const readiness = useAsync<PlanReadiness | null>(
+    useCallback(() => (isMine ? api.planReadiness(userId) : Promise.resolve(null)), [isMine, userId]),
+    [isMine, userId]
   );
-  const { data, error, loading, reload } = useAsync<PlanResult | PlanScenario>(fetchPlan, [isMine, userId, params, source]);
+  const notReady = isMine && readiness.data !== null && !readiness.data.ready;
+  // An old server without /readiness (error) still gets the plan request; the 422 branch below stays as a fallback.
+  const waiting = isMine && readiness.loading && !readiness.data;
+  const fetchPlan = useCallback(
+    () => (waiting || notReady ? Promise.resolve(null) : isMine ? api.plan(userId, params) : api.planScenario(source)),
+    [isMine, userId, params, source, waiting, notReady]
+  );
+  const { data, error, loading, reload } = useAsync<PlanResult | PlanScenario | null>(fetchPlan, [isMine, userId, params, source, waiting, notReady]);
 
   const scenario = data && "plan" in data ? data : null;
   const plan: PlanResult | null = data ? (scenario ? scenario.plan : (data as PlanResult)) : null;
   const active = plan && (plan.sequences.find((s) => s.id === selectedId) ?? (plan.risk_adjusted?.id === selectedId ? plan.risk_adjusted : null) ?? plan.sequences.find((s) => s.id === plan.recommended_id) ?? plan.sequences[0]);
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-8 pb-16">
-      <div className="border-b border-black/[0.04] pb-4">
-        <h1 className="font-display text-2xl font-medium text-ink sm:text-3xl">Financial Plan</h1>
-        <p className="mt-1 text-xs text-graphite sm:text-sm">
-          A 6-month constrained action plan driven by a probabilistic monthly forecast. Uncertainty sets the reserve and the order of actions.
-        </p>
+    <>
+    <div className="plan-screen mx-auto flex max-w-5xl flex-col gap-8 pb-16">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-black/[0.04] pb-4">
+        <div className="min-w-0 flex-1 basis-64">
+          <h1 className="font-display text-2xl font-medium text-ink sm:text-3xl">Financial Plan</h1>
+          <p className="mt-1 text-xs text-graphite sm:text-sm">
+            A 6-month constrained action plan driven by a probabilistic monthly forecast. Uncertainty sets the reserve and the order of actions.
+          </p>
+        </div>
+        {plan && (
+          <Button variant="secondary" onClick={printPlan} data-testid="plan-pdf">
+            <Printer className="size-4" aria-hidden />
+            {t("pl.pdf.btn")}
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2.5">
@@ -145,10 +184,10 @@ export default function PlanPage() {
         ))}
       </div>
 
-      {isMine && (
+      {isMine && !notReady && (
         <Card className="p-6 sm:p-8">
           <CardHeader><CardTitle>Constraints and goal</CardTitle></CardHeader>
-          <ParamsForm value={params} onApply={setParams} />
+          <ParamsForm value={params} onApply={setParams} method={plan?.method} />
         </Card>
       )}
 
@@ -163,7 +202,9 @@ export default function PlanPage() {
         </Card>
       )}
 
-      {loading && !data ? (
+      {notReady && readiness.data ? (
+        <NotReadyCard readiness={readiness.data} guest={userId.startsWith("guest-")} />
+      ) : (loading || waiting) && !data ? (
         <PlanSkeleton />
       ) : error && !data && /months of history/i.test(error) ? (
         <EmptyState
@@ -187,12 +228,14 @@ export default function PlanPage() {
             </Section>
           )}
 
-          <Section title="Recommendation and risk" sub={`Starting cash ${plan.starting_cash.toLocaleString("en-IN")} · select a sequence to inspect it`}>
+          <PlanSummaryCard plan={plan} />
+
+          <Section title="Recommendation and risk" sub={`Starting cash ${formatCurrency(plan.starting_cash)} · select a sequence to inspect it`}>
             <RiskSummary plan={plan} selectedId={active.id} onSelect={setSelectedId} />
           </Section>
 
-          <Section title="Cash trajectory" sub="P50 line and P10-P90 band per action sequence against the reserve">
-            <CashBandChart sequences={plan.sequences} reserve={plan.constraints.min_reserve} />
+          <Section title="Cash trajectory" sub="Median line and the middle 80% band per action sequence against your reserve">
+            <CashBandChart sequences={plan.sequences} reserve={plan.constraints.min_reserve} focus={active} nPaths={plan.method.n_paths} />
           </Section>
 
           <Section title={`Period plan: ${active.label}`}>
@@ -224,5 +267,7 @@ export default function PlanPage() {
         </>
       )}
     </div>
+    {plan && <PlanPrintView plan={plan} userId={userId} />}
+    </>
   );
 }

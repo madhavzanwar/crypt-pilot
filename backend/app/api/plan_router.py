@@ -48,6 +48,12 @@ class ReplanRequest(PlanParams):
     shock: Shock
 
 
+def _flows(user_id: str) -> pd.DataFrame:
+    """Complete calendar months of history (current month excluded) -- the one rule the plan and readiness share."""
+    df = _transactions_df(store.query(TransactionRow, user_id=user_id))
+    return monthly_flows(df) if not df.empty else pd.DataFrame()
+
+
 def _inputs(user_id: str, p: PlanParams) -> PlanInputs:
     if p.reserve is None and p.goal_amount is None and p.goal_month is None:
         # Connected sandbox users inherit the declared reserve/goal of the persona they linked.
@@ -62,8 +68,7 @@ def _inputs(user_id: str, p: PlanParams) -> PlanInputs:
         raise HTTPException(422, "goal_amount and goal_month must be given together")
     if p.goal_month is not None and not 1 <= p.goal_month <= p.horizon:
         raise HTTPException(422, "goal_month must be within the horizon")
-    df = _transactions_df(store.query(TransactionRow, user_id=user_id))
-    flows = monthly_flows(df) if not df.empty else pd.DataFrame()
+    flows = _flows(user_id)
     if len(flows) < _MIN_MONTHS:
         raise HTTPException(422, f"Need at least {_MIN_MONTHS} complete months of history to plan; found {len(flows)}")
     window = choose_window(flows, make_split(len(flows)))
@@ -84,6 +89,19 @@ def _inputs(user_id: str, p: PlanParams) -> PlanInputs:
         start_month=str(pd.Period(flows["month"].iloc[-1]) + 1),
         horizon=p.horizon,
     )
+
+
+class PlanReadiness(BaseModel):
+    ready: bool
+    months_available: int
+    months_needed: int
+
+
+@router.get("/plan/{user_id}/readiness", response_model=PlanReadiness)
+def get_plan_readiness(user_id: str = Depends(resolve_user_id)) -> PlanReadiness:
+    """Whether the plan can be built yet, by the same month count the plan enforces; never runs the forecast."""
+    have = len(_flows(user_id))
+    return PlanReadiness(ready=have >= _MIN_MONTHS, months_available=have, months_needed=_MIN_MONTHS)
 
 
 @router.get("/plan/{user_id}", response_model=PlanResult)

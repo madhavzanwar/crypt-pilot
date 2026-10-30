@@ -512,3 +512,89 @@ h1, h2, h3, h4, h5, h6 {
 * { scrollbar-width: none; -ms-overflow-style: none; }
 *::-webkit-scrollbar { display: none; }
 [data-slot="scroll-area-scrollbar"] { display: none !important; }
+
+/* ==========================================================================
+   Plan page: "Download plan as PDF" (browser print engine, A4). The print document is the
+   .plan-print-root block rendered by components/plan/PlanPrintView.tsx; it is hidden on screen.
+   ========================================================================== */
+.plan-print-root {
+  display: none;
+}
+
+@media print {
+  @page plan {
+    size: A4 portrait;
+    margin: 14mm 14mm 20mm 14mm;
+  }
+
+  /* Hide everything that is neither the print document, nor inside it, nor an ancestor of it (sidebar, header, nav, dialogs, chat, toasts, the on-screen plan). */
+  html:has(.plan-print-root) body *:not(:has(.plan-print-root)):not(.plan-print-root):not(.plan-print-root *) {
+    display: none !important;
+  }
+
+  /* Ancestors become plain blocks so the document flows across pages. */
+  html:has(.plan-print-root),
+  html:has(.plan-print-root) body,
+  html:has(.plan-print-root) body *:has(.plan-print-root) {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    transform: none !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    backdrop-filter: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .plan-print-root {
+    display: block !important;
+    page: plan;
+    color: #111827;
+    font-size: 9.5pt;
+    line-height: 1.45;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .plan-print-root, .plan-print-root * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .plan-print-root .pp-head { border-bottom: 1.5pt solid #111827; padding-bottom: 3mm; margin-bottom: 5mm; }
+  .plan-print-root .pp-brand { font-size: 9pt; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #374151; }
+  .plan-print-root .pp-title { font-size: 20pt; font-weight: 700; line-height: 1.2; margin: 1mm 0 2mm; color: #111827; }
+  .plan-print-root .pp-meta { display: flex; flex-wrap: wrap; gap: 1mm 8mm; font-size: 9pt; color: #374151; }
+  .plan-print-root .pp-block { margin-bottom: 6mm; break-inside: avoid; page-break-inside: avoid; }
+  .plan-print-root .pp-block > h2 { font-size: 12pt; font-weight: 700; margin: 0 0 2mm; padding-bottom: 1mm; border-bottom: 0.5pt solid #9ca3af; color: #111827; break-after: avoid; page-break-after: avoid; }
+  .plan-print-root .pp-chart { width: 100%; overflow: hidden; }
+  .plan-print-root .pp-chart svg { display: block; max-width: 100%; height: auto; }
+  .plan-print-root p, .plan-print-root li { color: #1f2937 !important; }
+  .plan-print-root ul { margin: 2mm 0; padding: 0; list-style: none; }
+  .plan-print-root .pp-table { width: 100%; border-collapse: collapse; font-size: 8.5pt; font-variant-numeric: tabular-nums; }
+  .plan-print-root .pp-table th, .plan-print-root .pp-table td { padding: 1.4mm 1.5mm; border-bottom: 0.5pt solid #d1d5db; text-align: right; vertical-align: top; }
+  .plan-print-root .pp-table th:first-child, .plan-print-root .pp-table tbody th { text-align: left; font-weight: 600; }
+  .plan-print-root .pp-table thead th { background: #e5e7eb; color: #111827; font-weight: 700; font-size: 8pt; border-bottom: 1pt solid #6b7280; }
+  .plan-print-root .pp-table tr { break-inside: avoid; page-break-inside: avoid; }
+  .plan-print-root .pp-assump th { width: 38%; background: #f3f4f6; }
+  .plan-print-root .pp-assump td { text-align: left; }
+  .plan-print-root .pp-flag { color: #9f1239; font-weight: 700; }
+  .plan-print-root .pp-rec { font-weight: 700; }
+  .plan-print-root .pp-foot {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-top: 0.5pt solid #9ca3af;
+    padding-top: 1.5mm;
+    font-size: 8pt;
+    color: #4b5563;
+  }
+}
