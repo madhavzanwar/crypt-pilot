@@ -113,7 +113,7 @@ export function MoneySummary({
   const topApr = debts.reduce((m, d) => Math.max(m, d.interest_rate_apr), 0);
 
   const monthly = obligations
-    .map((o) => ({ o, m: o.amount * PER_MONTH[o.frequency] }))
+    .map((o) => ({ o, m: Math.abs(o.amount) * PER_MONTH[o.frequency] }))
     .filter((x) => x.m > 0)
     .sort((a, b) => b.m - a.m);
   const recurringTotal = monthly.reduce((s, x) => s + x.m, 0);
