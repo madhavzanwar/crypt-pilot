@@ -15,6 +15,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import type { TaxOptimizationAnalysis } from "@/lib/types";
+import { validateGross } from "@/lib/validate";
 import { api } from "@/lib/api";
 import { formatCurrency, formatSignedCurrency } from "@/components/ui/money";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -31,6 +32,8 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
   const [analysis, setAnalysis] = useState<TaxOptimizationAnalysis>(initialAnalysis);
   const [isPending, startTransition] = useTransition();
   const [showSlabs, setShowSlabs] = useState(false);
+  const [grossError, setGrossError] = useState<string | null>(null);
+  const [calcError, setCalcError] = useState<string | null>(null);
 
   // Form State initialized from analysis / detected deductions
   const [grossIncome, setGrossIncome] = useState(initialAnalysis.gross_annual_income);
@@ -80,8 +83,10 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
           hra_exemption: h,
         });
         setAnalysis(result);
+        setCalcError(null);
       } catch (err) {
         console.error("Failed to recalculate tax", err);
+        setCalcError(err instanceof Error ? err.message : "Could not recalculate your tax. Please check the values.");
       }
     });
   }
@@ -386,15 +391,26 @@ export function TaxRegimeComparison({ initialAnalysis, userId }: TaxRegimeCompar
               step={10000}
               value={grossIncome}
               onChange={(e) => {
-                const val = Number(e.target.value) || 0;
+                const raw = e.target.value;
+                const val = Number(raw) || 0;
                 setGrossIncome(val);
-                handleRecalculate({ income: val });
+                const bad = validateGross(raw);
+                setGrossError(bad);
+                if (!bad) handleRecalculate({ income: val });
               }}
+              min={0}
+              aria-invalid={!!grossError}
               className="w-full rounded-chip border border-mist bg-paper px-3.5 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-ember/30 font-mono tnum"
             />
-            <span className="text-[11px] text-pewter">
-              ~{formatCurrency(grossIncome / 12)}/month gross salary
-            </span>
+            {grossError ? (
+              <span role="alert" className="text-[11px] font-medium text-rose-600">{grossError} Showing the last valid result.</span>
+            ) : calcError ? (
+              <span role="alert" className="text-[11px] font-medium text-rose-600">{calcError}</span>
+            ) : (
+              <span className="text-[11px] text-pewter">
+                ~{formatCurrency(grossIncome / 12)}/month gross salary
+              </span>
+            )}
           </div>
 
           {/* Section 80C */}

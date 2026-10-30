@@ -97,13 +97,17 @@ const nextId = () => `custom-${++uid}`;
 
 export function OptOutSimulator() {
   const userId = useUserId();
-  const [income, setIncome] = useState(10000);
-  const [other, setOther] = useState(3500);
+  // Typed values win; until then the defaults come from the user's own dashboard (QA-12), with generic sample values only as a fallback.
+  const [incomeEdit, setIncome] = useState<number | null>(null);
+  const [otherEdit, setOther] = useState<number | null>(null);
   const [items, setItems] = useState<Item[]>(DEFAULT_ITEMS);
   const [draft, setDraft] = useState({ name: "", cost: 0 });
 
   const fetchDashboard = useCallback(() => api.dashboard(userId), [userId]);
   const { data: dashboard } = useAsync(fetchDashboard, [userId]);
+  const income = incomeEdit ?? (dashboard && dashboard.monthly_income > 0 ? Math.round(dashboard.monthly_income) : 10000);
+  const listed = DEFAULT_ITEMS.reduce((t, x) => t + x.cost, 0);
+  const other = otherEdit ?? (dashboard && dashboard.monthly_expenses > 0 ? Math.max(0, Math.round(dashboard.monthly_expenses - listed)) : 3500);
   const detected = (dashboard?.recurring_obligations ?? []).filter((o) => o.category === "subscriptions");
 
   const patch = (id: string, p: Partial<Item>) =>

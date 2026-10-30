@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, Download, ScanSearch, ShieldAlert, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate, localizeMoneyText } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { FinancialSecurity } from "@/lib/types";
 
@@ -56,7 +56,7 @@ export default function FinancialSecurityPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl text-ink">Financial Security</h1>
-          <p className="text-sm text-graphite">How safe your own money data looks: duplicates, odd payments, look-alike merchants and more. {d.generated_at}</p>
+          <p className="text-sm text-graphite">How safe your own money data looks: duplicates, odd payments, look-alike merchants and more. {formatDate(d.generated_at)}</p>
         </div>
         <div className="flex gap-2 print:hidden">
           <Link href="/evidence-room" className="inline-flex items-center gap-1.5 rounded-full border border-mist bg-white px-4 py-2 text-sm text-ink hover:bg-fog">
@@ -153,8 +153,8 @@ export default function FinancialSecurityPage() {
                 <li key={i} className="flex items-start gap-3 rounded-2xl bg-fog/60 p-3 text-sm">
                   <span className={cn("mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase", SEVERITY[f.severity])}>{f.severity}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-ink">{f.title}</p>
-                    <p className="text-xs text-graphite">{f.detail}</p>
+                    <p className="font-medium text-ink">{localizeMoneyText(f.title, { absolute: true })}</p>
+                    <p className="text-xs text-graphite">{localizeMoneyText(f.detail, { absolute: true })}</p>
                   </div>
                   {f.amount > 0 && <span className="shrink-0 font-semibold tnum text-ink">{formatCurrency(f.amount)}</span>}
                 </li>
