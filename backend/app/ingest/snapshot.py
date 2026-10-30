@@ -52,7 +52,7 @@ from typing import Optional
 import pandas as pd
 from app.core import store
 
-from app.analytics.basis import through_today
+from app.analytics.basis import through_today, trailing_income_expenses
 from app.analytics.anomalies import detect_anomalies
 from app.analytics.benchmarks import benchmark_context
 from app.analytics.debt import compute_dti, credit_utilization as _credit_utilization
@@ -135,20 +135,7 @@ def _aggregate_credit_utilization(accounts: list[AccountRow]) -> Optional[float]
 def _avg_income_expenses(df: pd.DataFrame, months: int = _TRAILING_MONTHS) -> tuple[float, float]:
     """Trailing-`months`-month average monthly income/expenses, same window
     convention as `app.analytics.savings.trailing_savings_rate`."""
-    if df.empty:
-        return 0.0, 0.0
-    work = df.copy()
-    work["date"] = pd.to_datetime(work["date"])
-    as_of = work["date"].max()
-    window_start = as_of - pd.DateOffset(months=months)
-    window = work[(work["date"] > window_start) & (work["date"] <= as_of)]
-    # Same exclusion as app.analytics.savings.trailing_savings_rate (transfers
-    # and credit-card bill payments are not new spend -- see that module for
-    # why credit_card_payment is excluded here).
-    _excluded = {TxnCategory.transfer.value, TxnCategory.credit_card_payment.value}
-    window = window[~window["category"].isin(_excluded)]
-    income_total = float(window.loc[window["amount"] > 0, "amount"].sum())
-    expense_total = float(-window.loc[window["amount"] < 0, "amount"].sum())
+    income_total, expense_total = trailing_income_expenses(df, months)
     return income_total / months, expense_total / months
 
 
