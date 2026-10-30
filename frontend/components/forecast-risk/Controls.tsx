@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { ForecastRiskQuery } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
-import { validateDraft, type DraftErrors, type ForecastDraft } from "./forecastInputs";
+import { DEFAULT_SEED, validateDraft, type DraftErrors, type ForecastDraft } from "./forecastInputs";
 
 const INPUT = "min-h-11 w-full rounded-chip border bg-white px-3 text-sm text-ink tnum outline-none focus-visible:ring-2 focus-visible:ring-ember";
 
@@ -15,7 +15,7 @@ export function Controls({ q, onApply }: { q: ForecastRiskQuery; onApply: (q: Fo
   const init = (v: number | undefined, scale = 1) => (v === undefined ? "" : String(Math.round(v * scale)));
   const [d, setD] = useState<ForecastDraft>({
     reserve: init(q.reserve), savings: init(q.savings), extra_debt: init(q.extra_debt), goal_amount: init(q.goal_amount),
-    goal_month: init(q.goal_month), cut: init(q.cut ?? 0.2, 100), sims: String(q.sims ?? 2000), seed: String(q.seed ?? 42),
+    goal_month: init(q.goal_month), cut: init(q.cut ?? 0.2, 100), sims: String(q.sims ?? 2000), seed: String(q.seed ?? DEFAULT_SEED),
   });
   const [errors, setErrors] = useState<DraftErrors>({});
   const set = (k: keyof ForecastDraft) => (e: React.ChangeEvent<HTMLInputElement>) => {

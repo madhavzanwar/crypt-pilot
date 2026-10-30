@@ -13,6 +13,9 @@ export interface ForecastDraft {
 }
 export type DraftErrors = Partial<Record<keyof ForecastDraft, string>>;
 
+/** The forecasting engine's own default seed (backend/app/plan/forecast.py SEED): a blank seed and the first run use it. */
+export const DEFAULT_SEED = 20240601;
+
 const blank = (s: string) => s.trim() === "";
 const asNum = (s: string) => (blank(s) ? undefined : Number(s));
 
@@ -42,7 +45,7 @@ export function validateDraft(d: ForecastDraft, q: ForecastRiskQuery, horizon: n
   if (!Number.isFinite(cut) || cut < 0 || cut > 30) errors.cut = "Discretionary cut must be between 0 and 30 percent.";
   const sims = blank(d.sims) ? 2000 : Number(d.sims);
   if (!Number.isInteger(sims) || sims < 500 || sims > 10000) errors.sims = "Simulations must be a whole number from 500 to 10,000.";
-  const seed = blank(d.seed) ? 42 : Number(d.seed);
+  const seed = blank(d.seed) ? DEFAULT_SEED : Number(d.seed);
   if (!Number.isInteger(seed) || seed < 0 || seed > 2 ** 32 - 1) errors.seed = "Seed must be a whole number from 0 to 4,294,967,295.";
 
   if (Object.keys(errors).length > 0) return { errors, query: null };
@@ -72,5 +75,8 @@ export function friendlyForecastError(raw: string | null | undefined): string {
   if (status === "429") return "Too many forecast runs in a short time. Wait a minute and try again.";
   if (status && status.startsWith("5")) return "The forecast service had a problem. Try again in a moment.";
   if (/failed to fetch|network|load failed/i.test(text)) return "Could not reach the forecast service. Check your connection and try again.";
+  // lib/api already turns most failures into a sentence for people: keep it rather than replacing it with a generic line
+  const t = text.trim();
+  if (t && t.length <= 240 && !/^API\s|[{}<>]|https?:\/\//.test(t)) return t;
   return "The forecast could not be run. Try again, or change the inputs.";
 }
