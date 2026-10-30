@@ -6,6 +6,8 @@ export interface FeatureItem {
   title: string;
   description: string;
   ctaText: string;
+  /** Where the "Learn more" link goes. */
+  href: string;
   position: "left-top" | "left-bottom" | "right-top" | "right-bottom";
 }
 
@@ -23,6 +25,7 @@ export const SHOWCASE_FEATURES: FeatureItem[] = [
     description:
       "From your net worth to day-to-day spending and cash flow, feel confident about where you're at.",
     ctaText: "Learn more",
+    href: "/dashboard",
     position: "left-top",
   },
   {
@@ -32,6 +35,7 @@ export const SHOWCASE_FEATURES: FeatureItem[] = [
     description:
       "Create a budget that flexes to your needs — and not the other way around — so you can stay focused on the things that matter most.",
     ctaText: "Learn more",
+    href: "/budgets",
     position: "left-bottom",
   },
   {
@@ -41,6 +45,7 @@ export const SHOWCASE_FEATURES: FeatureItem[] = [
     description:
       "Invite your partner to see your full picture, budget together, and reach your goals faster (and with more high fives).",
     ctaText: "Learn more",
+    href: "/household",
     position: "right-top",
   },
   {
@@ -50,6 +55,7 @@ export const SHOWCASE_FEATURES: FeatureItem[] = [
     description:
       "From planning a vacation to a home remodel — track your goals and adjust your cash flow to make sure you stick the landing.",
     ctaText: "Learn more",
+    href: "/goals",
     position: "right-bottom",
   },
 ];

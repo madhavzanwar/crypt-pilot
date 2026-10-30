@@ -16,7 +16,7 @@ export function LandingHeader() {
   }, []);
 
   const link =
-    "inline-flex min-h-11 items-center rounded-chip px-2.5 text-xs sm:text-sm font-medium text-graphite hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember";
+    "min-h-11 items-center rounded-chip px-2.5 text-xs sm:text-sm font-medium text-graphite hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember";
 
   return (
     <header
@@ -34,7 +34,7 @@ export function LandingHeader() {
           <Link href="/dashboard" className={`${link} hidden sm:inline-flex`}>
             Dashboard
           </Link>
-          <Link href="/copilot" className={link}>
+          <Link href="/copilot" className={`${link} hidden sm:inline-flex`}>
             AI Copilot
           </Link>
           <Link href="/wallet-guard" className={`${link} hidden sm:inline-flex`}>

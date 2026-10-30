@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { FeatureItem } from "./showcaseData";
 
 interface FeatureCardProps {
@@ -61,15 +62,18 @@ export function FeatureCard({ feature, isActive, onActivate }: FeatureCardProps)
 
       {/* Pill "Learn more" Button */}
       <div className="mt-4">
-        <span
-          className={`inline-flex items-center justify-center px-4 py-1.5 rounded-full text-xs font-medium text-white transition-all duration-300 shadow-2xs ${
+        <Link
+          href={feature.href}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          className={`inline-flex min-h-11 items-center justify-center px-4 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#172554] rounded-full text-xs font-medium text-white transition-all duration-300 shadow-2xs ${
             isActive
               ? "bg-[#172554] shadow-sm hover:bg-[#1e3a8a]"
               : "bg-[#475569]/70 opacity-90"
           }`}
         >
           {feature.ctaText}
-        </span>
+        </Link>
       </div>
     </div>
   );
