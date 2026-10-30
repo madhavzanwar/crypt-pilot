@@ -36,7 +36,8 @@ from app.api.webhooks_router import router as webhooks_router
 from app.api.tax_router import router as tax_router
 from app.api.transactions_router import router as transactions_router
 from app.ocr import OCR_UNAVAILABLE_MESSAGE, OcrUnavailable
-from app.core.audit import log_audit_event
+from app.core.audit import humanise_action, log_audit_event
+from app.core.errors import HintedHTTPException
 from app.crypto_bridge.router import router as crypto_router
 
 _MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -112,6 +113,11 @@ app.add_middleware(
 @app.exception_handler(OcrUnavailable)
 async def _ocr_unavailable(_: Request, exc: OcrUnavailable) -> JSONResponse:
     return JSONResponse(status_code=503, content={"detail": OCR_UNAVAILABLE_MESSAGE})
+
+
+@app.exception_handler(HintedHTTPException)
+async def _hinted_http_error(_: Request, exc: HintedHTTPException) -> JSONResponse:
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail, "hint": exc.hint}, headers=exc.headers)
 
 
 @app.exception_handler(RequestValidationError)
@@ -230,6 +236,7 @@ async def audit_log_middleware(request: Request, call_next):
                 path=path,
                 status_code=status,
                 client_ip=request.client.host if request.client else None,
+                detail=humanise_action("rate_limited" if status == 429 else "auth_denied", method, path),
             )
         elif method in _MUTATING_METHODS and 200 <= status < 300 and path.startswith("/api/"):
             await run_in_threadpool(
@@ -240,6 +247,7 @@ async def audit_log_middleware(request: Request, call_next):
                 path=path,
                 status_code=status,
                 client_ip=request.client.host if request.client else None,
+                detail=humanise_action("mutation", method, path),
             )
     except Exception:  # noqa: BLE001 - audit logging must never break a response
         pass

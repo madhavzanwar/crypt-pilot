@@ -23,10 +23,13 @@ from pydantic import BaseModel
 
 from app.core import store
 from app.core.auth import DEMO_USER_IDS, resolve_user_id
+from app.core.errors import HintedHTTPException
 from app.ingest.personas import PERSONA_CONFIGS, generate_persona
 from app.ingest.seed import _clear_user
 from app.ingest.upload import parse_transaction_csv
 from app.models import AccountRow, ConnectionRow, InsightsSnapshotRow, TransactionRow
+
+SHEET_HINT = "Share the sheet as 'Anyone with the link can view', then paste the link again."
 
 router = APIRouter(prefix="/api/connectors", tags=["connectors"])
 
@@ -147,9 +150,9 @@ def _sync_sheet(user_id: str, csv_url: str, last_hash: str | None = None) -> tup
         r = _fetch_sheet(csv_url)
         r.raise_for_status()
     except httpx.HTTPError as exc:
-        raise HTTPException(502, "Couldn't read the sheet. In Google Sheets choose Share, then 'Anyone with the link' can view.") from exc
+        raise HintedHTTPException(502, "Couldn't read the sheet. In Google Sheets choose Share, then 'Anyone with the link' can view.", hint=SHEET_HINT) from exc
     if "text/csv" not in r.headers.get("content-type", ""):
-        raise HTTPException(502, "That link isn't readable as a CSV. Set sharing to 'Anyone with the link' can view.")
+        raise HintedHTTPException(502, "That link isn't readable as a CSV. Set sharing to 'Anyone with the link' can view.", hint=SHEET_HINT)
     digest = hashlib.sha256(r.content).hexdigest()
     if digest == last_hash:
         return False, digest, 0
@@ -205,7 +208,9 @@ def connect(connector: str, body: ConnectRequest, user_id: str = Depends(resolve
     store.delete_where(InsightsSnapshotRow, user_id=user_id)
     store.put(ConnectionRow(id=f"{user_id}:{connector}", user_id=user_id, connector=connector,
                             detail=detail, connected_at=datetime.now(timezone.utc)))
-    return {"connected": True, **stats}
+    # Honest response: a dataset-only link brings no transactions into the app, so the UI must not imply the dashboard fills up.
+    return {"connected": True, **stats, "has_data": False,
+            "message": "Connected. No transactions yet: upload a statement or add expenses."}
 
 
 @router.post("/{user_id}/google_sheets/sync")

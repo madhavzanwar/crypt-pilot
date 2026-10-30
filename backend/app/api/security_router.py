@@ -16,7 +16,7 @@ from app.core.validate import check_amount
 from app.api.connectors_router import CATALOG, DATASET_FILES, _dataset
 from app.api.jobs_router import enqueue_evidence
 from app.core import store
-from app.core.audit import log_audit_event
+from app.core.audit import humanise_action, log_audit_event
 from app.core.auth import resolve_user_id
 from app.models import AccountRow, AuditLogRow, ConnectionRow, TransactionRow
 from app.security import agents, chain_analyst, council
@@ -209,7 +209,8 @@ def my_data(request: Request, user_id: str = Depends(resolve_user_id)) -> dict:
             sources.append({"id": cid, "name": CATALOG[cid][0], "detail": linked[cid].detail, "records": n, "preview": prev, "disconnectable": True})
     log = sorted(store.query(AuditLogRow, user_id=user_id), key=lambda r: r.created_at, reverse=True)[:30]
     _log(request, user_id, "My Data page listed your connected sources")
-    return {"sources": sources, "access_log": [{"when": r.created_at.isoformat(), "event": r.event_type, "method": r.method, "path": r.path, "detail": r.detail, "status": r.status_code} for r in log]}
+    return {"sources": sources, "access_log": [{"when": r.created_at.isoformat(), "event": r.event_type, "method": r.method, "path": r.path, "detail": r.detail, "status": r.status_code,
+            "action": humanise_action(r.event_type, r.method, r.path, r.detail)} for r in log]}
 
 
 @router.get("/{user_id}/data/export")
