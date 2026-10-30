@@ -53,6 +53,7 @@ import type {
   TxnCategory,
 } from "@/lib/types";
 import { TxnSummary } from "@/components/transactions/TxnSummary";
+import { GetStarted } from "@/components/transactions/GetStarted";
 import { MerchantLogo } from "@/components/dashboard/MerchantLogo";
 import { CATEGORY_META } from "@/lib/spend";
 import { Card } from "@/components/ui/Card";
@@ -293,6 +294,8 @@ export default function TransactionsPage() {
       </div>
 
       <TxnSummary />
+
+      {data && !loading && data.total === 0 && !search && !category && !reviewStatusFilter && !tagFilter && !dateFrom && !dateTo && <GetStarted />}
 
       {/* Review Queue Deck (Matching Showcase Track Pattern) */}
       {queueData && queueData.pending_count > 0 && showReviewDeck && (
