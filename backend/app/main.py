@@ -15,6 +15,7 @@ from app.api.copilot_feed_router import router as copilot_feed_router
 from app.api.documents_router import router as documents_router
 from app.api.goals_router import router as goals_router
 from app.api.household_router import router as household_router
+from app.api.my_data_router import router as my_data_router
 from app.api.networth_router import router as networth_router
 from app.api.notifications_router import router as notifications_router
 from app.api.profile_router import router as profile_router
@@ -157,6 +158,7 @@ app.include_router(ops_router)
 app.include_router(jobs_router)
 app.include_router(pay_router, prefix="/api")
 app.include_router(household_router)
+app.include_router(my_data_router)
 app.include_router(networth_router)
 app.include_router(notifications_router)
 app.include_router(profile_router)
@@ -245,7 +247,7 @@ async def audit_log_middleware(request: Request, call_next):
                 client_ip=request.client.host if request.client else None,
                 detail=humanise_action("rate_limited" if status == 429 else "auth_denied", method, path),
             )
-        elif method in _MUTATING_METHODS and 200 <= status < 300 and path.startswith("/api/"):
+        elif method in _MUTATING_METHODS and 200 <= status < 300 and path.startswith("/api/") and not path.startswith("/api/my-data/"):  # a deletion leaves no per-request trace of the user
             await run_in_threadpool(
                 log_audit_event,
                 user_id=_guess_user_id(),
