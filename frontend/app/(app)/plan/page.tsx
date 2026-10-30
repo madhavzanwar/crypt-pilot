@@ -195,8 +195,8 @@ export default function PlanPage() {
             <RiskSummary plan={plan} selectedId={active.id} onSelect={setSelectedId} />
           </Section>
 
-          <Section title="Cash trajectory" sub="P50 line and P10-P90 band per action sequence against the reserve">
-            <CashBandChart sequences={plan.sequences} reserve={plan.constraints.min_reserve} />
+          <Section title="Cash trajectory" sub="Median line and the middle 80% band per action sequence against your reserve">
+            <CashBandChart sequences={plan.sequences} reserve={plan.constraints.min_reserve} focus={active} nPaths={plan.method.n_paths} />
           </Section>
 
           <Section title={`Period plan: ${active.label}`}>
