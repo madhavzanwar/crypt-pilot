@@ -255,3 +255,24 @@ def test_finpilot_store_memory_ignores_firebase_credentials(monkeypatch):
         assert store._db() is None
     finally:
         store._db.cache_clear()
+
+
+def test_notifications_are_reused_until_the_store_changes(monkeypatch):
+    """Notifications scan the whole ledger: a second call within the memo window must not rebuild, a write must."""
+    from fastapi.testclient import TestClient
+
+    from app.api import notifications_router as nr
+    from app.main import app
+
+    c = TestClient(app)
+    calls = []
+    real = nr._build_notifications
+    monkeypatch.setattr(nr, "_build_notifications", lambda uid: (calls.append(uid), real(uid))[1])
+    nr._memo.clear()
+    a = c.get("/api/notifications/demo-meera").json()
+    b = c.get("/api/notifications/demo-meera").json()
+    assert a == b and len(calls) == 1
+    from app.core import store
+    store._bump("transactions")  # any store write invalidates
+    c.get("/api/notifications/demo-meera")
+    assert len(calls) == 2

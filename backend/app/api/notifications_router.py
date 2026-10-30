@@ -28,6 +28,7 @@ now.
 from __future__ import annotations
 
 import hashlib
+import time
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends
@@ -53,8 +54,25 @@ def _stable_id(*parts: str) -> str:
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
 
 
+_MEMO_SECONDS = 20.0
+_memo: dict[str, tuple[float, int, list[NotificationItem]]] = {}  # user -> (when, store write counter, items)
+
+
 @router.get("/api/notifications/{user_id}", response_model=list[NotificationItem])
 def get_notifications(user_id: str = Depends(resolve_user_id)) -> list[NotificationItem]:
+    """Built from the whole ledger (anomaly scan + recommendations), so reuse it briefly: any write to the store invalidates it."""
+    now, writes = time.monotonic(), store.writes()
+    hit = _memo.get(user_id)
+    if hit and hit[1] == writes and now - hit[0] < _MEMO_SECONDS:
+        return hit[2]
+    items = _build_notifications(user_id)
+    if len(_memo) > 500:
+        _memo.clear()
+    _memo[user_id] = (now, writes, items)
+    return items
+
+
+def _build_notifications(user_id: str) -> list[NotificationItem]:
     items: list[NotificationItem] = []
     today = date.today()
 

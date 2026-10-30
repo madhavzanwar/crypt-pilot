@@ -80,11 +80,24 @@ import { getOfflineOnly } from "./user";
 
 import { API_URL, authHeader } from "./apiBase";
 
-// GET responses are reused for a short while, so switching tabs shows data instantly and
-// identical in-flight requests share one fetch. Every write clears it, so edits never look stale.
-const GET_TTL_MS = 30_000;
-const getCache = new Map<string, { at: number; value: Promise<unknown> }>();
+// Stale-while-revalidate cache for GET responses, so switching tabs shows data instantly and identical in-flight
+// requests share one fetch. Within FRESH_MS an entry is served with no network at all; up to STALE_MS it is still
+// served instantly while one quiet background refetch replaces it (mounted pages refresh only if the data changed).
+// Every write clears it, so edits never look stale.
+const FRESH_MS = 60_000;
+const STALE_MS = 10 * 60_000;
+const MAX_ENTRIES = 200;
+type CacheEntry = { at: number; value: Promise<unknown>; refreshing?: boolean };
+const getCache = new Map<string, CacheEntry>();
 export const clearApiCache = () => getCache.clear();
+
+let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+/** One debounced "data changed" for however many background refreshes finish together. */
+function scheduleViewRefresh() {
+  if (typeof window === "undefined") return;
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => window.dispatchEvent(new Event(DATA_CHANGED_EVENT)), 150);
+}
 
 /** After a successful write, tell every mounted useAsync() to refetch. */
 function notifyIfWrite(method?: string) {
@@ -99,10 +112,33 @@ function publishInsights(d: RecomputeDiff): RecomputeDiff {
   return d;
 }
 
+function revalidate(path: string, init: RequestInit | undefined, old: CacheEntry) {
+  if (old.refreshing) return;
+  old.refreshing = true;
+  request<unknown>(path, init)
+    .then(async (fresh) => {
+      if (getCache.get(path) !== old) return; // a write cleared or replaced it meanwhile
+      const prev = await old.value.catch(() => undefined);
+      getCache.set(path, { at: Date.now(), value: Promise.resolve(fresh) });
+      if (JSON.stringify(prev) !== JSON.stringify(fresh)) scheduleViewRefresh();
+    })
+    .catch(() => {
+      old.refreshing = false; // keep serving the stale copy and try again on the next visit
+    });
+}
+
 function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   if (init?.method && init.method !== "GET") return request<T>(path, init);
   const hit = getCache.get(path);
-  if (hit && Date.now() - hit.at < GET_TTL_MS) return hit.value as Promise<T>;
+  if (hit) {
+    const age = Date.now() - hit.at;
+    if (age < FRESH_MS) return hit.value as Promise<T>;
+    if (age < STALE_MS) {
+      revalidate(path, init, hit);
+      return hit.value as Promise<T>;
+    }
+  }
+  if (getCache.size >= MAX_ENTRIES) getCache.delete(getCache.keys().next().value as string); // oldest first
   const value = request<T>(path, init);
   getCache.set(path, { at: Date.now(), value });
   value.catch(() => getCache.delete(path)); // never keep a failed request
@@ -483,11 +519,22 @@ export const api = {
     }),
 };
 
-/** Warm the response cache for the main tabs once the app is idle, so the first click on each is instant. */
+/** Warm the response cache for the main tabs once the app is idle, so the first click on each is instant.
+ * One request at a time with a short gap: firing them all at once starved the small API server of the page's own calls. */
 export function prefetchCore(userId: string) {
-  const run = () =>
-    [api.dashboard, api.goals, api.budgets, api.budgetStatus, api.accounts, api.notifications, api.plan, api.financialSecurity]
-      .forEach((f) => (f as (id: string) => Promise<unknown>)(userId).catch(() => {}));
-  if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(run, { timeout: 3000 });
-  else setTimeout(run, 1500);
+  let stopped = false;
+  const calls = [api.dashboard, api.goals, api.budgets, api.budgetStatus, api.accounts, api.notifications, api.plan, api.financialSecurity];
+  const run = async () => {
+    for (const f of calls) {
+      if (stopped || document.hidden) return;
+      await (f as (id: string) => Promise<unknown>)(userId).catch(() => {});
+      await new Promise((r) => setTimeout(r, 400));
+    }
+  };
+  const start = () => void run();
+  const idle = typeof window.requestIdleCallback === "function" ? window.requestIdleCallback(start, { timeout: 4000 }) : window.setTimeout(start, 2500);
+  return () => {
+    stopped = true;
+    if (typeof window.cancelIdleCallback === "function" && typeof idle === "number") window.cancelIdleCallback(idle);
+  };
 }
