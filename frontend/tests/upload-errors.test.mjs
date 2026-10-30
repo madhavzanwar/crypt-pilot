@@ -22,3 +22,9 @@ test("goal target date must not be in the past", () => {
   assert.match(validateTargetDate("2020-01-01", now), /past/);
   assert.match(validateTargetDate("garbage", now), /valid/);
 });
+import { photoErrorMessage } from "../lib/apiError.ts";
+test("photo errors are friendly", () => {
+  assert.match(photoErrorMessage(503, "OCR unavailable", "x"), /not available/);
+  assert.equal(photoErrorMessage(422, "That does not look like a receipt.", "x"), "That does not look like a receipt.");
+  assert.equal(photoErrorMessage(400, undefined, "fallback"), "fallback");
+});

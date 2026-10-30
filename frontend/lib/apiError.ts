@@ -92,3 +92,12 @@ export function extractErrorMessage(status: number, detail: string): string {
   if (status === 413) return "That file is too large. Please use a file under 5 MB.";
   return "We could not read that file. Try a clearer photo or a .csv / .txt statement.";
 }
+
+/** Message for a failed photo call (snap / teach). 503 means the reader is not available; otherwise the backend's own detail. */
+export function photoErrorMessage(status: number, detail: unknown, fallback: string): string {
+  if (status === 503) return "Photo reading is not available right now. You can still type the item and price below.";
+  if (status === 429) return "Too many photos in a short time. Please wait a minute and try again.";
+  if (typeof detail === "string" && detail.trim() && status < 500) return detail.trim();
+  if (status >= 500) return "Something went wrong on our side. Please try again in a moment.";
+  return fallback;
+}

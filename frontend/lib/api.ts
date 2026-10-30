@@ -1,4 +1,4 @@
-import { extractErrorMessage, formatApiError, SecretInputError, secretInputDetail } from "@/lib/apiError";
+import { extractErrorMessage, formatApiError, photoErrorMessage, SecretInputError, secretInputDetail } from "@/lib/apiError";
 import { TranslateCache } from "@/lib/translateCache";
 import { getLang, getSimpleNow } from "@/lib/i18n";
 
@@ -396,7 +396,7 @@ export const api = {
     if (photo) body.append("photo", photo);
     const res = await fetch(`${API_URL}/api/expenses/${userId}`, { method: "POST", headers: await authHeader(), body });
     clearApiCache();
-    if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `Could not save: ${res.status}`);
+    if (!res.ok) throw new Error(photoErrorMessage(res.status, (await res.json().catch(() => null))?.detail, "Could not save that item."));
     return res.json();
   },
   // Photo -> price memory: teach once (photo + name + price), then a photo alone books the expense
@@ -407,7 +407,7 @@ export const api = {
     body.append("photo", photo);
     const res = await fetch(`${API_URL}/api/expenses/${userId}/teach`, { method: "POST", headers: await authHeader(), body });
     clearApiCache();
-    if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `Could not save: ${res.status}`);
+    if (!res.ok) throw new Error(photoErrorMessage(res.status, (await res.json().catch(() => null))?.detail, "Could not save that item."));
     return res.json() as Promise<{ item: string; price: number }>;
   },
   snapPhoto: async (userId: string, photo: File): Promise<SnapResult> => {
@@ -415,7 +415,7 @@ export const api = {
     body.append("photo", photo);
     const res = await fetch(`${API_URL}/api/expenses/${userId}/snap`, { method: "POST", headers: await authHeader(), body });
     clearApiCache();
-    if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `Could not read that photo: ${res.status}`);
+    if (!res.ok) throw new Error(photoErrorMessage(res.status, (await res.json().catch(() => null))?.detail, "Could not read that photo."));
     return res.json();
   },
   /** Phone pay app: books a scanned-QR payment into the ledger (no real money moves). `code` is the pairing code from the dashboard. */
