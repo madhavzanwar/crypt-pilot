@@ -323,7 +323,7 @@ export const api = {
   clearThreats: (userId: string) => apiFetch<{ removed: number }>(`/api/security/${userId}/demo-threats`, { method: "DELETE" }),
   securityGraph: (userId: string, months: number) => apiFetch<SecurityGraph>(`/api/security/${userId}/graph?months=${months}`),
   simulateFraud: (userId: string, merchant: string, amount: number) =>
-    apiFetch<{ caught: boolean; findings: SecurityFinding[] }>(`/api/security/${userId}/simulate-fraud`, { method: "POST", body: JSON.stringify({ merchant, amount }) }),
+    apiFetch<{ caught: boolean; outcome?: "caught" | "unverified" | "not_flagged"; findings: SecurityFinding[] }>(`/api/security/${userId}/simulate-fraud`, { method: "POST", body: JSON.stringify({ merchant, amount }) }),
   myData: (userId: string) => apiFetch<MyData>(`/api/security/${userId}/data`),
   exportAllData: async (userId: string) => {
     const res = await fetch(`${API_URL}/api/security/${userId}/data/export`, { headers: await authHeader() });

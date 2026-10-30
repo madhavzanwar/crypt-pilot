@@ -48,7 +48,7 @@ export default function TwinSimulatorPage() {
   const [picked, setPicked] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<string[]>([]);
   const [fraud, setFraud] = useState({ merchant: "AMAZ0N PAY", amount: "4999", wallet: "" });
-  const [sim, setSim] = useState<{ caught: boolean; findings: SecurityFinding[]; merchant: string; wallet?: ChainWallet } | null>(null);
+  const [sim, setSim] = useState<{ caught: boolean; outcome?: "caught" | "unverified" | "not_flagged"; findings: SecurityFinding[]; merchant: string; wallet?: ChainWallet } | null>(null);
   const [simError, setSimError] = useState<string | null>(null);
   const [fieldErr, setFieldErr] = useState<{ merchant?: string | null; amount?: string | null }>({});
   const graph = useAsync(useCallback(() => api.securityGraph(userId, months), [userId, months]), [userId, months]);
@@ -78,6 +78,7 @@ export default function TwinSimulatorPage() {
   const flagged = all.filter((m) => m.flagged);
   const node = all.find((m) => m.id === picked);
   const top = cats[0]?.amount ?? 1;
+  const outcome = sim ? (sim.outcome ?? (sim.caught ? "caught" : "not_flagged")) : null;
 
   async function attempt() {
     setSimError(null);
@@ -104,7 +105,7 @@ export default function TwinSimulatorPage() {
     try {
       // Without a wallet this is the original request; with one the Chain Analyst screens it too.
       const r = checked
-        ? await postJson<{ caught: boolean; findings: SecurityFinding[]; wallet?: ChainWallet }>(`/api/security/${userId}/simulate-fraud`, { merchant: fraud.merchant, amount, wallet: checked.address })
+        ? await postJson<{ caught: boolean; outcome?: "caught" | "unverified" | "not_flagged"; findings: SecurityFinding[]; wallet?: ChainWallet }>(`/api/security/${userId}/simulate-fraud`, { merchant: fraud.merchant, amount, wallet: checked.address })
         : await api.simulateFraud(userId, fraud.merchant, amount);
       setSim({ ...r, merchant: fraud.merchant });
     } catch (err) {
@@ -220,8 +221,14 @@ export default function TwinSimulatorPage() {
               <Button size="sm" onClick={attempt}>Run the agents</Button>
               {simError && <p className="text-xs text-rose-700">{simError}</p>}
               {sim && (
-                <div className={cn("rounded-xl p-3 text-xs", sim.caught ? "bg-rose-50 text-rose-800" : "bg-tint-lime text-ink")}>
-                  <p className="font-semibold">{sim.caught ? `Caught: ${sim.findings.length} flag(s) for ${sim.merchant}` : `Not flagged: ${sim.merchant} looks normal to the agents.`}</p>
+                <div className={cn("rounded-xl p-3 text-xs", outcome === "caught" ? "bg-rose-50 text-rose-800" : outcome === "unverified" ? "bg-amber-50 text-amber-900" : "bg-tint-lime text-ink")}>
+                  <p className="font-semibold" data-testid="twin-outcome">
+                    {outcome === "caught"
+                      ? `Caught: ${sim.findings.length} flag(s) for ${sim.merchant}`
+                      : outcome === "unverified"
+                        ? `Unverified: the wallet for ${sim.merchant} could not be checked. That is not an all-clear; treat it as unsafe until verified.`
+                        : `Not flagged: ${sim.merchant} looks normal to the agents.`}
+                  </p>
                   {sim.findings.map((f, i) => <p key={i} className="mt-1">{f.title}</p>)}
                   {sim.wallet && (
                     <div className="mt-2 grid gap-1 border-t border-black/10 pt-2 text-ink">
