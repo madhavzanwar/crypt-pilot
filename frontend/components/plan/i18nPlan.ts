@@ -90,4 +90,16 @@ export const PLAN_STRINGS: Record<string, [string, string, string]> = {
   "pl.adv.seed": ["Random seed", "रैंडम सीड", "रँडम सीड"],
   "pl.adv.window": ["History window (months)", "इतिहास की अवधि (महीने)", "इतिहासाचा कालावधी (महिने)"],
   "pl.adv.fixed": ["Fixed by the planner so results are repeatable.", "नतीजे दोहराए जा सकें, इसलिए प्लानर इन्हें तय रखता है।", "निकाल पुन्हा तसेच मिळावेत म्हणून प्लॅनर हे निश्चित ठेवतो."],
+  // Item 5: first-time state
+  "pl.nr.title": ["Your plan needs about {n} months of history", "आपकी योजना के लिए लगभग {n} महीनों का इतिहास चाहिए", "तुमच्या योजनेसाठी सुमारे {n} महिन्यांचा इतिहास हवा"],
+  "pl.nr.progress": ["You have {have} of {need} months", "आपके पास {need} में से {have} महीने हैं", "तुमच्याकडे {need} पैकी {have} महिने आहेत"],
+  "pl.nr.note": ["Only complete calendar months count; the current month is not included.", "केवल पूरे कैलेंडर महीने गिने जाते हैं; चालू महीना शामिल नहीं है।", "फक्त पूर्ण कॅलेंडर महिने मोजले जातात; चालू महिना समाविष्ट नाही."],
+  "pl.nr.what": [
+    "Once there is enough history, you will see a 6-month action plan in plain words, a cash forecast with a likely range, and whether your safety reserve and savings goal hold up.",
+    "पर्याप्त इतिहास होते ही आपको सरल शब्दों में 6 महीने की कार्य-योजना, संभावित दायरे के साथ नकदी का पूर्वानुमान, और यह दिखेगा कि आपका सुरक्षा रिज़र्व और बचत लक्ष्य टिकते हैं या नहीं।",
+    "पुरेसा इतिहास झाल्यावर तुम्हाला सोप्या शब्दांत 6 महिन्यांची कृती-योजना, संभाव्य श्रेणीसह रोख अंदाज, आणि तुमची सुरक्षा राखीव निधी व बचत ध्येय टिकतात का ते दिसेल.",
+  ],
+  "pl.nr.upload": ["Upload a statement", "स्टेटमेंट अपलोड करें", "स्टेटमेंट अपलोड करा"],
+  "pl.nr.connect": ["Connect a source", "स्रोत जोड़ें", "स्रोत जोडा"],
+  "pl.nr.demo": ["Try with a demo person", "डेमो व्यक्ति के साथ आज़माएँ", "डेमो व्यक्तीसह वापरून पाहा"],
 };

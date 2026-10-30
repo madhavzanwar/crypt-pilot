@@ -724,6 +724,11 @@ export interface PlanResult {
   rationale: string;
   risk_adjusted: SequenceResult | null;
 }
+export interface PlanReadiness {
+  ready: boolean;
+  months_available: number;
+  months_needed: number;
+}
 export interface PlanShock {
   kind: "income_change" | "essential_expense";
   from_period: number;

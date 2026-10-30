@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
-import type { ForecastMethod, PlanParams, PlanResult, PlanScenario } from "@/lib/types";
+import type { ForecastMethod, PlanParams, PlanReadiness, PlanResult, PlanScenario } from "@/lib/types";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -17,6 +17,7 @@ import { ReplanPanel } from "@/components/plan/ReplanPanel";
 import { ForecastTable } from "@/components/plan/ForecastTable";
 import { BacktestTable } from "@/components/plan/BacktestTable";
 import { OutcomeTable } from "@/components/plan/OutcomeTable";
+import { NotReadyCard } from "@/components/plan/NotReadyCard";
 import { PlanSummaryCard } from "@/components/plan/PlanSummaryCard";
 import { formatCurrency } from "@/components/ui/money";
 import { AdvancedSettings } from "@/components/plan/AdvancedSettings";
@@ -124,11 +125,19 @@ export default function PlanPage() {
   }
 
   const isMine = source === MY_DATA;
-  const fetchPlan = useCallback(
-    () => (isMine ? api.plan(userId, params) : api.planScenario(source)),
-    [isMine, userId, params, source]
+  // Ask readiness first (a cheap month count) so a new user never sends a plan request that is bound to 422.
+  const readiness = useAsync<PlanReadiness | null>(
+    useCallback(() => (isMine ? api.planReadiness(userId) : Promise.resolve(null)), [isMine, userId]),
+    [isMine, userId]
   );
-  const { data, error, loading, reload } = useAsync<PlanResult | PlanScenario>(fetchPlan, [isMine, userId, params, source]);
+  const notReady = isMine && readiness.data !== null && !readiness.data.ready;
+  // An old server without /readiness (error) still gets the plan request; the 422 branch below stays as a fallback.
+  const waiting = isMine && readiness.loading && !readiness.data;
+  const fetchPlan = useCallback(
+    () => (waiting || notReady ? Promise.resolve(null) : isMine ? api.plan(userId, params) : api.planScenario(source)),
+    [isMine, userId, params, source, waiting, notReady]
+  );
+  const { data, error, loading, reload } = useAsync<PlanResult | PlanScenario | null>(fetchPlan, [isMine, userId, params, source, waiting, notReady]);
 
   const scenario = data && "plan" in data ? data : null;
   const plan: PlanResult | null = data ? (scenario ? scenario.plan : (data as PlanResult)) : null;
@@ -162,7 +171,7 @@ export default function PlanPage() {
         ))}
       </div>
 
-      {isMine && (
+      {isMine && !notReady && (
         <Card className="p-6 sm:p-8">
           <CardHeader><CardTitle>Constraints and goal</CardTitle></CardHeader>
           <ParamsForm value={params} onApply={setParams} method={plan?.method} />
@@ -180,7 +189,9 @@ export default function PlanPage() {
         </Card>
       )}
 
-      {loading && !data ? (
+      {notReady && readiness.data ? (
+        <NotReadyCard readiness={readiness.data} guest={userId.startsWith("guest-")} />
+      ) : (loading || waiting) && !data ? (
         <PlanSkeleton />
       ) : error && !data && /months of history/i.test(error) ? (
         <EmptyState

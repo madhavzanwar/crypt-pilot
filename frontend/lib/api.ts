@@ -49,6 +49,7 @@ import type {
   ConnectProfile,
   NotificationItem,
   PlanParams,
+  PlanReadiness,
   PayResult, PayReviewItem,
   ForecastRiskQuery,
   ForecastRiskReport,
@@ -484,6 +485,14 @@ export const api = {
     apiFetch<PlanResult>(`/api/plan/${userId}${planQuery(p)}`),
   forecastRisk: (userId: string, q: ForecastRiskQuery = {}) =>
     apiFetch<ForecastRiskReport>(`/api/forecast-risk/${userId}${planQuery(q)}`),
+  /** Cheap check (no forecast): is there enough history to plan? Same month rule as the plan itself. */
+  planReadiness: (userId: string) => apiFetch<PlanReadiness>(`/api/plan/${userId}/readiness`),
+  /** The plan, or null when the history is too short; asks readiness first so a new user never triggers a 422. */
+  planIfReady: async (userId: string, p: PlanParams = {}): Promise<PlanResult | null> => {
+    const r = await apiFetch<PlanReadiness>(`/api/plan/${userId}/readiness`).catch(() => null); // older server: just try the plan
+    if (r && !r.ready) return null;
+    return apiFetch<PlanResult>(`/api/plan/${userId}${planQuery(p)}`);
+  },
   replan: (userId: string, p: PlanParams, shock: PlanShock) =>
     apiFetch<ReplanResult>(`/api/plan/${userId}/replan`, { method: "POST", body: JSON.stringify({ ...p, shock }) }),
   // Public (synthetic data) -- no user id.
@@ -552,7 +561,7 @@ export const api = {
  * One request at a time with a short gap: firing them all at once starved the small API server of the page's own calls. */
 export function prefetchCore(userId: string) {
   let stopped = false;
-  const calls = [api.dashboard, api.goals, api.budgets, api.budgetStatus, api.accounts, api.notifications, api.plan, api.financialSecurity];
+  const calls = [api.dashboard, api.goals, api.budgets, api.budgetStatus, api.accounts, api.notifications, api.planIfReady, api.financialSecurity];
   const run = async () => {
     for (const f of calls) {
       if (stopped || document.hidden) return;
