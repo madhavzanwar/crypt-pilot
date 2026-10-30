@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validateExpense, isDeleteConfirmed, todayISO, namedTransfers, isWritable, describeDeleted } from "../lib/sharedExpenses.ts";
+import { memberName, validateExpense, isDeleteConfirmed, todayISO, namedTransfers, isWritable, describeDeleted } from "../lib/sharedExpenses.ts";
 
 const ids = ["a", "b", "c"];
 const ok = { title: "Groceries", amount: "450.50", paidBy: "a", split: ["a", "b"], date: "2026-10-29" };
@@ -39,3 +39,8 @@ test("transfers get names; sample/read_only blocks writes", () => {
 });
 
 test("describeDeleted skips zeros", () => assert.deepEqual(describeDeleted({ transactions: 12, goals: 0, shared_expenses: 1 }), ["12 transactions", "1 shared expenses"]));
+
+test("ids of former members resolve to 'Former member'", () => {
+  assert.equal(memberName([{ id: "a", name: "A", kind: "user" }], "x", [{ id: "x", name: "Former member" }]), "Former member");
+  assert.equal(memberName([], "y"), "Former member");
+});

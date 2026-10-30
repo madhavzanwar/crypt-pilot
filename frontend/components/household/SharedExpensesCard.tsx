@@ -77,7 +77,7 @@ export function SharedExpensesCard() {
 
   const writable = isWritable(data);
   const transfers = namedTransfers(data);
-  const names = (ids: string[]) => (ids.length === data.members.length ? t("hs.all") : ids.map((i) => memberName(data.members, i)).join(", "));
+  const names = (ids: string[]) => (ids.length === data.members.length ? t("hs.all") : ids.map((i) => memberName(data.members, i, data.former_members)).join(", "));
 
   return shell(
     <div className="mt-3 grid gap-5">
@@ -138,7 +138,7 @@ export function SharedExpensesCard() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-ink">{e.title}</p>
                   <p className="text-xs text-graphite">
-                    {e.date} · {t("hs.paid_by_x")} {memberName(data.members, e.paid_by)} · {t("hs.split_x")}: {names(e.split_among)}
+                    {e.date} · {t("hs.paid_by_x")} {memberName(data.members, e.paid_by, data.former_members)} · {t("hs.split_x")}: {names(e.split_among)}
                     {e.category ? ` · ${e.category}` : ""}
                   </p>
                 </div>
@@ -163,7 +163,7 @@ export function SharedExpensesCard() {
           <ul className="mt-1 divide-y divide-mist" data-testid="settlement-list">
             {data.settlements.map((s) => (
               <li key={s.id} className="flex flex-wrap justify-between gap-2 py-2 text-sm text-ink">
-                <span>{memberName(data.members, s.from)} {t("hs.paid_to")} {memberName(data.members, s.to)} <span className="tnum font-semibold">{formatCurrency(s.amount)}</span></span>
+                <span>{memberName(data.members, s.from, data.former_members)} {t("hs.paid_to")} {memberName(data.members, s.to, data.former_members)} <span className="tnum font-semibold">{formatCurrency(s.amount)}</span></span>
                 <time className="text-xs text-graphite">{s.date}</time>
               </li>
             ))}

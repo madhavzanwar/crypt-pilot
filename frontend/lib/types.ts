@@ -1092,7 +1092,7 @@ export interface SharedBalance { member_id: string; name: string; paid: number; 
 export interface SharedTransfer { from: string; to: string; amount: number }
 export interface SharedExpensesSummary {
   household_id: string; sample: boolean; read_only: boolean;
-  members: SharedMember[]; expenses: SharedExpense[]; settlements: SharedSettlement[];
+  members: SharedMember[]; former_members?: { id: string; name: string }[]; expenses: SharedExpense[]; settlements: SharedSettlement[];
   balances: SharedBalance[]; transfers: SharedTransfer[];
 }
 export interface AddSharedExpenseRequest {

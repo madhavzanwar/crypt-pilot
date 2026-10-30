@@ -29,7 +29,9 @@ test("money keys have Devanagari hi/mr text", () => {
   }
 });
 
-test("household card has no fake data or dead controls", () => {
+test("household card has no hard-coded people and saves through the API", () => {
   const src = readFileSync(new URL("../components/household/SharedExpensesCard.tsx", import.meta.url), "utf8");
-  assert.doesNotMatch(src, /Rishi|Priya|Settle Up|<form/);
+  assert.doesNotMatch(src, /Rishi|Priya/);
+  assert.match(src, /api\.addSharedExpense/);
+  assert.match(src, /api\.addSettlement/);
 });

@@ -36,11 +36,13 @@ export function validateExpense(d: ExpenseDraft, memberIds: string[], now: Date 
   return e;
 }
 
-export const memberName = (members: SharedMember[], id: string): string => members.find((m) => m.id === id)?.name ?? "Someone";
+/** Name for a member id; ids that left the household resolve through `former` ("Former member"). */
+export const memberName = (members: SharedMember[], id: string, former: { id: string; name: string }[] = []): string =>
+  members.find((m) => m.id === id)?.name ?? former.find((m) => m.id === id)?.name ?? "Former member";
 
 /** Transfers with names resolved; the amount is left for the caller to format. */
 export function namedTransfers(s: SharedExpensesSummary): { from: string; to: string; fromName: string; toName: string; amount: number }[] {
-  return s.transfers.map((t: SharedTransfer) => ({ ...t, fromName: memberName(s.members, t.from), toName: memberName(s.members, t.to) }));
+  return s.transfers.map((t: SharedTransfer) => ({ ...t, fromName: memberName(s.members, t.from, s.former_members), toName: memberName(s.members, t.to, s.former_members) }));
 }
 
 export const isWritable = (s: SharedExpensesSummary): boolean => !s.sample && !s.read_only;
