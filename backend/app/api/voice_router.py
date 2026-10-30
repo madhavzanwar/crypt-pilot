@@ -18,7 +18,7 @@ PAGES = {  # path -> what it is, so the model can choose where to go
     "/dashboard": "overview, balances, spending, health score", "/wallet-guard": "check a Bitcoin wallet before paying (graph-verified risk verdict)", "/credits": "buy or top up wallet-check credits (test mode)", "/transactions": "all transactions", "/photos": "quick expense entry (item + amount) and price-from-photo; not in the menu", "/budgets": "budgets", "/goals": "savings goals",
     "/tax": "tax", "/plan": "forecast plan", "/household": "family", "/upload": "upload a bill", "/statement": "statement",
     "/security": "security", "/financial-security": "financial security score", "/evidence-room": "Evidence Council fraud agents", "/council": "Risk Council", "/twin": "twin simulator", "/my-data": "my data", "/profile": "profile",
-    "/copilot": "full copilot chat", "/scenarios": "what-if scenarios", "/timeline": "timeline", "/simulate": "simulator",
+    "/copilot": "full copilot chat", "/scenarios": "what-if scenarios", "/timeline": "timeline", "/simulate": "simulator", "/forecast-risk": "forecast and risk",
     "/connect": "Connectors: link bank accounts, Google Sheets, Gmail, mutual funds, add a card",
 }
 LANG = {"en": "English", "hi": "Hindi (Devanagari script)", "mr": "Marathi (Devanagari script)"}

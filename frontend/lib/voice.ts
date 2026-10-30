@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getLang, SPEECH_LANG } from "@/lib/i18n";
+import { matchNavigation } from "@/lib/voiceNav";
 
 // The browser's own speech engines: free, no key needed. Works in Chrome, Edge and Safari.
 interface Recognition {
@@ -112,26 +113,9 @@ export function stopSpeaking() {
   if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
 }
 
-const PAGES: { path: string; label: string; words: RegExp; target?: string }[] = [
-  { path: "/transactions", label: "your transactions", words: /transaction|payment/, target: "table tbody tr" },
-  { path: "/budgets", label: "your budgets", words: /budget/ },
-  { path: "/goals", label: "your goals", words: /\bgoals?\b/ },
-  { path: "/tax", label: "your tax page", words: /\btax/ },
-  { path: "/financial-security", label: "Financial Security", words: /financial security|fraud|security score/ },
-  { path: "/plan", label: "your plan", words: /\bplan\b|forecast/ },
-  { path: "/household", label: "your household", words: /household|family/ },
-  { path: "/wallet-guard", label: "Wallet Guard", words: /wallet|bitcoin|btc|crypto/ },
-  { path: "/credits", label: "your credits", words: /credits?|top ?up|buy checks/ },
-  { path: "/connect", label: "the connect page", words: /connect|link (my )?(account|bank|google)/ },
-  { path: "/profile", label: "your profile", words: /profile/ },
-  { path: "/dashboard", label: "your dashboard", words: /dashboard|home|overview/ },
-];
-
-/** "show/open/go to/take me to X" -> the page to open. Plain questions return null and go to the Copilot. */
+/** "open / go to / show X" (English, Hindi, Marathi, Hinglish) -> the page to open. Questions and tasks return null and go to the AI. */
 export function pageToOpen(text: string): { path: string; label: string; target?: string } | null {
-  const t = text.toLowerCase();
-  if (!/\b(show|open|go to|take me|navigate|view|display)\b/.test(t)) return null;
-  return PAGES.find((p) => p.words.test(t)) ?? null;
+  return matchNavigation(text);
 }
 
 export function isRecentTransactionQuestion(text: string): boolean {

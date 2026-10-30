@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { BotIcon } from "@animateicons/react/lucide";
 import { CalendarClock, ChevronDown, Check, ExternalLink, History, Paperclip, Plus, ShieldAlert, Sparkles, Trash2, X } from "lucide-react";
 import { LoopIcon } from "@/components/ui/LoopIcon";
@@ -20,6 +21,7 @@ import { toCryptoLang } from "@/lib/crypto/lang";
 import { engineLabel, useVoiceT, type VoiceStringKey } from "@/lib/crypto/voice/strings";
 import { useCryptoStatus } from "@/lib/crypto/voice/useCryptoStatus";
 import { SPEECH_LANG } from "@/lib/i18n";
+import { pageToOpen, scrollToSelector, speak } from "@/lib/voice";
 import { api } from "@/lib/api";
 import { newChatId, titleFrom, useChats, type Turn } from "@/lib/chats";
 import { useAsync, useUserId } from "@/lib/hooks";
@@ -68,6 +70,7 @@ export default function CopilotPage() {
   const cryptoLang: CryptoLang = toCryptoLang(lang);
   const cryptoStatus = useCryptoStatus();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [voiceNote, setVoiceNote] = useState("");
   const [secretWarn, setSecretWarn] = useState(false);
   const [secretDetail, setSecretDetail] = useState<string | null>(null);
   const [needAddress, setNeedAddress] = useState(false);
@@ -167,7 +170,22 @@ export default function CopilotPage() {
     });
   }
 
+  const router = useRouter();
+  /** "open the statement": understood on the device and done at once (no AI call). Returns true if it was a navigation command. */
+  function openByVoice(text: string): boolean {
+    if (messageHasSecret(text)) return false;
+    const nav = pageToOpen(text);
+    if (!nav) return false;
+    setInput("");
+    setVoiceNote(`Opening ${nav.label}…`);
+    speak(`Opening ${nav.label}.`);
+    router.push(nav.path, { scroll: !nav.target });
+    if (nav.target) void scrollToSelector(nav.path, nav.target);
+    return true;
+  }
+
   function onTranscript(text: string, provider: VoiceProvider) {
+    if (openByVoice(text)) return;
     // the words go into the input for the person to check and edit; they are never sent automatically
     setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text));
     setVoiceProvider(provider);
@@ -186,6 +204,7 @@ export default function CopilotPage() {
 
   async function send(message: string) {
     if (!message.trim() || loading) return;
+    if (openByVoice(message)) return;
     const split = findSplitSecret(turns.filter((t) => t.role === "user").map((t) => t.message), message);
     if (split >= 0) {
       if (split > 0) {
@@ -547,6 +566,7 @@ export default function CopilotPage() {
             </div>
           )}
           {!empty && <ul className="mb-2 flex flex-wrap gap-2">{cryptoChips}</ul>}
+          {voiceNote && <p role="status" className="mb-2 px-2 text-xs font-medium text-ink">{voiceNote}</p>}
           <PromptInputBox
             value={input}
             onChange={changeInput}

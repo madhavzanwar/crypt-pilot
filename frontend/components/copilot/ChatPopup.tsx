@@ -201,6 +201,18 @@ export function ChatPopup() {
       if (spoken) {
         // spoken questions go to the voice agent first: it sees the screen, thinks out loud, answers like a person and can open, scroll and click
         setLog((l) => ({ heard: message, live: false, steps: [], answer: "", over: false, ...l }));
+        const nav = pageToOpen(message);
+        if (nav) {
+          // "open the statement": understood on the device, instantly, with no AI call that could be slow or busy
+          addStep(`Opening ${nav.label}…`);
+          router.push(nav.path, { scroll: !nav.target });
+          if (nav.target) void scrollToSelector(nav.path, nav.target);
+          speak(`Opening ${nav.label}.`);
+          doneStep(`Opened ${nav.label}`);
+          patch({ answer: `Opening ${nav.label}.`, over: true });
+          reply = { role: "assistant", text: `Opening ${nav.label}.` };
+          voiced = true;
+        } else {
         addStep("Reading what is on your screen…");
         const plan = await api.voiceAct(message, pathname, getLang(), snapshotScreen(), [...recallVoice(), ...history.map((h) => `${h.role}: ${h.content}`.slice(0, 200)).slice(-4)].slice(-8), userId).catch(() => null);
         if (!plan) {
@@ -234,6 +246,7 @@ export function ChatPopup() {
         }
         if (plan?.say) rememberVoice(`user: ${message}`.slice(0, 200), `assistant: ${plan.say}`.slice(0, 200));
         patch({ over: !plan?.ask_copilot });
+        }
       }
       reply ??= await answer(message, history);
       if (spoken && !voiced) {
