@@ -79,6 +79,10 @@ def _num(s: str) -> float:
     return float(s.replace(",", ""))
 
 
+_BALANCE_ROW = re.compile(r"^\W*(?:opening|closing|brought\s*forward|carried\s*forward|b/f|c/f|balance\b)", re.I)
+_FOOTER = re.compile(r"\b(?:page\s*\d+|printed|authori[sz]ed|signatory|all amounts|computer generated)\b", re.I)
+
+
 def parse_transactions(clean_text: str) -> list[dict]:
     """Rows like 'DATE  narration  amount  [balance]'. Wrapped narration lines are joined to the row above.
 
@@ -90,6 +94,13 @@ def parse_transactions(clean_text: str) -> list[dict]:
         line = raw.strip()
         if not line:
             continue
+        if _FOOTER.search(line):
+            # a footer ("Page 3 | Printed ... | Authorised Signatory") that OCR glued onto a row of a tilted photo: keep the
+            # row (it starts at the last date followed by an amount), drop the footer; a pure footer line is skipped
+            later = [m_ for m_ in _DATE_ANY.finditer(line) if m_.start() > 0 and _AMOUNT.search(line[m_.end():])]
+            if not later:
+                continue
+            line = line[later[-1].start():]
         m = _DATE.match(line)
         d = _to_date(*m.groups()) if m else None
         if d is None:
@@ -101,6 +112,9 @@ def parse_transactions(clean_text: str) -> list[dict]:
         if not amounts:
             continue
         desc = _AMOUNT.sub("", rest).strip(" -|\t")
+        if _BALANCE_ROW.match(desc):  # 'Opening Balance 45,250.00' is a balance, not a transaction
+            prev_balance = _num(amounts[-1])
+            continue
         value = _num(amounts[-2] if len(amounts) >= 2 else amounts[0])
         balance = _num(amounts[-1]) if len(amounts) >= 2 else None
         if balance is not None and prev_balance is not None and abs(abs(balance - prev_balance) - value) < 0.02:

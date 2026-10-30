@@ -30,7 +30,7 @@ def test_prepay_endpoint_rejects_negative_extra(client=None):
     ok = c.post("/api/simulate/demo-priya", json={"action": "prepay_debt", "action_params": {"debt_id": debt, "extra_payment": 20000}})
     assert ok.status_code == 200 and ok.json()["impact"]["after"] >= 0
     bad = c.post("/api/simulate/demo-priya", json={"action": "prepay_debt", "action_params": {"debt_id": debt, "extra_payment": -5}})
-    assert bad.status_code == 400
+    assert bad.status_code in (400, 422)  # rejected either by the shared param check (422) or the engine (400)
 
 
 def test_what_if_free_cash_flow_uses_dashboard_basis():

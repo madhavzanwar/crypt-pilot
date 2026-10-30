@@ -149,8 +149,24 @@ def schemes_feed() -> dict:
     return {**schemes.upcoming(), "nudges": schemes.nudges()}
 
 
+def _check_action_params(params: dict) -> None:
+    """What-if numbers must be finite, sane and (except the market return) not negative: NaN/Infinity/negatives otherwise
+    flow straight into the forecast and produce nonsense health scores."""
+    import math
+
+    for key, value in params.items():
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        if not math.isfinite(value) or abs(value) > 1e12:
+            raise HTTPException(422, f"'{key}' must be a finite number below 1e12")
+        floor = -100 if key == "annual_return_pct" else 0
+        if value < floor:
+            raise HTTPException(422, f"'{key}' cannot be below {floor}")
+
+
 @router.post("/simulate/{user_id}", response_model=SimulationResult)
 def run_simulation(req: SimulationRequest, user_id: str = Depends(resolve_user_id)) -> SimulationResult:
+    _check_action_params(req.action_params)
     snap = build_dashboard_snapshot(user_id)
     inputs = _forecast_inputs_from_snapshot(snap, user_id)
     try:
