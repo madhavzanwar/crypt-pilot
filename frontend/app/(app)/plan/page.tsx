@@ -17,6 +17,8 @@ import { ReplanPanel } from "@/components/plan/ReplanPanel";
 import { ForecastTable } from "@/components/plan/ForecastTable";
 import { BacktestTable } from "@/components/plan/BacktestTable";
 import { OutcomeTable } from "@/components/plan/OutcomeTable";
+import { PlanSummaryCard } from "@/components/plan/PlanSummaryCard";
+import { formatCurrency } from "@/components/ui/money";
 import { cn } from "@/lib/utils";
 
 const MY_DATA = "my_data";
@@ -187,7 +189,9 @@ export default function PlanPage() {
             </Section>
           )}
 
-          <Section title="Recommendation and risk" sub={`Starting cash ${plan.starting_cash.toLocaleString("en-IN")} · select a sequence to inspect it`}>
+          <PlanSummaryCard plan={plan} />
+
+          <Section title="Recommendation and risk" sub={`Starting cash ${formatCurrency(plan.starting_cash)} · select a sequence to inspect it`}>
             <RiskSummary plan={plan} selectedId={active.id} onSelect={setSelectedId} />
           </Section>
 
