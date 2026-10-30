@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import { useAsync, useUserId } from "@/lib/hooks";
-import type { PlanParams, PlanResult, PlanScenario } from "@/lib/types";
+import type { ForecastMethod, PlanParams, PlanResult, PlanScenario } from "@/lib/types";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -19,6 +19,8 @@ import { BacktestTable } from "@/components/plan/BacktestTable";
 import { OutcomeTable } from "@/components/plan/OutcomeTable";
 import { PlanSummaryCard } from "@/components/plan/PlanSummaryCard";
 import { formatCurrency } from "@/components/ui/money";
+import { AdvancedSettings } from "@/components/plan/AdvancedSettings";
+import { useT } from "@/components/i18nMoney";
 import { cn } from "@/lib/utils";
 
 const MY_DATA = "my_data";
@@ -57,7 +59,8 @@ function PlanSkeleton() {
   );
 }
 
-function ParamsForm({ value, onApply }: { value: PlanParams; onApply: (p: PlanParams) => void }) {
+function ParamsForm({ value, onApply, method }: { value: PlanParams; onApply: (p: PlanParams) => void; method?: ForecastMethod }) {
+  const { t } = useT();
   const [draft, setDraft] = useState<Record<string, string>>({});
   // Re-seed the form when a relaxation changes the applied params (adjust-state-during-render).
   const [seen, setSeen] = useState(value);
@@ -88,8 +91,20 @@ function ParamsForm({ value, onApply }: { value: PlanParams; onApply: (p: PlanPa
       {field("reserve", "Min reserve", "Auto (from your spending)")}
       {field("goal_amount", "Goal amount", "With goal month, e.g. 50000")}
       {field("goal_month", "Goal by month", "With goal amount, 1-6")}
-      {field("tolerance", "Risk tolerance (0-1)", "Default 0.10")}
       <Button variant="primary" onClick={apply}>Plan</Button>
+      <AdvancedSettings>
+        <div className="flex flex-wrap items-end gap-3">
+          {field("tolerance", t("pl.adv.tol"), "Default 0.10")}
+          {method && (
+            <dl className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-graphite" data-testid="plan-engine-info">
+              <div><dt className="inline font-semibold text-ink">{t("pl.adv.sims")}: </dt><dd className="inline tnum">{method.n_paths}</dd></div>
+              <div><dt className="inline font-semibold text-ink">{t("pl.adv.seed")}: </dt><dd className="inline tnum">{method.seed}</dd></div>
+              <div><dt className="inline font-semibold text-ink">{t("pl.adv.window")}: </dt><dd className="inline tnum">{method.window_months}</dd></div>
+            </dl>
+          )}
+          {method && <p className="basis-full text-xs text-pewter">{t("pl.adv.fixed")}</p>}
+        </div>
+      </AdvancedSettings>
     </div>
   );
 }
@@ -150,7 +165,7 @@ export default function PlanPage() {
       {isMine && (
         <Card className="p-6 sm:p-8">
           <CardHeader><CardTitle>Constraints and goal</CardTitle></CardHeader>
-          <ParamsForm value={params} onApply={setParams} />
+          <ParamsForm value={params} onApply={setParams} method={plan?.method} />
         </Card>
       )}
 

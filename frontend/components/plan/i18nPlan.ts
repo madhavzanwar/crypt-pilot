@@ -82,4 +82,12 @@ export const PLAN_STRINGS: Record<string, [string, string, string]> = {
     "{label} के {n} सिमुलेशन में से किसी में भी नकदी रिज़र्व से नीचे नहीं जाती।",
     "{label} च्या {n} सिम्युलेशनपैकी एकातही रोख राखीव निधीच्या खाली जात नाही.",
   ],
+  // Item 3: advanced settings
+  "pl.adv.title": ["Advanced settings", "उन्नत सेटिंग", "प्रगत सेटिंग्ज"],
+  "pl.adv.hint": ["Technical settings. The defaults work well for most people.", "तकनीकी सेटिंग। ज़्यादातर लोगों के लिए डिफ़ॉल्ट ठीक रहते हैं।", "तांत्रिक सेटिंग्ज. बहुतेक लोकांसाठी डिफॉल्ट योग्य आहेत."],
+  "pl.adv.tol": ["Risk tolerance (0-1)", "जोखिम सहनशीलता (0-1)", "जोखीम सहनशीलता (0-1)"],
+  "pl.adv.sims": ["Simulations", "सिमुलेशन की संख्या", "सिम्युलेशनची संख्या"],
+  "pl.adv.seed": ["Random seed", "रैंडम सीड", "रँडम सीड"],
+  "pl.adv.window": ["History window (months)", "इतिहास की अवधि (महीने)", "इतिहासाचा कालावधी (महिने)"],
+  "pl.adv.fixed": ["Fixed by the planner so results are repeatable.", "नतीजे दोहराए जा सकें, इसलिए प्लानर इन्हें तय रखता है।", "निकाल पुन्हा तसेच मिळावेत म्हणून प्लॅनर हे निश्चित ठेवतो."],
 };
