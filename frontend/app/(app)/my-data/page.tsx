@@ -1,5 +1,6 @@
 "use client";
 
+import { describeAccess } from "@/lib/accessLog";
 import { useCallback, useState } from "react";
 import { motion } from "framer-motion";
 import { Activity, Database, Download, Eye, Unplug } from "lucide-react";
@@ -113,7 +114,7 @@ export default function MyDataPage() {
                 <span className={`flex size-7 shrink-0 items-center justify-center rounded-full ${a.event === "data_access" ? "bg-tint-lime text-olive" : "bg-fog text-graphite"}`}>
                   {a.event === "data_access" ? <Eye className="size-3.5" /> : <Activity className="size-3.5" />}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-ink">{a.detail || `${a.method} ${a.path}`}</span>
+                <span className="min-w-0 flex-1 truncate text-ink">{describeAccess(a)}</span>
                 <time className="text-xs text-graphite tnum">{new Date(a.when).toLocaleString()}</time>
               </motion.li>
             ))}
