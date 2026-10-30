@@ -285,22 +285,24 @@ def answer(
     ask = message + _style(language, simple)
     deep = lambda: _nvidia_answer(user_id, ask, history, chunks, sources)  # noqa: E731
     fast = lambda: _general_answer(ask, history, user_id if money else None, chunks, sources)  # noqa: E731
-    steps = [fast, deep] if model == "fast" or (model == "auto" and not money) else [deep, fast]
+    steps = [("fast", fast), ("deep", deep)] if model == "fast" or (model == "auto" and not money) else [("deep", deep), ("fast", fast)]
 
     # Nugen's second opinion runs alongside money questions only
     pool = ThreadPoolExecutor(max_workers=1)
     second = pool.submit(nugen.second_opinion, user_id, message, history) if money and settings.has_nugen else None
-    result, last = None, None
-    for step in steps:
+    result, last, tried = None, None, []
+    for name, step in steps:
         try:
             result = step()
             result.source = "FinPilot"
             break
         except Exception as exc:  # noqa: BLE001 - deliberate broad boundary
             last = exc
-            logger.warning("Copilot engine step failed: %s", exc)
+            tried.append(f"{name}: {failure_reason(exc)[1]}")
+            logger.warning("Copilot engine step failed (%s): %s", name, exc)
     if result is None:
         why, detail = failure_reason(last)
+        detail = "; ".join(tried) or detail  # every step's own reason, not just the last one
         result = AnswerContract(
             query=message,
             narrative=f"I couldn't answer right now because {why}. Please try again in a minute.",

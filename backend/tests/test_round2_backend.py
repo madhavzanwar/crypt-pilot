@@ -276,3 +276,35 @@ def test_notifications_are_reused_until_the_store_changes(monkeypatch):
     store._bump("transactions")  # any store write invalidates
     c.get("/api/notifications/demo-meera")
     assert len(calls) == 2
+
+
+def test_nvidia_timeouts_are_configurable_and_capped_on_serverless(monkeypatch):
+    from app.copilot import nvidia
+
+    monkeypatch.delenv("VERCEL", raising=False)
+    monkeypatch.delenv("NVIDIA_DEEP_TIMEOUT_S", raising=False)
+    monkeypatch.delenv("NVIDIA_CHAT_TIMEOUT_S", raising=False)
+    assert nvidia._timeout("deep") == 40.0 and nvidia._timeout("chat") == 30.0
+    monkeypatch.setenv("NVIDIA_DEEP_TIMEOUT_S", "55")
+    assert nvidia._timeout("deep") == 55.0
+    monkeypatch.setenv("NVIDIA_DEEP_TIMEOUT_S", "junk")
+    assert nvidia._timeout("deep") == 40.0
+    monkeypatch.setenv("VERCEL", "1")
+    assert nvidia._timeout("deep") == 12.0 and nvidia._timeout("chat") == 12.0
+
+
+def test_copilot_failure_names_every_step(monkeypatch):
+    from app.copilot import engine
+
+    def boom(*a, **k):
+        raise RuntimeError("NVIDIA 429: slow down")
+
+    monkeypatch.setattr(engine.nvidia, "complete_json", boom)
+    monkeypatch.setattr(engine.nvidia, "chat", lambda *a, **k: (_ for _ in ()).throw(TimeoutError("The read operation timed out")))
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(engine, "get_settings", lambda: SimpleNamespace(has_nvidia=True, nvidia_chat_api_key="x", has_nugen=False))
+    monkeypatch.setattr(engine, "_prefetch", lambda *a, **k: ([], None, []))
+    r = engine.answer("demo-meera", "how much can I save each week?", model="auto")
+    texts = " ".join(g.text for g in r.data_gaps)
+    assert "deep:" in texts and "fast:" in texts
