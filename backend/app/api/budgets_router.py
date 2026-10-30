@@ -12,8 +12,8 @@ from datetime import date, datetime, timezone
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.analytics.recurring import detect_recurring
-from app.analytics.basis import through_today
+from app.analytics.basis import committed_obligations, monthly_basis, through_today
+from app.analytics.recurring import detect_recurring, normalize_merchant
 from app.core import store
 from app.core.auth import resolve_user_id
 from app.models import BudgetRow, TransactionRow
@@ -255,21 +255,6 @@ def _monthly_income(df: pd.DataFrame, recurring_all: list[RecurringObligation]) 
     return float(income_txns["amount"].sum()) / 3.0
 
 
-def _monthly_equivalent_obligation(r: RecurringObligation) -> float:
-    """Normalize a recurring obligation's magnitude to a monthly run-rate so
-    weekly/biweekly/quarterly/annual commitments are comparable on the same
-    monthly basis as `monthly_income`. E.g. a quarterly ₹3000 payment is
-    ₹1000/month of committed obligation."""
-    interval_days = {
-        "weekly": 7,
-        "biweekly": 14,
-        "monthly": 30,
-        "quarterly": 90,
-        "annual": 365,
-    }.get(r.frequency.value, 30)
-    return abs(r.amount) * (30.0 / interval_days)
-
-
 @router.get("/budgets/{user_id}/safe-to-spend", response_model=SafeToSpend)
 def safe_to_spend(user_id: str = Depends(resolve_user_id)) -> SafeToSpend:
     """"Safe to spend today" = how much of today's remaining discretionary
@@ -289,20 +274,15 @@ def safe_to_spend(user_id: str = Depends(resolve_user_id)) -> SafeToSpend:
     Where:
       * `monthly_income` -- see `_monthly_income` (detected recurring salary
         cadence, or a trailing-3-month average fallback).
-      * `committed_recurring_this_month` -- every detected recurring
-        obligation (app.analytics.recurring.detect_recurring; excludes the
-        income entry itself) normalized to a monthly-equivalent run-rate
-        (see `_monthly_equivalent_obligation`), summed. This represents cash
-        already earmarked for rent/EMI/subscriptions/etc. regardless of
-        whether its exact due date has occurred yet this month -- it is a
-        planning number, not a ledger of what's already left the account.
-      * `discretionary_spend_so_far_this_month` -- actual outflow
-        transactions dated in the current calendar month that are NOT
-        themselves part of a detected recurring series (is_recurring is
-        False) and are not transfers/CC-bill-payments (see
-        `_EXCLUDED_FROM_SPEND`) -- i.e. the spend that competes with
-        "safe to spend today" money, as opposed to money already
-        earmarked/committed.
+      * `committed_recurring_this_month` -- confirmed obligations only
+        (app.analytics.basis.committed_obligations): rent, EMI, utilities,
+        subscriptions, school fees and SIPs that repeat monthly or slower
+        with detection confidence >= 0.6, as a monthly run-rate. Card-bill
+        payments, transfers and everyday merchants that merely repeat
+        (Uber, Starbucks) are not committed. Never above total monthly spend.
+      * `discretionary_spend_so_far_this_month` -- outflows dated in the
+        current month that are not a committed obligation and not a
+        transfer / card-bill payment.
       * `days_remaining_in_current_month` -- inclusive of today, so the
         number spreads today's opportunity across today and the days after.
       * Floored at 0 -- never tells the user to "spend" a negative amount.
@@ -314,34 +294,39 @@ def safe_to_spend(user_id: str = Depends(resolve_user_id)) -> SafeToSpend:
     df = _transactions_df(list(txn_rows))
     recurring_all = detect_recurring(df)
 
-    monthly_income = _monthly_income(df, recurring_all)
-    committed_recurring = sum(
-        _monthly_equivalent_obligation(r) for r in recurring_all if r.category != TxnCategory.income
-    )
+    basis_ = monthly_basis(df, recurring_all)
+    monthly_income = basis_["income"] or _monthly_income(df, recurring_all)
+    committed_recurring = basis_["committed"]
+    committed_merchants = {r.merchant for r in committed_obligations(recurring_all)}
 
     if df.empty:
         discretionary_spent = 0.0
     else:
-        discretionary = df[
+        month_out = df[
             (df["amount"] < 0)
             & (df["date"].dt.year == today.year)
             & (df["date"].dt.month == today.month)
-            & (~df["is_recurring"].astype(bool))
             & (~df["category"].isin(_EXCLUDED_FROM_SPEND))
         ]
-        discretionary_spent = float(-discretionary["amount"].sum())
+        # committed obligations are already counted in full above, so they are not spend "so far" a second time
+        is_committed = month_out["merchant"].apply(normalize_merchant).isin(committed_merchants)
+        discretionary_spent = float(-month_out[~is_committed]["amount"].sum())
 
     days_in_month = calendar.monthrange(today.year, today.month)[1]
     days_remaining = max(1, days_in_month - today.day + 1)
 
-    raw = (monthly_income - committed_recurring - discretionary_spent) / days_remaining
-    amount = max(0.0, raw)
+    left = monthly_income - committed_recurring - discretionary_spent
+    amount = max(0.0, left / days_remaining)
+    status = "no_income" if monthly_income <= 0 else ("over" if left <= 0 else "ok")
 
     basis = (
-        f"(monthly income ₹{monthly_income:,.0f} - committed recurring "
-        f"₹{committed_recurring:,.0f}/mo - discretionary spend so far this month "
+        f"(average monthly income ₹{monthly_income:,.0f} - committed obligations "
+        f"₹{committed_recurring:,.0f}/mo (rent, EMIs, bills, subscriptions, SIPs) - everyday spend so far this month "
         f"₹{discretionary_spent:,.0f}) / {days_remaining} day(s) left in "
         f"{today.strftime('%B %Y')}, floored at 0."
     )
+    if status == "no_income":
+        basis = "No income on record yet, so a safe daily amount cannot be worked out. Upload a statement or add your income."
 
-    return SafeToSpend(amount=round(amount, 2), basis=basis, as_of_date=today)
+    return SafeToSpend(amount=round(amount, 2), basis=basis, as_of_date=today, monthly_income=round(monthly_income, 2),
+                       committed_monthly=round(committed_recurring, 2), spent_so_far=round(discretionary_spent, 2), status=status)

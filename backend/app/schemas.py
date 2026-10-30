@@ -6,6 +6,7 @@ Do not duplicate these shapes elsewhere -- import from here.
 """
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 from enum import Enum
 from typing import Literal, Optional
@@ -327,6 +328,7 @@ class DashboardSnapshot(BaseModel):
     net_worth: float
     monthly_income: float
     monthly_expenses: float
+    committed_monthly: float = 0.0  # confirmed recurring obligations per month (shared basis, see app.analytics.basis)
     savings_rate: float
     recurring_obligations: list[RecurringObligation]
     debts: list[Debt]
@@ -526,6 +528,10 @@ class SafeToSpend(BaseModel):
     amount: float
     basis: str  # human-readable explanation of the formula/data used
     as_of_date: date
+    monthly_income: float = 0.0  # shared basis (same figure as the dashboard)
+    committed_monthly: float = 0.0  # confirmed recurring obligations only
+    spent_so_far: float = 0.0  # everyday spend this month, outside the committed obligations
+    status: str = "ok"  # "ok" | "over" (spent past what is left) | "no_income" (no income on record yet)
 
 
 # ---------------------------------------------------------------------------
@@ -738,15 +744,26 @@ class CreateHouseholdRequest(BaseModel):
     name: str
 
 
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+'-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}$")
+
+
 class CreateInviteRequest(BaseModel):
-    email: str
+    email: str = Field(max_length=254)
     role: HouseholdRole = HouseholdRole.editor
+
+    @field_validator("email")
+    @classmethod
+    def _valid_email(cls, v: str) -> str:
+        v = v.strip()
+        if not _EMAIL_RE.match(v):
+            raise ValueError("Enter a valid email address, like name@example.com")
+        return v
 
 
 class AddManagedMemberRequest(BaseModel):
     name: str
     relationship: Optional[str] = None  # e.g. "Child", "Parent"
-    opening_balance: float = 0.0
+    opening_balance: float = Field(default=0.0, ge=0, le=1e12, allow_inf_nan=False)
 
 
 class AddManagedTransactionRequest(BaseModel):

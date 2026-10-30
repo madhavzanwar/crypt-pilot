@@ -57,6 +57,7 @@ from app.analytics.anomalies import detect_anomalies
 from app.analytics.benchmarks import benchmark_context
 from app.analytics.debt import compute_dti, credit_utilization as _credit_utilization
 from app.analytics.health_score import compute_health_score
+from app.analytics.basis import committed_monthly
 from app.analytics.recurring import detect_recurring
 from app.analytics.savings import emergency_fund_months, trailing_savings_rate
 from app.forecast.cashflow import build_forecast
@@ -343,6 +344,7 @@ def _build_dashboard_snapshot(user_id: str, extra_txns: Optional[list[Transactio
         net_worth=net_worth,
         monthly_income=monthly_income,
         monthly_expenses=monthly_expenses,
+        committed_monthly=committed_monthly(recurring_all, monthly_expenses),
         savings_rate=savings_rate,
         recurring_obligations=recurring_obligations,
         debts=debts,
