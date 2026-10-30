@@ -1,7 +1,11 @@
 import type { Transaction, TxnCategory } from "@/lib/types";
 
-/** Categories that move money between the user's own accounts, not real spend/income. */
-const NON_SPEND: TxnCategory[] = ["transfer", "credit_card_payment", "income"];
+/**
+ * Categories that move money between the user's own accounts, not real spend/income.
+ * Same rule as the backend's app/analytics/basis.py (_NOT_SPEND_OR_INCOME): every other outflow is spend, every other
+ * inflow (salary, refunds, interest) is income.
+ */
+const NON_SPEND: TxnCategory[] = ["transfer", "credit_card_payment"];
 
 export const CATEGORY_META: Record<TxnCategory, { label: string; color: string }> = {
   income: { label: "Income", color: "#12a56b" },
@@ -77,8 +81,9 @@ export function summarizeSpend(allTxns: Transaction[], monthsBack = 6, today: st
   for (const t of txns) {
     const key = t.date.slice(0, 7);
     const m = byMonth.get(key) ?? { income: 0, spend: 0 };
-    if (t.amount > 0 && t.category === "income") m.income += t.amount;
-    else if (t.amount < 0 && !NON_SPEND.includes(t.category)) m.spend += -t.amount;
+    if (NON_SPEND.includes(t.category)) continue;
+    if (t.amount > 0) m.income += t.amount;
+    else if (t.amount < 0) m.spend += -t.amount;
     byMonth.set(key, m);
   }
 
