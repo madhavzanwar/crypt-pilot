@@ -12,6 +12,10 @@
 
 An AI personal-finance copilot that forecasts your next 90 days, plus a graph-verified Bitcoin wallet risk check, in one app.
 
+> **Live demo:** [cryptpilot.vercel.app](https://cryptpilot.vercel.app) (press **Explore Demo App**, no sign-in needed)
+>
+> **Wake the server first.** The backend runs on a free Render instance that sleeps when idle, so the first request can take up to a minute. Before you use the demo, open **[crypt-pilot.onrender.com/api/health](https://crypt-pilot.onrender.com/api/health)** and wait for `{"status":"ok"}`, then use the app. (The bare address `https://crypt-pilot.onrender.com` shows a "not found" page: that is normal, the API lives under `/api`.)
+
 <a href="assets/showcase/cryptpilot-showcase.mp4">
   <img src="assets/showcase/teaser.gif" alt="CryptPilot product showcase. Click to watch the full video." width="100%">
 </a>
